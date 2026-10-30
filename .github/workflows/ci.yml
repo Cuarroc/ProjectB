@@ -10,7 +10,9 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  # Mergify bearbeitet seinen Queue-Entwurf selbst (edited); abgebrochene oder verdrängte Läufe werfen den PR
+  # aus der Queue. Deshalb bekommt jeder Queue-Lauf eine eigene Gruppe.
+  group: ci-${{ startsWith(github.head_ref, 'mergify/') && github.run_id || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
