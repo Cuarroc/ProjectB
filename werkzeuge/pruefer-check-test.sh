@@ -44,10 +44,12 @@ done
 
 # Externer curl-Stub: prüft argv/Umgebung und speist echte JSON-Formate ohne Netz ein.
 curl_stub() {
-    local captured_argv auth body='' i
+    local captured_argv auth body='' i environment
     captured_argv=$(printf '%s\n' "$@")
     [[ $captured_argv != *eyJ* && $captured_argv != *installation_token_test* ]] || return 1
     [[ -z ${GH_TOKEN:-}${GITHUB_TOKEN:-}${PRUEFER_APP_KEY:-}${PRUEFER_APP_ID:-}${GH_DEBUG:-} ]] || return 1
+    environment=$(env)
+    [[ $environment != *eyJ* && $environment != *installation_token_test* ]] || return 1
     [[ $1 == --disable && " $* " == *' -H @- '* ]] || return 1
     auth=$(cat); auth=${auth#Authorization: Bearer }
     for ((i=1; i<=$#; i++)); do
@@ -95,6 +97,12 @@ sha=0123456789012345678901234567890123456789
 run() { bash -x ./pruefer-check.sh "$@" 2>&1; }
 safe() { [[ $1 != *'PRIVATE KEY'* && $1 != *eyJ* && $1 != *installation_token_test* ]]; }
 export GH_DEBUG=api
+for probe in eyJ_offline_test installation_token_test; do
+    if output=$(PRUEFER_LEAK_PROBE=$probe run --test); then
+        printf 'Umgebungsprobe wurde nicht erkannt\n' >&2; exit 1
+    fi
+    safe "$output"
+done
 for conclusion in success failure; do
     for name in review/claude review/codex; do
         export expected_name=$name expected_conclusion=$conclusion sha
