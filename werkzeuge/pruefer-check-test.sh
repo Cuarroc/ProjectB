@@ -27,51 +27,83 @@ if printf '%s' "$header.${payload}x" | "$openssl_cmd" dgst -sha256 \
     -verify <(printf '%s' "$PRUEFER_APP_KEY" | "$openssl_cmd" pkey -pubout 2>/dev/null) \
     -signature <(decode "$signature" | "$openssl_cmd" base64 -d -A) >/dev/null 2>&1; then exit 1; fi
 
-# gh wird ersetzt, um HTTP-Fehler und Antworten offline einzuspeisen; kein Netz in CI.
-gh() {
-    [[ -z ${GH_DEBUG:-} && $1 == api && $2 == --hostname && $3 == github.com ]] || return 1
-    [[ $5 == "Authorization: Bearer $GH_TOKEN" ]] || return 1
+# Jedes feste Antwortfeld: gültig, fehlend, doppelt und außerhalb seines Zeichensatzes.
+for key in access_tokens_url token total_count full_name; do
+    case $key in
+        access_tokens_url) value='"https://api.github.com/app/installations/42/access_tokens"'; pattern='"https://api[.]github[.]com/app/installations/[0-9]+/access_tokens"' ;;
+        token) value='"installation_token_test"'; pattern='"[A-Za-z0-9_]+"' ;;
+        total_count) value=1; pattern='[0-9]+' ;;
+        full_name) value='"Cuarroc/ProjectB"'; pattern='"Cuarroc/ProjectB"' ;;
+    esac
+    [[ $(printf '{\n "%s" : %s\n}' "$key" "$value" | field "$key" "$pattern") == "${value//\"/}" ]]
+    for response in '{}' "{\"$key\":$value,\"$key\":$value}" "{\"$key\":\"bad-value\"}"; do
+        if output=$(printf '%s' "$response" | field "$key" "$pattern" 2>/dev/null); then exit 1; fi
+    done
+done
+[[ $(quote_json $'A\\"\n\t\001') == '"A\\\"\u000a\u0009\u0001"' ]]
+
+# Externer curl-Stub: prüft argv/Umgebung und speist echte JSON-Formate ohne Netz ein.
+curl_stub() {
+    local captured_argv auth body='' i
+    captured_argv=$(printf '%s\n' "$@")
+    [[ $captured_argv != *eyJ* && $captured_argv != *installation_token_test* ]] || return 1
+    [[ -z ${GH_TOKEN:-}${GITHUB_TOKEN:-}${PRUEFER_APP_KEY:-}${PRUEFER_APP_ID:-}${GH_DEBUG:-} ]] || return 1
+    [[ $1 == --disable && " $* " == *' -H @- '* ]] || return 1
+    auth=$(cat); auth=${auth#Authorization: Bearer }
+    for ((i=1; i<=$#; i++)); do
+        if [[ ${!i} == --data-binary ]]; then i=$((i+1)); body=${!i}; fi
+    done
     case " $* " in
-        *' repos/Cuarroc/ProjectB/installation '*)
-            [[ $GH_TOKEN == eyJ* ]] || return 1
-            if [[ ${scenario:-} == installation_error ]]; then printf '%s' "$GH_TOKEN" >&2; return 1; fi
+        *' https://api.github.com/repos/Cuarroc/ProjectB/installation '*)
+            [[ $auth == eyJ* && " $* " == *' -X GET '* ]] || return 1
+            if [[ ${scenario:-} == installation_error ]]; then printf '%s' "$auth" >&2; return 1; fi
             if [[ ${scenario:-} == installation_invalid ]]; then printf 'null\n'; return; fi
-            printf '42\n' ;;
-        *' app/installations/42/access_tokens '*)
-            if [[ ${scenario:-} == token_error ]]; then printf '%s' "$GH_TOKEN" >&2; return 1; fi
-            if [[ ${scenario:-} == token_empty ]]; then printf 'null\n'; return; fi
-            printf 'installation-token-test\n' ;;
-        *' installation/repositories?per_page=100 '*)
-            [[ $GH_TOKEN == installation-token-test ]] || return 1
+            printf '{"id":42,"account":{"id":7},"access_tokens_url":"https://api.github.com/app/installations/42/access_tokens"}' ;;
+        *' https://api.github.com/app/installations/42/access_tokens '*)
+            [[ $auth == eyJ* && " $* " == *' -X POST '* ]] || return 1
+            if [[ ${scenario:-} == token_error ]]; then printf '%s' "$auth" >&2; return 1; fi
+            if [[ ${scenario:-} == token_empty ]]; then printf '{"token":null}'; return; fi
+            printf '{"token":"installation_token_test"}' ;;
+        *' https://api.github.com/installation/repositories?per_page=100 '*)
+            [[ $auth == installation_token_test ]] || return 1
             if [[ ${scenario:-} == scope_error ]]; then return 1; fi
             case ${scenario:-} in
-                broad) printf '2\t2\tCuarroc/ProjectB\n' ;;
-                paginated) printf '101\t100\tCuarroc/ProjectB\n' ;;
-                empty) printf '0\t0\t\n' ;;
-                wrong_repo) printf '1\t1\tCuarroc/Fremd\n' ;;
-                inconsistent) printf '1\t2\tCuarroc/ProjectB\n' ;;
-                *) printf '1\t1\tCuarroc/ProjectB\n' ;;
+                broad) printf '{"total_count":2,"repositories":[{"full_name":"Cuarroc/ProjectB"},{"full_name":"Cuarroc/Fremd"}]}' ;;
+                paginated) printf '{"total_count":101,"repositories":[{"full_name":"Cuarroc/ProjectB"}]}' ;;
+                empty) printf '{"total_count":0,"repositories":[]}' ;;
+                wrong_repo) printf '{"total_count":1,"repositories":[{"full_name":"Cuarroc/Fremd"}]}' ;;
+                inconsistent) printf '{"total_count":1,"repositories":[{"full_name":"Cuarroc/ProjectB"},{"full_name":"Cuarroc/ProjectB"}]}' ;;
+                *) printf '{"total_count":1,"repositories":[{"id":9,"full_name":"Cuarroc/ProjectB","owner":{"id":7}}]}' ;;
             esac ;;
-        *' repos/Cuarroc/ProjectB/check-runs '*)
-            [[ $GH_TOKEN == installation-token-test && ${scenario:-} != test_only ]] || return 1
-            [[ " $* " == *'status=completed'* && " $* " == *'output[title]=Titel "Zitat"'* ]] || return 1
-            if [[ ${scenario:-} == check_error ]]; then printf '%s' "$GH_TOKEN" >&2; return 1; fi
-            printf '%s' "$GH_TOKEN" ;;
+        *' https://api.github.com/repos/Cuarroc/ProjectB/check-runs '*)
+            [[ $auth == installation_token_test && ${scenario:-} != test_only && " $* " == *' -X POST '* ]] || return 1
+            [[ $body == *'"status":"completed"'* && $body == *'"title":"Titel \"Zitat\""'* ]] || return 1
+            [[ $body == *"\"name\":\"${expected_name:-review/claude}\""* && $body == *"\"head_sha\":\"$sha\""* ]] || return 1
+            [[ $body == *"\"conclusion\":\"${expected_conclusion:-success}\""* ]] || return 1
+            if [[ ${scenario:-} == check_error ]]; then printf '%s' "$auth" >&2; return 1; fi
+            printf '%s' "$auth" ;;
         *) return 1 ;;
     esac
 }
-export -f gh
+mkdir -p ../kern/target
+stub_dir=$(mktemp -d "$PWD/../kern/target/pruefer.XXXXXX")
+trap 'rm -rf "$stub_dir"' EXIT
+{ printf '#!/usr/bin/env bash\nset -Eeuo pipefail\n'; declare -f curl_stub; printf 'curl_stub "$@"\n'; } > "$stub_dir/curl"
+chmod +x "$stub_dir/curl"
+export PATH="$stub_dir:$PATH"
 sha=0123456789012345678901234567890123456789
 run() { bash -x ./pruefer-check.sh "$@" 2>&1; }
-safe() { [[ $1 != *'PRIVATE KEY'* && $1 != *eyJ* && $1 != *installation-token-test* ]]; }
+safe() { [[ $1 != *'PRIVATE KEY'* && $1 != *eyJ* && $1 != *installation_token_test* ]]; }
 export GH_DEBUG=api
 for conclusion in success failure; do
     for name in review/claude review/codex; do
+        export expected_name=$name expected_conclusion=$conclusion sha
         output=$(run "$sha" "$conclusion" 'Titel "Zitat"' $'Text\nZeile 2' "$name")
         safe "$output"
         [[ $output == *"Check-Run angelegt: $name"* ]]
     done
 done
+unset expected_name expected_conclusion
 output=$(scenario=test_only run --test)
 safe "$output"
 [[ $output == *'Repo-Grenze bestätigt'* ]]
