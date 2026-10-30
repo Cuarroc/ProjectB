@@ -67,7 +67,7 @@ jobs:
           gh run download $env:GITHUB_RUN_ID --repo $env:GITHUB_REPOSITORY --name testzahl-windows-latest --dir current/windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ($env:EVENT_NAME -eq 'pull_request') {
-            $runs = gh run list --repo $env:GITHUB_REPOSITORY --workflow ci.yml --branch main --status success --limit 1 --json databaseId | ConvertFrom-Json
+            $runs = gh run list --repo $env:GITHUB_REPOSITORY --workflow ci.yml --branch main --event push --status success --limit 1 --json databaseId | ConvertFrom-Json
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             if ($runs.Count -eq 0) { throw 'Kein grüner main-Lauf für den Vergleich gefunden' }
             if ($runs.Count -gt 0) {
