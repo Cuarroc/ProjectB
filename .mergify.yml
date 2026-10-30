@@ -1,0 +1,21 @@
+# Merge nur über die Queue (AGENTS.md Regel 5). Elias setzt das Label „bereit“.
+# „stopp“ ist die Notbremse. Squash: ein Commit pro PR, auch bei Auftrags-PRs.
+queue_rules:
+  - name: default
+    merge_method: squash
+    merge_conditions:
+      - check-success=test (ubuntu-latest)
+      - check-success=test (windows-latest)
+      - check-success=secrets
+      - -label=stopp
+
+pull_request_rules:
+  - name: grün und bereit, ab in die Queue
+    conditions:
+      - base=main
+      - label=bereit
+      - -label=stopp
+      - -draft
+    actions:
+      queue:
+        name: default
