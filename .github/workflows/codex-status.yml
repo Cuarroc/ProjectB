@@ -29,8 +29,12 @@ jobs:
           sha=$(jq -r '.code_review.commit_sha' <<<"$zustand")
           offen=$(jq -r '.code_review.has_unresolved_findings' <<<"$zustand")
           head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)
-          if [ "$status" != completed ] || [ "$sha" != "$head" ]; then
-            echo "nicht fertig oder alter Stand ($status, $sha statt $head)"; exit 0
+          if [ "$sha" != "$head" ]; then echo "alter Stand ($sha statt $head)"; exit 0; fi
+          if [ "$status" != completed ]; then
+            # Läuft ein neues Review auf diesem Head, gilt eine frühere Freigabe nicht mehr.
+            gh api "repos/$REPO/check-runs" -f name=review-codex -f head_sha="$head" -f status=in_progress \
+              -f details_url="$URL" -f "output[title]=Codex-Review läuft" -f "output[summary]=Status: $status"
+            exit 0
           fi
           ergebnis=failure
           [ "$offen" = false ] && ergebnis=success
