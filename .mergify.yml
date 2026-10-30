@@ -1,5 +1,9 @@
 # Merge nur über die Queue (AGENTS.md Regel 5). Elias setzt das Label „bereit“.
 # „stopp“ ist die Notbremse. Squash: ein Commit pro PR, auch bei Auftrags-PRs.
+# Mergify liest diese Regeln aus der Basis, nicht aus dem PR: ein PR kann sie nicht ändern.
+# „wache …“ laufen mit der ci.yml aus main (pull_request_target), siehe ci.yml.
+# „#check-failure=0“: ein vom PR gefälschter grüner Check gleichen Namens verdeckt keinen roten.
+# Ganz dicht erst, wenn die Wache-Checks im Ruleset Pflicht sind (Mergify liest sonst nur den neuesten Lauf).
 queue_rules:
   - name: default
     merge_method: squash
@@ -7,6 +11,10 @@ queue_rules:
       - check-success=test (ubuntu-latest)
       - check-success=test (windows-latest)
       - check-success=secrets
+      - check-success=wache (ubuntu-latest)
+      - check-success=wache (windows-latest)
+      - check-success=wache-secrets
+      - "#check-failure=0"
       - -label=stopp
 
 pull_request_rules:
@@ -16,6 +24,10 @@ pull_request_rules:
       - label=bereit
       - -label=stopp
       - -draft
+      - check-success=wache (ubuntu-latest)
+      - check-success=wache (windows-latest)
+      - check-success=wache-secrets
+      - "#check-failure=0"
     actions:
       queue:
         name: default

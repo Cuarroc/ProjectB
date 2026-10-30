@@ -3,26 +3,58 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Wache: GitHub nimmt bei pull_request_target die ci.yml aus main, nicht aus dem PR.
+  # Ein PR kann die Wache also nicht entschärfen; nur der geprüfte Code kommt aus dem PR.
+  pull_request_target:
+    branches: [main]
+
+# pull_request_target läuft im Vertrauens-Kontext von main ("pwn request"-Gefahr, Repo ist öffentlich).
+# Darum: Token nur lesend und nicht im Checkout gespeichert, keine Secrets, kein Cache, keine Artefakte.
+permissions:
+  contents: read
 
 jobs:
   test:
+    name: ${{ github.event_name == 'pull_request_target' && 'wache' || 'test' }} (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      # checkout v7 verweigert Fork-PRs bei pull_request_target. Absichtlich so lassen: Fork-PRs fallen durch.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          persist-credentials: false
       - run: cargo fmt --manifest-path kern/Cargo.toml --check
       - run: cargo clippy --manifest-path kern/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path kern/Cargo.toml
 
   secrets:
+    name: ${{ github.event_name == 'pull_request_target' && 'wache-secrets' || 'secrets' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+          persist-credentials: false
+      - if: github.event_name != 'pull_request_target'
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # gitleaks-action kann kein pull_request_target, darum die CLI mit fester Version und Prüfsumme.
+      # Eigene Config und leerer Ignore-Pfad: eine .gitleaks.toml oder .gitleaksignore aus dem PR zählt nicht.
+      - if: github.event_name == 'pull_request_target'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o gl.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gl.tgz" | sha256sum -c -
+          tar -xzf gl.tgz gitleaks
+          printf '[extend]\nuseDefault = true\n' > gitleaks.toml
+          ./gitleaks git --no-banner --redact --config gitleaks.toml --gitleaks-ignore-path . \
+            --log-opts="$BASE..$HEAD" "$GITHUB_WORKSPACE"
