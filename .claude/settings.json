@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": false,
+    "noetic-control-room@synced": false,
+    "claude-obsidian@agricidaniel-claude-obsidian": false,
+    "warp@claude-code-warp": false,
+    "fastly-agent-toolkit@synced": false,
+    "miro@synced": false,
+    "letmewatch@synced": false,
+    "workflow-audit@synced": false,
+    "cowork-plugin-management@synced": false,
+    "auto-research@synced": false
+  }
+}
