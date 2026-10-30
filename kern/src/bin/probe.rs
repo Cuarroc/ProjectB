@@ -22,7 +22,7 @@ fn main() {
         eprintln!("Start von {} fehlgeschlagen: {e}", a.name);
         std::process::exit(1);
     });
-    println!("{} {} gestartet in {}", zeit(), a.name, ordner.display());
+    println!("{} {} gestartet in {} (PID {})", zeit(), a.name, ordner.display(), lauf.pid());
     let mut angehalten = false;
     loop {
         match lauf.ereignisse.recv_timeout(Duration::from_millis(200)) {

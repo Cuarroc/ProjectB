@@ -60,6 +60,7 @@ pub fn lies_claude(v: &Value) -> Vec<Ereignis> {
             vec![Ereignis::Gestartet { modell: text(v, "/model") }]
         }
         Some("system") | Some("user") => vec![],
+        Some("rate_limit_event") => vec![Ereignis::Meldung("Hinweis zum Kontingent".into())],
         Some("assistant") => v
             .pointer("/message/content")
             .and_then(Value::as_array)
@@ -102,6 +103,7 @@ pub fn lies_codex(v: &Value) -> Vec<Ereignis> {
                 _ => vec![],
             },
             Some("reasoning") => vec![],
+            Some("error") => vec![Ereignis::Meldung(text(v, "/item/message").unwrap_or_default())],
             Some(andere) => vec![Ereignis::Werkzeug(andere.into())],
             None => vec![],
         },
@@ -160,6 +162,11 @@ impl Lauf {
         self.kind.wait().map(|_| ())
     }
 
+    /// Prozessnummer des Agenten, z. B. um nach dem Anhalten gezielt nach Resten zu suchen.
+    pub fn pid(&self) -> u32 {
+        self.kind.id()
+    }
+
     pub fn warten(&mut self) -> io::Result<ExitStatus> {
         self.kind.wait()
     }
@@ -214,6 +221,7 @@ impl fmt::Display for Ereignis {
             }
             Ereignis::Text(t) => write!(f, "sagt: {}", kurz(t)),
             Ereignis::Werkzeug(w) => write!(f, "benutzt: {}", kurz(w)),
+            Ereignis::Fertig { erfolg: true, zusammenfassung } if zusammenfassung.is_empty() => write!(f, "fertig"),
             Ereignis::Fertig { erfolg: true, zusammenfassung } => write!(f, "fertig: {}", kurz(zusammenfassung)),
             Ereignis::Fertig { erfolg: false, zusammenfassung } => write!(f, "PROBLEM: {}", kurz(zusammenfassung)),
             Ereignis::Meldung(m) => write!(f, "Meldung: {}", kurz(m)),
@@ -242,6 +250,9 @@ mod tests {
             lies_claude(&abbruch),
             vec![Ereignis::Fertig { erfolg: false, zusammenfassung: "Limit; weg".into() }]
         );
+        // Beobachtet in der Probe auf Windows (PR #2): Kontingent-Hinweis von Claude.
+        let kontingent = json!({"type":"rate_limit_event"});
+        assert_eq!(lies_claude(&kontingent), vec![Ereignis::Meldung("Hinweis zum Kontingent".into())]);
     }
 
     #[test]
@@ -257,5 +268,8 @@ mod tests {
         assert_eq!(lies_codex(&rot), vec![Ereignis::Meldung("`cargo test` endete mit Exit-Code 101".into())]);
         let gruen = json!({"type":"item.completed","item":{"type":"command_execution","command":"ls","exit_code":0}});
         assert_eq!(lies_codex(&gruen), vec![]);
+        // Beobachtet in der Probe auf Windows (PR #2): Fehler-Einträge sind kein Werkzeug.
+        let fehler_eintrag = json!({"type":"item.completed","item":{"type":"error","message":"Skill fehlt"}});
+        assert_eq!(lies_codex(&fehler_eintrag), vec![Ereignis::Meldung("Skill fehlt".into())]);
     }
 }
