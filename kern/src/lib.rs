@@ -135,7 +135,13 @@ impl Lauf {
                 let mut t = Command::new("taskkill");
                 t.args(["/T", "/F", "/PID", &self.kind.id().to_string()]);
                 ohne_fenster(t.stdout(Stdio::null()).stderr(Stdio::null()));
-                t.status()?;
+                // Exit-Code nicht verstecken: scheitert taskkill (z. B. keine Rechte) und läuft
+                // der Agent noch, nie unbegrenzt warten, sondern den Agenten selbst beenden und melden.
+                if !t.status()?.success() && self.kind.try_wait()?.is_none() {
+                    self.kind.kill()?;
+                    self.kind.wait()?;
+                    return Err(io::Error::other("taskkill gescheitert; Unterprozesse laufen evtl. weiter"));
+                }
             }
             #[cfg(not(windows))]
             self.kind.kill()?;
