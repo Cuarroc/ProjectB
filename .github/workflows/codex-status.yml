@@ -2,7 +2,8 @@
 # Läuft bei issue_comment immer mit dem Stand aus main, checkt keinen PR-Code aus und führt keinen aus.
 name: codex-status
 on:
-  issue_comment:
+  # Kein PR-Code: nur Bot-Kommentar lesen, Absender und aktuellen Head prüfen.
+  issue_comment: # zizmor: ignore[dangerous-triggers]
     types: [created, edited]
 
 permissions:
