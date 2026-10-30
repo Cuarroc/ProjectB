@@ -10,7 +10,7 @@ ProjectB ist der schlanke Neubau von ProjectA, mit allem, was dort gelernt wurde
 
 1. **Übersicht:** wenige Bereiche, jeder Platz hat Inhalt, Zustand in 3 Sekunden klar.
 2. **Denkraum:** Ideen sammeln, ordnen, mit einem Klick zum Auftrag machen.
-3. **Grün heißt bewiesen:** Tests, zwei Reviewer aus verschiedenen Modellfamilien (Codex und Claude),
+3. **Produktfunktion „Grün heißt bewiesen“:** Tests, zwei Reviewer aus verschiedenen Modellfamilien (Codex und Claude),
    Screenshot bei Oberflächen. Erst dann „fertig“.
 4. **Mein Werkzeug:** anpassbar über kleine lesbare Dateien statt über hundert Schalter.
 
@@ -19,7 +19,7 @@ ProjectB ist der schlanke Neubau von ProjectA, mit allem, was dort gelernt wurde
 - Windows-Desktop-App mit Tauri 2: Oberfläche in React und TypeScript (Vite), Kern in Rust, Daten in SQLite.
 - Agenten laufen ohne Terminal über ihre Kommandozeilen: `claude -p --output-format stream-json` und `codex exec`.
   Jeder Agent bekommt einen eigenen Git-Worktree.
-- Agenten laufen auf dem PC. Der Server kommt als zweiter Ort später dazu.
+- Für die Entwicklung nutzen wir den Server schon. Im Produkt laufen Agenten zunächst auf dem PC; der Server kommt später als zweiter Ort dazu.
 - Es werden die Abos genutzt: Claude und Codex ab 0.1; OpenCode, Kimi und Ollama später.
   Bezahlte API-Schlüssel nur mit Elias' Ja.
 
