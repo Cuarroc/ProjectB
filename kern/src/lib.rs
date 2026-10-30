@@ -1,9 +1,13 @@
 //! Kern von ProjectB: startet Coding-Agenten ohne Terminal, liest ihre
 //! JSON-Ereignisse live und kann sie anhalten (Technik-Probe, Schritt 3).
-//! Dieser Teil: Ereignisse und Anbieter; Starten und Anhalten folgt im nächsten PR.
 
 use serde_json::Value;
 use std::fmt;
+use std::io::{self, BufRead, BufReader, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread;
 
 /// Was ein Agent gerade tut.
 #[derive(Debug, Clone, PartialEq)]
@@ -56,6 +60,7 @@ pub fn lies_claude(v: &Value) -> Vec<Ereignis> {
             vec![Ereignis::Gestartet { modell: text(v, "/model") }]
         }
         Some("system") | Some("user") => vec![],
+        Some("rate_limit_event") => vec![Ereignis::Meldung("Hinweis zum Kontingent".into())],
         Some("assistant") => v
             .pointer("/message/content")
             .and_then(Value::as_array)
@@ -98,6 +103,7 @@ pub fn lies_codex(v: &Value) -> Vec<Ereignis> {
                 _ => vec![],
             },
             Some("reasoning") => vec![],
+            Some("error") => vec![Ereignis::Meldung(text(v, "/item/message").unwrap_or_default())],
             Some(andere) => vec![Ereignis::Werkzeug(andere.into())],
             None => vec![],
         },
@@ -110,6 +116,102 @@ pub fn lies_codex(v: &Value) -> Vec<Ereignis> {
     }
 }
 
+/// Ein laufender Agent.
+pub struct Lauf {
+    kind: Child,
+    pub ereignisse: Receiver<Ereignis>,
+}
+
+impl Lauf {
+    pub fn starten(a: &Anbieter, auftrag: &str, ordner: &Path) -> io::Result<Lauf> {
+        let mut befehl = Command::new(finde_programm(a.programm));
+        befehl.args(a.argumente).current_dir(ordner);
+        befehl.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        ohne_fenster(&mut befehl);
+        let mut kind = befehl.spawn()?;
+        kind.stdin.take().expect("stdin").write_all(auftrag.as_bytes())?;
+        let (tx, rx) = channel();
+        let lesen = a.lesen;
+        mitlesen(kind.stdout.take().expect("stdout"), tx.clone(), move |zeile| {
+            serde_json::from_str(zeile).map(|v| lesen(&v)).unwrap_or_default()
+        });
+        mitlesen(kind.stderr.take().expect("stderr"), tx, |zeile| vec![Ereignis::Meldung(zeile.into())]);
+        Ok(Lauf { kind, ereignisse: rx })
+    }
+
+    /// Hält den Agenten samt allen Unterprozessen an.
+    pub fn anhalten(&mut self) -> io::Result<()> {
+        if self.kind.try_wait()?.is_none() {
+            #[cfg(windows)]
+            {
+                // Ein .cmd-Starter startet node als Kind: den ganzen Baum beenden (LEHREN.md).
+                let mut t = Command::new("taskkill");
+                t.args(["/T", "/F", "/PID", &self.kind.id().to_string()]);
+                ohne_fenster(t.stdout(Stdio::null()).stderr(Stdio::null()));
+                // Exit-Code nicht verstecken: scheitert taskkill (z. B. keine Rechte) und läuft
+                // der Agent noch, nie unbegrenzt warten, sondern den Agenten selbst beenden und melden.
+                if !t.status()?.success() && self.kind.try_wait()?.is_none() {
+                    self.kind.kill()?;
+                    self.kind.wait()?;
+                    return Err(io::Error::other("taskkill gescheitert; Unterprozesse laufen evtl. weiter"));
+                }
+            }
+            #[cfg(not(windows))]
+            self.kind.kill()?;
+        }
+        self.kind.wait().map(|_| ())
+    }
+
+    /// Prozessnummer des Agenten, z. B. um nach dem Anhalten gezielt nach Resten zu suchen.
+    pub fn pid(&self) -> u32 {
+        self.kind.id()
+    }
+
+    pub fn warten(&mut self) -> io::Result<ExitStatus> {
+        self.kind.wait()
+    }
+}
+
+fn mitlesen(
+    quelle: impl Read + Send + 'static,
+    tx: Sender<Ereignis>,
+    lesen: impl Fn(&str) -> Vec<Ereignis> + Send + 'static,
+) {
+    thread::spawn(move || {
+        for zeile in BufReader::new(quelle).lines().map_while(Result::ok) {
+            for e in lesen(zeile.trim()) {
+                if tx.send(e).is_err() {
+                    return;
+                }
+            }
+        }
+    });
+}
+
+/// Unter Windows liegen die Agenten oft als `name.cmd` im PATH; Rust findet sonst nur `.exe`.
+fn finde_programm(name: &str) -> PathBuf {
+    if cfg!(windows) {
+        for ordner in std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()) {
+            for endung in ["exe", "cmd", "bat"] {
+                let pfad = ordner.join(format!("{name}.{endung}"));
+                if pfad.is_file() {
+                    return pfad;
+                }
+            }
+        }
+    }
+    PathBuf::from(name)
+}
+
+#[cfg(windows)]
+fn ohne_fenster(befehl: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    befehl.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: kein aufblitzendes Konsolenfenster
+}
+
+#[cfg(not(windows))]
+fn ohne_fenster(_: &mut Command) {}
+
 impl fmt::Display for Ereignis {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let kurz = |s: &str| s.chars().take(160).collect::<String>().replace('\n', " ");
@@ -119,6 +221,7 @@ impl fmt::Display for Ereignis {
             }
             Ereignis::Text(t) => write!(f, "sagt: {}", kurz(t)),
             Ereignis::Werkzeug(w) => write!(f, "benutzt: {}", kurz(w)),
+            Ereignis::Fertig { erfolg: true, zusammenfassung } if zusammenfassung.is_empty() => write!(f, "fertig"),
             Ereignis::Fertig { erfolg: true, zusammenfassung } => write!(f, "fertig: {}", kurz(zusammenfassung)),
             Ereignis::Fertig { erfolg: false, zusammenfassung } => write!(f, "PROBLEM: {}", kurz(zusammenfassung)),
             Ereignis::Meldung(m) => write!(f, "Meldung: {}", kurz(m)),
@@ -147,6 +250,9 @@ mod tests {
             lies_claude(&abbruch),
             vec![Ereignis::Fertig { erfolg: false, zusammenfassung: "Limit; weg".into() }]
         );
+        // Beobachtet in der Probe auf Windows (PR #2): Kontingent-Hinweis von Claude.
+        let kontingent = json!({"type":"rate_limit_event"});
+        assert_eq!(lies_claude(&kontingent), vec![Ereignis::Meldung("Hinweis zum Kontingent".into())]);
     }
 
     #[test]
@@ -162,5 +268,8 @@ mod tests {
         assert_eq!(lies_codex(&rot), vec![Ereignis::Meldung("`cargo test` endete mit Exit-Code 101".into())]);
         let gruen = json!({"type":"item.completed","item":{"type":"command_execution","command":"ls","exit_code":0}});
         assert_eq!(lies_codex(&gruen), vec![]);
+        // Beobachtet in der Probe auf Windows (PR #2): Fehler-Einträge sind kein Werkzeug.
+        let fehler_eintrag = json!({"type":"item.completed","item":{"type":"error","message":"Skill fehlt"}});
+        assert_eq!(lies_codex(&fehler_eintrag), vec![Ereignis::Meldung("Skill fehlt".into())]);
     }
 }
