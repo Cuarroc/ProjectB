@@ -1,6 +1,6 @@
 # Regeln für alle Agenten in ProjectB
 
-Lies vor der Arbeit `README.md`, `FAHRPLAN.md` und `LEHREN.md`. Sonst nichts.
+Arbeiter lesen vor der Arbeit `AGENTS.md`, ihren Auftrag und „Technik (Windows)“ in `LEHREN.md`. `README.md` und `FAHRPLAN.md` liest nur der Orchestrator.
 Elias ist kein Programmierer. Schreib für ihn einfach und kurz.
 
 ## Arbeiten

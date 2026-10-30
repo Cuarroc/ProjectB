@@ -47,11 +47,21 @@ um das Terminal-Auslesen (PTY) herum gebaut und wird nicht gebraucht.
 - Nebenfunktionen: `omniroute`, `freetier`, `ruflo`, `scout`, `critic`, `roles`, `learnings`, `enhance`, `digest`
 - Prozess-Regeln: Nahtstellen-Regel, Hooks `rules-guard` und `seam-guard`, Red-First als CI-Job (als Gewohnheit bleibt es), Plan- und Spec-Skripte
 - Doku-Ordner: `docs/`, `.pa/`
-- Die Rollen Alfred, Stabschef, PM und Projektassistent. Es bleibt ein Orchestrator.
+- Die Rollen Alfred, Stabschef, PM und Projektassistent. Gesteuert wird nur vom Orchestrator; daneben gibt es den Assistenten für Elias außerhalb der Steuerung, die Aufsicht (Claude) und die Prüfer Claude und Codex.
 
 ## Entschieden (Elias, 30.10.2026)
 
 1. **Denkraum:** Er wurde in ProjectA gebaut, aber nie benutzt. In ProjectB wird er neu und klein gebaut, als Kandidat für 0.2.
-2. **Agenten** laufen heute auf dem PC und auf dem Server (Server etwa 83 €/Monat). ProjectB fängt auf dem PC an,
-   der Server kommt später als zweiter Ort.
+2. **Agenten** laufen heute auf dem PC und auf dem Server (Server etwa 83 €/Monat). Für die Entwicklung nutzen wir den Server schon; im Produkt kommt der Server später als zweiter Ort dazu.
 3. **Bezahlte API-Schlüssel** nur mit Elias' Ja, wie in ProjectA.
+
+## Dauerfreigaben
+
+| Nr. | Freigabe | Grenze |
+|---|---|---|
+| 1 | Werkzeug-Updates auf PC und Server | Nur installierte Werkzeuge aus offizieller Quelle; Neues nur mit Ja |
+| 2 | Aufräumen nach Merge | Nur ProjectB, nie main, nichts Ungesichertes, nichts aus ProjectA |
+| 3 | AgentsRoom für ProjectB einrichten | Nur wie in freigegebenen Konzepten, nie kostenpflichtig; Webhooks und Tresor bleiben bei Elias |
+| 4 | Server-Betrieb für ProjectB | Kein Server-Neustart, keine Admin-Rechte |
+| 5 | Alte ProjectA-Quota-Regeln aus | Einmalig, erledigt |
+| 6 | Weitergabe durch die Aufsicht | Nicht für Geld, Rechte, Löschen außerhalb, neue Programme oder Releases |
