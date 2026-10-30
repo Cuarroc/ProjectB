@@ -2,12 +2,11 @@
 # Läuft bei issue_comment immer mit dem Stand aus main, checkt keinen PR-Code aus und führt keinen aus.
 name: codex-status
 on:
-  issue_comment:
+  # Kein PR-Code: nur Bot-Kommentar lesen, Absender und aktuellen Head prüfen.
+  issue_comment: # zizmor: ignore[dangerous-triggers]
     types: [created, edited]
 
-permissions:
-  checks: write
-  pull-requests: read
+permissions: {}
 
 # Läufe für denselben PR nacheinander, damit kein älterer Stand einen neueren überschreibt.
 concurrency:
@@ -18,6 +17,9 @@ jobs:
   review-codex:
     if: github.event.issue.pull_request && github.event.comment.user.login == 'chatgpt-codex-connector[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      checks: write # Schreibt den Review-Check auf den aktuellen PR-Head.
+      pull-requests: read # Liest den PR-Head und seinen Bot-Kommentar.
     steps:
       - name: Codex-Ergebnis als Check setzen
         env:

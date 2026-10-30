@@ -19,6 +19,9 @@ shared:
         - and:
             - label=autor-codex
             - check-success=review/claude
+        - and:
+            - author=dependabot[bot]
+            - check-success=review/claude
     # Oberfläche: Ein Claude-Agent hat den Screenshot geprüft.
     - or:
         - -files~=^src/
