@@ -30,6 +30,10 @@ shared:
     - or:
         - -files~=^(\.github/|\.mergify\.yml$)
         - label=elias-ok
+        # Dependabot ohne elias-ok (Elias, 30.10.2026). Major-Sprünge hält Prüfer Claude mit P2 auf.
+        - and:
+            - author=dependabot[bot]
+            - -files~=^\.mergify\.yml$
 
 queue_rules:
   - name: default
