@@ -25,7 +25,9 @@ Stand: 30.10.2026 · Aktueller Schritt: **3** · Version 0.1 eingefroren (Elias,
    Erst danach steht „fertig“ da, mit Beleg und Link zum PR.
 5. **Rollen einstellen:** welcher Anbieter und welches Modell für Orchestrator, Worker und Reviewer.
 
-0.1 ist fertig, wenn Elias damit an mindestens 5 Tagen echte Aufträge erledigt hat.
+0.1 ist fertig, wenn Elias damit drei echte Aufträge von Anfang bis Ende erledigt hat, ohne selbst in den Code
+einzugreifen, und dabei jede der fünf Funktionen oben mindestens einmal funktioniert hat. Was dabei hakt, wird
+behoben, bevor 0.2 beginnt.
 
 ## Spielregeln für diesen Plan
 
