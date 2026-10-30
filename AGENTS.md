@@ -7,7 +7,7 @@ Elias ist kein Programmierer. Schreib für ihn einfach und kurz.
 
 1. **Nur die laufende Version** aus `FAHRPLAN.md`. Eine Idee außerhalb davon wird eine Zeile auf der Später-Liste, mehr nicht.
 2. **Ein Auftrag ist ein Branch, ein Worktree und ein PR,** mit höchstens 300 geänderten Zeilen einschließlich Tests.
-   Größeres wird vorher geteilt.
+   Automatisch erzeugte Dateien wie `Cargo.lock` zählen nicht mit. Größeres wird vorher geteilt.
 3. **Grün heißt bewiesen.** Tests laufen lokal und in CI. Ein Fehler bekommt zuerst einen Test, der ihn zeigt.
    Eine Oberflächen-Änderung braucht einen Screenshot, den jemand angesehen hat. Exit-Codes nie verstecken.
 4. **Review durch Codex und Claude,** nie nur durch die Familie, die den Code geschrieben hat. Höchstens zwei Runden,
