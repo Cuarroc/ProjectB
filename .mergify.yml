@@ -1,0 +1,16 @@
+# Merge nur über die Queue (AGENTS.md Regel 5). Elias setzt das Label „bereit“.
+queue_rules:
+  - name: default
+    merge_conditions:
+      - check-success=test (ubuntu-latest)
+      - check-success=test (windows-latest)
+      - check-success=secrets
+
+pull_request_rules:
+  - name: grün und bereit, ab in die Queue
+    conditions:
+      - base=main
+      - label=bereit
+    actions:
+      queue:
+        name: default
