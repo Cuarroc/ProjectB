@@ -1,11 +1,13 @@
 name: ci
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
@@ -31,7 +33,72 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo fmt --manifest-path kern/Cargo.toml --check
       - run: cargo clippy --manifest-path kern/Cargo.toml --all-targets -- -D warnings
-      - run: cargo test --manifest-path kern/Cargo.toml
+      - name: Tests ausführen
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --manifest-path kern/Cargo.toml 2>&1 | tee testausgabe.txt
+      - name: Testzahl erfassen
+        shell: pwsh
+        run: ./\.github\scripts\testzahl.ps1 -Mode count -Log testausgabe.txt -Output testzahl.json -Platform '${{ matrix.os }}'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: testzahl-${{ matrix.os }}
+          path: testzahl.json
+          if-no-files-found: error
+
+  testzahl:
+    name: Testzahl-Wächter
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Testzahlen laden und vergleichen
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          gh run download $env:GITHUB_RUN_ID --repo $env:GITHUB_REPOSITORY --name testzahl-ubuntu-latest --dir current/ubuntu
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          gh run download $env:GITHUB_RUN_ID --repo $env:GITHUB_REPOSITORY --name testzahl-windows-latest --dir current/windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($env:EVENT_NAME -eq 'pull_request') {
+            $runs = gh run list --repo $env:GITHUB_REPOSITORY --workflow ci.yml --branch main --status success --limit 1 --json databaseId | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($runs.Count -eq 0) { throw 'Kein grüner main-Lauf für den Vergleich gefunden' }
+            if ($runs.Count -gt 0) {
+              $runId = $runs[0].databaseId
+              $artifacts = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/artifacts" | ConvertFrom-Json
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              $names = @($artifacts.artifacts | Where-Object { -not $_.expired } | ForEach-Object { $_.name })
+              $hasUbuntu = $names -contains 'testzahl-ubuntu-latest'
+              $hasWindows = $names -contains 'testzahl-windows-latest'
+              if ($hasUbuntu -ne $hasWindows) { throw 'Unvollständige Testzahlen auf main' }
+              if ($hasUbuntu) {
+                gh run download $runId --repo $env:GITHUB_REPOSITORY --name testzahl-ubuntu-latest --dir baseline/ubuntu
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                gh run download $runId --repo $env:GITHUB_REPOSITORY --name testzahl-windows-latest --dir baseline/windows
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              } else {
+                # Vor dem ersten Lauf mit Artefakten: vorhandene cargo-Ausgabe von main nutzen.
+                $jobs = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/jobs" | ConvertFrom-Json
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                foreach ($platform in @('ubuntu', 'windows')) {
+                  $job = @($jobs.jobs | Where-Object { $_.name -eq "test ($platform-latest)" -and $_.conclusion -eq 'success' })
+                  if ($job.Count -ne 1) { throw "Kein eindeutiger main-Testlauf für $platform" }
+                  New-Item -ItemType Directory -Force "baseline/$platform" | Out-Null
+                  gh api --allow-escape-sequences "repos/$env:GITHUB_REPOSITORY/actions/jobs/$($job[0].id)/logs" | Set-Content "baseline/$platform/log.txt"
+                  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                  ./\.github\scripts\testzahl.ps1 -Mode count -Log "baseline/$platform/log.txt" -Output "baseline/$platform/testzahl.json" -Platform "main $platform"
+                }
+              }
+            }
+          }
+          ./\.github\scripts\testzahl.ps1 -Mode compare -Current current -Baseline baseline
 
   secrets:
     runs-on: ubuntu-latest
