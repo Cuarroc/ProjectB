@@ -10,9 +10,11 @@ Elias ist kein Programmierer. Schreib für ihn einfach und kurz.
    Automatisch erzeugte Dateien wie `Cargo.lock` zählen nicht mit. Größeres wird vorher geteilt.
 3. **Grün heißt bewiesen.** Tests laufen lokal und in CI. Ein Fehler bekommt zuerst einen Test, der ihn zeigt.
    Eine Oberflächen-Änderung braucht einen Screenshot, den jemand angesehen hat. Exit-Codes nie verstecken.
-4. **Review durch Codex und Claude,** nie nur durch die Familie, die den Code geschrieben hat. Höchstens zwei Runden,
-   danach entscheidet Elias. PRs, die nur Doku oder nur Tests ändern, brauchen kein Review.
-5. **Merge nur über die Merge-Queue.** Ein roter `main` stoppt alles, bis er wieder grün ist.
+4. **Review durch die ANDERE Modellfamilie** auf dem aktuellen Stand (eins reicht). Oberflächen-PRs prüft zusätzlich
+   ein Claude-Agent am Screenshot. Höchstens zwei Runden mit offenen Funden, dann Label `stopp` und Frage an Elias.
+   Im PR-Text steht „Geschrieben von: Claude|Codex“, dazu das Label `autor-claude` oder `autor-codex`.
+5. **Merge automatisch über Mergify,** wenn CI grün und Review ok. Änderungen an `.github/` und `.mergify.yml` nur mit
+   Elias' Ja (Label `elias-ok`). Ein roter `main` stoppt alles, der Orchestrator repariert ihn sofort.
 
 ## Sicherheit
 

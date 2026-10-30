@@ -1,21 +1,38 @@
-# Merge nur über die Queue (AGENTS.md Regel 5). Elias setzt das Label „bereit“.
-# „stopp“ ist die Notbremse. Squash: ein Commit pro PR, auch bei Auftrags-PRs.
+# Merge automatisch über die Queue, wenn CI grün und das Review der ANDEREN Modellfamilie ok ist (AGENTS.md Regel 4 und 5).
+# „stopp“ ist die Notbremse. Squash: ein Commit pro PR.
+shared:
+  bedingungen: &bedingungen
+    - base=main
+    - -draft
+    - -label=stopp
+    - check-success=test (ubuntu-latest)
+    - check-success=test (windows-latest)
+    - check-success=secrets
+    # Geschrieben von Claude -> Codex prüft; geschrieben von Codex -> ein frischer Claude-Agent prüft.
+    - or:
+        - and:
+            - label=autor-claude
+            - check-success=review-codex
+        - and:
+            - label=autor-codex
+            - check-success=review/claude
+    # Oberfläche: Ein Claude-Agent hat den Screenshot geprüft.
+    - or:
+        - -files~=^src/
+        - check-success=review/claude
+    # CI- und Mergify-Dateien nur mit Elias' Ja. Nach dem Bot-Konto: label=elias-ok -> approved-reviews-by=Cuarroc.
+    - or:
+        - -files~=^(\.github/|\.mergify\.yml$)
+        - label=elias-ok
+
 queue_rules:
   - name: default
     merge_method: squash
-    merge_conditions:
-      - check-success=test (ubuntu-latest)
-      - check-success=test (windows-latest)
-      - check-success=secrets
-      - -label=stopp
+    merge_conditions: *bedingungen
 
 pull_request_rules:
-  - name: grün und bereit, ab in die Queue
-    conditions:
-      - base=main
-      - label=bereit
-      - -label=stopp
-      - -draft
+  - name: grün und geprüft, ab in die Queue
+    conditions: *bedingungen
     actions:
       queue:
         name: default

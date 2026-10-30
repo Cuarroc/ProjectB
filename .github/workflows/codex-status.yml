@@ -1,0 +1,39 @@
+# Macht das Codex-Review zu einem Check „review-codex“ auf dem Head des PRs (AGENTS.md Regel 4).
+# Läuft bei issue_comment immer mit dem Stand aus main, checkt keinen PR-Code aus und führt keinen aus.
+name: codex-status
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  checks: write
+  pull-requests: read
+
+jobs:
+  review-codex:
+    if: github.event.issue.pull_request && github.event.comment.user.login == 'chatgpt-codex-connector[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Codex-Ergebnis als Check setzen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+          BODY: ${{ github.event.comment.body }}
+          URL: ${{ github.event.comment.html_url }}
+        run: |
+          # Fremder Text nur aus der Umgebung lesen, nie in die Befehlszeile einsetzen.
+          zustand=$(printf '%s' "$BODY" | grep -o 'codex-review-state:v1 {.*}' | head -1 | sed 's/^codex-review-state:v1 //' || true)
+          if [ -z "$zustand" ]; then echo "kein Codex-Zustand im Kommentar"; exit 0; fi
+          status=$(jq -r '.code_review.status' <<<"$zustand")
+          sha=$(jq -r '.code_review.commit_sha' <<<"$zustand")
+          offen=$(jq -r '.code_review.has_unresolved_findings' <<<"$zustand")
+          head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)
+          if [ "$status" != completed ] || [ "$sha" != "$head" ]; then
+            echo "nicht fertig oder alter Stand ($status, $sha statt $head)"; exit 0
+          fi
+          ergebnis=failure
+          [ "$offen" = false ] && ergebnis=success
+          gh api "repos/$REPO/check-runs" -f name=review-codex -f head_sha="$head" -f status=completed \
+            -f conclusion="$ergebnis" -f details_url="$URL" -f "output[title]=Codex-Review: $ergebnis" \
+            -f "output[summary]=Offene Funde: $offen"
