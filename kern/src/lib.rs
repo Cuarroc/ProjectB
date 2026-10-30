@@ -21,7 +21,7 @@ pub enum Ereignis {
         erfolg: bool,
         zusammenfassung: String,
     },
-    /// Zeile auf der Fehlerausgabe, z. B. „nicht angemeldet“.
+    /// Hinweis: Zeile auf der Fehlerausgabe (z. B. „nicht angemeldet“) oder ein Befehl, der scheiterte.
     Meldung(String),
     Unbekannt(String),
 }
@@ -73,7 +73,11 @@ pub fn lies_claude(v: &Value) -> Vec<Ereignis> {
             .collect(),
         Some("result") => vec![Ereignis::Fertig {
             erfolg: v.get("is_error").and_then(Value::as_bool) == Some(false),
-            zusammenfassung: text(v, "/result").unwrap_or_default(),
+            // Bei Abbrüchen (error_during_execution, error_max_turns) steht der Grund in `errors`.
+            zusammenfassung: text(v, "/result").unwrap_or_else(|| {
+                let fehler = v.get("errors").and_then(Value::as_array).into_iter().flatten();
+                fehler.filter_map(Value::as_str).collect::<Vec<_>>().join("; ")
+            }),
         }],
         andere => vec![Ereignis::Unbekannt(andere.unwrap_or("ohne type").into())],
     }
@@ -90,7 +94,14 @@ pub fn lies_codex(v: &Value) -> Vec<Ereignis> {
         Some("item.started") => vec![],
         Some("item.completed") => match art.as_deref() {
             Some("agent_message") => vec![Ereignis::Text(text(v, "/item/text").unwrap_or_default())],
-            Some("command_execution") | Some("reasoning") => vec![],
+            Some("command_execution") => match v.pointer("/item/exit_code").and_then(Value::as_i64) {
+                Some(code) if code != 0 => vec![Ereignis::Meldung(format!(
+                    "`{}` endete mit Exit-Code {code}",
+                    text(v, "/item/command").unwrap_or_default()
+                ))],
+                _ => vec![],
+            },
+            Some("reasoning") => vec![],
             Some(andere) => vec![Ereignis::Werkzeug(andere.into())],
             None => vec![],
         },
@@ -225,6 +236,12 @@ mod tests {
         let fehler = json!({"type":"result","is_error":true,"result":"kaputt"});
         assert_eq!(lies_claude(&fehler), vec![Ereignis::Fertig { erfolg: false, zusammenfassung: "kaputt".into() }]);
         assert_eq!(lies_claude(&json!({"type":"neu"})), vec![Ereignis::Unbekannt("neu".into())]);
+        let abbruch =
+            json!({"type":"result","subtype":"error_during_execution","is_error":true,"errors":["Limit","weg"]});
+        assert_eq!(
+            lies_claude(&abbruch),
+            vec![Ereignis::Fertig { erfolg: false, zusammenfassung: "Limit; weg".into() }]
+        );
     }
 
     #[test]
@@ -235,5 +252,10 @@ mod tests {
         assert_eq!(lies_codex(&antwort), vec![Ereignis::Text("Fertig".into())]);
         let fehler = json!({"type":"turn.failed","error":{"message":"Limit"}});
         assert_eq!(lies_codex(&fehler), vec![Ereignis::Fertig { erfolg: false, zusammenfassung: "Limit".into() }]);
+        let rot =
+            json!({"type":"item.completed","item":{"type":"command_execution","command":"cargo test","exit_code":101}});
+        assert_eq!(lies_codex(&rot), vec![Ereignis::Meldung("`cargo test` endete mit Exit-Code 101".into())]);
+        let gruen = json!({"type":"item.completed","item":{"type":"command_execution","command":"ls","exit_code":0}});
+        assert_eq!(lies_codex(&gruen), vec![]);
     }
 }
