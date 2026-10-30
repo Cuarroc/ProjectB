@@ -20,7 +20,7 @@ Elias ist kein Programmierer. Schreib für ihn einfach und kurz.
 
 6. **Keine Geheimnisse** in Dateien, Logs oder Commits. Secret-Scan vor jedem Commit.
 7. **Nur mit Elias' ausdrücklichem Ja:** Geld und bezahlte API-Schlüssel, Installationen außerhalb des Projekts,
-   Releases und Tags, Rechte-Änderungen, Löschen außerhalb des eigenen Worktrees.
+   Releases und Tags, Rechte-Änderungen, Löschen außerhalb des eigenen Worktrees. Ausnahmen nur über die Dauerfreigaben in `UEBERNAHME.md`.
 
 ## Gegen Ballast
 
