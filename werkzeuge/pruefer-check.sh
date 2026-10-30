@@ -44,8 +44,8 @@ main() {
     [[ -n $credential && $credential != null && $credential != *$'\n'* ]] || return 1
     # Absichtlich unbeschränkten Installationstoken prüfen: eine zu breite Installation ist ein Fehler.
     scope=$(api 'installation/repositories?per_page=100' \
-        --jq '.total_count == 1 and (.repositories | length) == 1 and .repositories[0].full_name == "Cuarroc/ProjectB"')
-    [[ $scope == true ]] || return 1
+        --jq '[.total_count, (.repositories | length), .repositories[0].full_name] | @tsv')
+    [[ $scope == $'1\t1\tCuarroc/ProjectB' ]] || return 1
     if [[ $mode == --test ]]; then
         printf 'Repo-Grenze bestätigt: Cuarroc/ProjectB\n'
         return
