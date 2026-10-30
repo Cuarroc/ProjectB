@@ -9,6 +9,9 @@ fn main() {
         std::thread::sleep(std::time::Duration::from_secs(60));
         return;
     }
+    if hat("--ohne-lesen") {
+        return; // endet, ohne den Auftrag zu lesen: das Schreiben des Auftrags scheitert
+    }
     if hat("--zwischen") {
         // Startet einen Enkel, der die Ausgabe erbt, und endet sofort: der Enkel ist verwaist
         // und hängt nicht mehr im Prozessbaum (wie der `git clone`, den Codex nebenbei startet).

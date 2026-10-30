@@ -162,11 +162,13 @@ impl Lauf {
         #[cfg(windows)]
         if let Err(e) = job::beenden(&self.job) {
             // Exit-Code nicht verstecken: nie unbegrenzt warten, sondern den Agenten selbst beenden und melden.
-            if self.kind.try_wait()?.is_none() {
-                self.kind.kill()?;
-                self.kind.wait()?;
-            }
-            return Err(io::Error::other(format!("Job nicht beendet ({e}); Unterprozesse laufen evtl. weiter")));
+            // Scheitert auch das, bleibt der Job-Fehler `e` in der Meldung.
+            let agent = match self.kind.try_wait() {
+                Ok(Some(_)) => Ok(()),
+                _ => self.kind.kill().and_then(|_| self.kind.wait().map(|_| ())),
+            };
+            let agent = agent.err().map(|f| format!(", Agent nicht beendet ({f})")).unwrap_or_default();
+            return Err(io::Error::other(format!("Job nicht beendet ({e}){agent}; Unterprozesse laufen evtl. weiter")));
         }
         #[cfg(not(windows))]
         if self.kind.try_wait()?.is_none() {

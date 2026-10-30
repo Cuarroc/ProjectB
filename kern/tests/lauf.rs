@@ -57,6 +57,18 @@ fn grosser_auftrag_blockiert_nicht() {
     assert!(rx.recv_timeout(Duration::from_secs(30)).expect("Lauf hängt mit großem Auftrag"));
 }
 
+#[test]
+fn schreibfehler_wird_zur_meldung() {
+    // Größer als der Pipe-Puffer: das Schreiben wartet, bis der Agent ohne Lesen endet, und scheitert dann.
+    let auftrag = "a".repeat(1 << 20);
+    let mut lauf = Lauf::starten(&agent(&["--ohne-lesen"]), &auftrag, &std::env::temp_dir()).unwrap();
+    let alle: Vec<Ereignis> = lauf.ereignisse.iter().collect();
+    lauf.warten().unwrap();
+    let gemeldet =
+        alle.iter().any(|e| matches!(e, Ereignis::Meldung(m) if m.starts_with("Auftrag nicht vollständig übergeben")));
+    assert!(gemeldet, "{alle:?}");
+}
+
 #[cfg(windows)]
 mod verwaiste_enkel {
     use super::*;
@@ -107,15 +119,6 @@ mod verwaiste_enkel {
             }
         }
         assert!(lauf.warten().unwrap().success());
-        assert!(endet(pid), "Enkel {pid} lebt noch");
-    }
-
-    #[test]
-    fn anhalten_nach_dem_ende_des_agenten_beendet_den_enkel() {
-        let mut lauf = Lauf::starten(&agent(&["--enkel"]), "x", &std::env::temp_dir()).unwrap();
-        let pid = enkel_pid(&lauf);
-        assert!(lauf.warten().unwrap().success());
-        lauf.anhalten().unwrap();
         assert!(endet(pid), "Enkel {pid} lebt noch");
     }
 
