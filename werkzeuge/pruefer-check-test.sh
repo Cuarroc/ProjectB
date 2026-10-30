@@ -35,15 +35,23 @@ gh() {
         *' repos/Cuarroc/ProjectB/installation '*)
             [[ $GH_TOKEN == eyJ* ]] || return 1
             if [[ ${scenario:-} == installation_error ]]; then printf '%s' "$GH_TOKEN" >&2; return 1; fi
+            if [[ ${scenario:-} == installation_invalid ]]; then printf 'null\n'; return; fi
             printf '42\n' ;;
         *' app/installations/42/access_tokens '*)
             if [[ ${scenario:-} == token_error ]]; then printf '%s' "$GH_TOKEN" >&2; return 1; fi
+            if [[ ${scenario:-} == token_empty ]]; then printf 'null\n'; return; fi
             printf 'installation-token-test\n' ;;
         *' installation/repositories?per_page=100 '*)
             [[ $GH_TOKEN == installation-token-test ]] || return 1
-            [[ " $* " == *'.total_count == 1 and (.repositories | length) == 1 and .repositories[0].full_name == "Cuarroc/ProjectB"'* ]] || return 1
             if [[ ${scenario:-} == scope_error ]]; then return 1; fi
-            if [[ ${scenario:-} == broad ]]; then printf 'false\n'; else printf 'true\n'; fi ;;
+            case ${scenario:-} in
+                broad) printf '2\t2\tCuarroc/ProjectB\n' ;;
+                paginated) printf '101\t100\tCuarroc/ProjectB\n' ;;
+                empty) printf '0\t0\t\n' ;;
+                wrong_repo) printf '1\t1\tCuarroc/Fremd\n' ;;
+                inconsistent) printf '1\t2\tCuarroc/ProjectB\n' ;;
+                *) printf '1\t1\tCuarroc/ProjectB\n' ;;
+            esac ;;
         *' repos/Cuarroc/ProjectB/check-runs '*)
             [[ $GH_TOKEN == installation-token-test && ${scenario:-} != test_only ]] || return 1
             [[ " $* " == *'status=completed'* && " $* " == *'output[title]=Titel "Zitat"'* ]] || return 1
@@ -67,10 +75,14 @@ done
 output=$(scenario=test_only run --test)
 safe "$output"
 [[ $output == *'Repo-Grenze bestätigt'* ]]
-for scenario in installation_error token_error scope_error broad check_error; do
+for scenario in installation_error installation_invalid token_error token_empty scope_error broad paginated empty wrong_repo inconsistent check_error; do
     export scenario
     if output=$(run "$sha" success 'Titel "Zitat"' Text); then exit 1; fi
     safe "$output"
+    if [[ $scenario != check_error ]]; then
+        if output=$(run --test); then exit 1; fi
+        safe "$output"
+    fi
 done
 unset scenario
 for args in missing invalid_sha invalid_conclusion invalid_name empty_title; do
