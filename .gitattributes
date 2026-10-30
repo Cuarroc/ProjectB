@@ -1,0 +1,6 @@
+# Alles Textdateien mit LF, auch unter Windows. Gelernt in ProjectA:
+# CRLF hat dort Tests, Signatur und CI mehrfach gebrochen (LEHREN.md).
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary

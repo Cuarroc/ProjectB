@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+src-tauri/target/
+src-tauri/gen/schemas/
+# Lokale Agenten-Daten und Zugangsdaten nie einchecken
+.env
+*.env
+.mcp.json
+.claude/*
+!.claude/settings.json
+.agentsroom/
+.codex/
