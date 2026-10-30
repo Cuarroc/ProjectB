@@ -47,7 +47,7 @@ um das Terminal-Auslesen (PTY) herum gebaut und wird nicht gebraucht.
 - Nebenfunktionen: `omniroute`, `freetier`, `ruflo`, `scout`, `critic`, `roles`, `learnings`, `enhance`, `digest`
 - Prozess-Regeln: Nahtstellen-Regel, Hooks `rules-guard` und `seam-guard`, Red-First als CI-Job (als Gewohnheit bleibt es), Plan- und Spec-Skripte
 - Doku-Ordner: `docs/`, `.pa/`
-- Die Rollen Alfred, Stabschef, PM und Projektassistent. Gesteuert wird nur vom Orchestrator; daneben gibt es den Assistenten für Elias außerhalb der Steuerung, die Aufsicht (Claude) und die Prüfer Claude und Codex.
+- Die Rollen Alfred, Stabschef, PM und Projektassistent. Gesteuert wird nur vom Orchestrator; daneben gibt es den Assistenten für Elias außerhalb der Steuerung, die Aufsicht (Claude) und die Prüfer Claude und Codex (Elias, 30.10.2026).
 
 ## Entschieden (Elias, 30.10.2026)
 
@@ -57,6 +57,8 @@ um das Terminal-Auslesen (PTY) herum gebaut und wird nicht gebraucht.
 
 ## Dauerfreigaben
 
+(Elias, 30.10.2026)
+
 | Nr. | Freigabe | Grenze |
 |---|---|---|
 | 1 | Werkzeug-Updates auf PC und Server | Nur installierte Werkzeuge aus offizieller Quelle; Neues nur mit Ja |
@@ -64,4 +66,4 @@ um das Terminal-Auslesen (PTY) herum gebaut und wird nicht gebraucht.
 | 3 | AgentsRoom für ProjectB einrichten | Nur wie in freigegebenen Konzepten, nie kostenpflichtig; Webhooks und Tresor bleiben bei Elias |
 | 4 | Server-Betrieb für ProjectB | Kein Server-Neustart, keine Admin-Rechte |
 | 5 | Alte ProjectA-Quota-Regeln aus | Einmalig, erledigt |
-| 6 | Weitergabe durch die Aufsicht | Nicht für Geld, Rechte, Löschen außerhalb, neue Programme oder Releases |
+| 6 | Weitergabe durch die Aufsicht | Entscheidungen von Elias an die Aufsicht gelten über das Postfach wie direkt gesagt; nicht für Geld, Rechte, Löschen außerhalb, neue Programme oder Releases |
