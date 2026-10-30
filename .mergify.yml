@@ -5,39 +5,41 @@ shared:
     - check-success=test (ubuntu-latest)
     - check-success=test (windows-latest)
     - check-success=secrets
+  # Am ursprünglichen PR geprüft, auch bei „@mergifyio queue“ (queue_conditions).
+  freigabe: &freigabe
+    - base=main
+    - -draft
+    - -label=stopp
+    - and: *ci
+    # Geschrieben von Claude -> Codex prüft; geschrieben von Codex -> ein frischer Claude-Agent prüft.
+    - or:
+        - and:
+            - label=autor-claude
+            - check-success=review-codex
+        - and:
+            - label=autor-codex
+            - check-success=review/claude
+    # Oberfläche: Ein Claude-Agent hat den Screenshot geprüft.
+    - or:
+        - -files~=^src/
+        - check-success=review/claude
+    # CI- und Mergify-Dateien nur mit Elias' Ja. Nach dem Bot-Konto: label=elias-ok -> approved-reviews-by=Cuarroc.
+    - or:
+        - -files~=^(\.github/|\.mergify\.yml$)
+        - label=elias-ok
 
 queue_rules:
   - name: default
     merge_method: squash
-    # Geprüft am Entwurfs-PR der Queue: dort gibt es nur die CI, keine Review-Checks.
+    queue_conditions: *freigabe
+    # Am Entwurfs-PR der Queue geprüft: dort gibt es nur die CI, keine Review-Checks.
     merge_conditions:
       - -label=stopp
       - and: *ci
 
 pull_request_rules:
   - name: grün und geprüft, ab in die Queue
-    # Geprüft am ursprünglichen PR.
-    conditions:
-      - base=main
-      - -draft
-      - -label=stopp
-      - and: *ci
-      # Geschrieben von Claude -> Codex prüft; geschrieben von Codex -> ein frischer Claude-Agent prüft.
-      - or:
-          - and:
-              - label=autor-claude
-              - check-success=review-codex
-          - and:
-              - label=autor-codex
-              - check-success=review/claude
-      # Oberfläche: Ein Claude-Agent hat den Screenshot geprüft.
-      - or:
-          - -files~=^src/
-          - check-success=review/claude
-      # CI- und Mergify-Dateien nur mit Elias' Ja. Nach dem Bot-Konto: label=elias-ok -> approved-reviews-by=Cuarroc.
-      - or:
-          - -files~=^(\.github/|\.mergify\.yml$)
-          - label=elias-ok
+    conditions: *freigabe
     actions:
       queue:
         name: default

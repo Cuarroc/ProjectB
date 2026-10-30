@@ -9,6 +9,11 @@ permissions:
   checks: write
   pull-requests: read
 
+# Läufe für denselben PR nacheinander, damit kein älterer Stand einen neueren überschreibt.
+concurrency:
+  group: codex-status-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   review-codex:
     if: github.event.issue.pull_request && github.event.comment.user.login == 'chatgpt-codex-connector[bot]'
@@ -19,11 +24,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.issue.number }}
-          BODY: ${{ github.event.comment.body }}
+          KOMMENTAR: ${{ github.event.comment.id }}
           URL: ${{ github.event.comment.html_url }}
         run: |
-          # Fremder Text nur aus der Umgebung lesen, nie in die Befehlszeile einsetzen.
-          zustand=$(printf '%s' "$BODY" | grep -o 'codex-review-state:v1 {.*}' | head -1 | sed 's/^codex-review-state:v1 //' || true)
+          # Den Kommentar jetzt frisch lesen, nicht den Stand des Ereignisses: Codex ändert ihn mehrmals.
+          # Fremder Text bleibt in Variablen, nie in der Befehlszeile.
+          body=$(gh api "repos/$REPO/issues/comments/$KOMMENTAR" --jq .body)
+          zustand=$(printf '%s' "$body" | grep -o 'codex-review-state:v1 {.*}' | head -1 | sed 's/^codex-review-state:v1 //' || true)
           if [ -z "$zustand" ]; then echo "kein Codex-Zustand im Kommentar"; exit 0; fi
           status=$(jq -r '.code_review.status' <<<"$zustand")
           sha=$(jq -r '.code_review.commit_sha' <<<"$zustand")
