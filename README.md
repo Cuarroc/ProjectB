@@ -20,7 +20,8 @@ ProjectB ist der schlanke Neubau von ProjectA, mit allem, was dort gelernt wurde
 - Agenten laufen ohne Terminal über ihre Kommandozeilen: `claude -p --output-format stream-json` und `codex exec`.
   Jeder Agent bekommt einen eigenen Git-Worktree.
 - Agenten laufen auf dem PC. Der Server kommt als zweiter Ort später dazu.
-- Es werden die Abos genutzt. Bezahlte API-Schlüssel nur mit Elias' Ja.
+- Es werden die Abos genutzt: Claude und Codex ab 0.1; OpenCode, Kimi und Ollama später.
+  Bezahlte API-Schlüssel nur mit Elias' Ja.
 
 ## Die fünf Seiten
 
