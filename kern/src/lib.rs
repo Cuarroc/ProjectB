@@ -1,9 +1,13 @@
 //! Kern von ProjectB: startet Coding-Agenten ohne Terminal, liest ihre
 //! JSON-Ereignisse live und kann sie anhalten (Technik-Probe, Schritt 3).
-//! Dieser Teil: Ereignisse und Anbieter; Starten und Anhalten folgt im nächsten PR.
 
 use serde_json::Value;
 use std::fmt;
+use std::io::{self, BufRead, BufReader, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread;
 
 /// Was ein Agent gerade tut.
 #[derive(Debug, Clone, PartialEq)]
@@ -98,6 +102,91 @@ pub fn lies_codex(v: &Value) -> Vec<Ereignis> {
         andere => vec![Ereignis::Unbekannt(andere.unwrap_or("ohne type").into())],
     }
 }
+
+/// Ein laufender Agent.
+pub struct Lauf {
+    kind: Child,
+    pub ereignisse: Receiver<Ereignis>,
+}
+
+impl Lauf {
+    pub fn starten(a: &Anbieter, auftrag: &str, ordner: &Path) -> io::Result<Lauf> {
+        let mut befehl = Command::new(finde_programm(a.programm));
+        befehl.args(a.argumente).current_dir(ordner);
+        befehl.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        ohne_fenster(&mut befehl);
+        let mut kind = befehl.spawn()?;
+        kind.stdin.take().expect("stdin").write_all(auftrag.as_bytes())?;
+        let (tx, rx) = channel();
+        let lesen = a.lesen;
+        mitlesen(kind.stdout.take().expect("stdout"), tx.clone(), move |zeile| {
+            serde_json::from_str(zeile).map(|v| lesen(&v)).unwrap_or_default()
+        });
+        mitlesen(kind.stderr.take().expect("stderr"), tx, |zeile| vec![Ereignis::Meldung(zeile.into())]);
+        Ok(Lauf { kind, ereignisse: rx })
+    }
+
+    /// Hält den Agenten samt allen Unterprozessen an.
+    pub fn anhalten(&mut self) -> io::Result<()> {
+        if self.kind.try_wait()?.is_none() {
+            #[cfg(windows)]
+            {
+                // Ein .cmd-Starter startet node als Kind: den ganzen Baum beenden (LEHREN.md).
+                let mut t = Command::new("taskkill");
+                t.args(["/T", "/F", "/PID", &self.kind.id().to_string()]);
+                ohne_fenster(t.stdout(Stdio::null()).stderr(Stdio::null()));
+                t.status()?;
+            }
+            #[cfg(not(windows))]
+            self.kind.kill()?;
+        }
+        self.kind.wait().map(|_| ())
+    }
+
+    pub fn warten(&mut self) -> io::Result<ExitStatus> {
+        self.kind.wait()
+    }
+}
+
+fn mitlesen(
+    quelle: impl Read + Send + 'static,
+    tx: Sender<Ereignis>,
+    lesen: impl Fn(&str) -> Vec<Ereignis> + Send + 'static,
+) {
+    thread::spawn(move || {
+        for zeile in BufReader::new(quelle).lines().map_while(Result::ok) {
+            for e in lesen(zeile.trim()) {
+                if tx.send(e).is_err() {
+                    return;
+                }
+            }
+        }
+    });
+}
+
+/// Unter Windows liegen die Agenten oft als `name.cmd` im PATH; Rust findet sonst nur `.exe`.
+fn finde_programm(name: &str) -> PathBuf {
+    if cfg!(windows) {
+        for ordner in std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()) {
+            for endung in ["exe", "cmd", "bat"] {
+                let pfad = ordner.join(format!("{name}.{endung}"));
+                if pfad.is_file() {
+                    return pfad;
+                }
+            }
+        }
+    }
+    PathBuf::from(name)
+}
+
+#[cfg(windows)]
+fn ohne_fenster(befehl: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    befehl.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: kein aufblitzendes Konsolenfenster
+}
+
+#[cfg(not(windows))]
+fn ohne_fenster(_: &mut Command) {}
 
 impl fmt::Display for Ereignis {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
