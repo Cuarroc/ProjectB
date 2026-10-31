@@ -13,13 +13,27 @@ openssl_cmd=openssl
 case ${OSTYPE:-} in msys*|cygwin*) openssl_cmd=/usr/bin/openssl ;; esac
 base64url() { "$openssl_cmd" base64 -A | tr '+/' '-_' | tr -d '='; }
 build_jwt() {
-    local now header payload signature
-    export -n header payload signature
+    local now header payload signature body key_type normalized i
+    local LC_ALL=C
+    export -n header payload signature body key_type normalized
+    if [[ $PRUEFER_APP_KEY =~ ^-----BEGIN\ ([A-Z0-9\ ]+)-----([[:space:]A-Za-z0-9+/=]*)-----END\ ([A-Z0-9\ ]+)-----[[:space:]]*$ ]]; then
+        key_type=${BASH_REMATCH[1]} body=${BASH_REMATCH[2]}
+        [[ $key_type == "${BASH_REMATCH[3]}" ]] || return 1
+    else
+        return 1
+    fi
+    body=${body//[[:space:]]/}
+    [[ -n $body ]] || return 1
+    printf -v normalized '%s\n' "-----BEGIN $key_type-----"
+    for ((i=0; i<${#body}; i+=64)); do
+        normalized+=${body:i:64}$'\n'
+    done
+    normalized+="-----END $key_type-----"$'\n'
     now=$(date +%s)
     header=$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | base64url)
     payload=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' "$((now-60))" "$((now+540))" "$PRUEFER_APP_ID" | base64url)
     signature=$(printf '%s' "$header.$payload" | "$openssl_cmd" dgst -sha256 \
-        -sign <(printf '%s' "$PRUEFER_APP_KEY") 2>/dev/null | base64url)
+        -sign <(printf '%s' "$normalized") 2>/dev/null | base64url) || return 1
     jwt=$header.$payload.$signature
 }
 field() {
