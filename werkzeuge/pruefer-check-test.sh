@@ -47,7 +47,7 @@ unset multiline_key invalid_key
 for key in access_tokens_url token total_count full_name; do
     case $key in
         access_tokens_url) value='"https://api.github.com/app/installations/42/access_tokens"'; pattern='"https://api[.]github[.]com/app/installations/[0-9]+/access_tokens"' ;;
-        token) value='"installation_token_test"'; pattern='"[A-Za-z0-9_]+"' ;;
+        token) value='"ghs_installation_token_test.v2-a.b-c"'; pattern='"ghs_[A-Za-z0-9_.-]+"' ;;
         total_count) value=1; pattern='[0-9]+' ;;
         full_name) value='"Cuarroc/ProjectB"'; pattern='"Cuarroc/ProjectB"' ;;
     esac
@@ -81,9 +81,9 @@ curl_stub() {
             [[ $auth == eyJ* && " $* " == *' -X POST '* ]] || return 1
             if [[ ${scenario:-} == token_error ]]; then printf '%s' "$auth" >&2; return 1; fi
             if [[ ${scenario:-} == token_empty ]]; then printf '{"token":null}'; return; fi
-            printf '{"token":"installation_token_test"}' ;;
+            printf '{"token":"ghs_installation_token_test.v2-a.b-c"}' ;;
         *' https://api.github.com/installation/repositories?per_page=100 '*)
-            [[ $auth == installation_token_test ]] || return 1
+            [[ $auth == ghs_installation_token_test.v2-a.b-c ]] || return 1
             if [[ ${scenario:-} == scope_error ]]; then return 1; fi
             case ${scenario:-} in
                 broad) printf '{"total_count":2,"repositories":[{"full_name":"Cuarroc/ProjectB"},{"full_name":"Cuarroc/Fremd"}]}' ;;
@@ -94,7 +94,7 @@ curl_stub() {
                 *) printf '{"total_count":1,"repositories":[{"id":9,"full_name":"Cuarroc/ProjectB","owner":{"id":7}}]}' ;;
             esac ;;
         *' https://api.github.com/repos/Cuarroc/ProjectB/check-runs '*)
-            [[ $auth == installation_token_test && ${scenario:-} != test_only && " $* " == *' -X POST '* ]] || return 1
+            [[ $auth == ghs_installation_token_test.v2-a.b-c && ${scenario:-} != test_only && " $* " == *' -X POST '* ]] || return 1
             [[ $body == *'"status":"completed"'* && $body == *'"title":"Titel \"Zitat\""'* ]] || return 1
             [[ $body == *"\"name\":\"${expected_name:-review/claude}\""* && $body == *"\"head_sha\":\"$sha\""* ]] || return 1
             [[ $body == *"\"conclusion\":\"${expected_conclusion:-success}\""* ]] || return 1
