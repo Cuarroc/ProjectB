@@ -89,7 +89,7 @@ main() {
         field access_tokens_url '"https://api[.]github[.]com/app/installations/[0-9]+/access_tokens"')
     installation=${installation#https://api.github.com/app/installations/}; installation=${installation%/access_tokens}
     [[ $installation =~ ^[0-9]+$ ]] || return 1
-    credential=$(api POST "app/installations/$installation/access_tokens" | field token '"[A-Za-z0-9_]+"')
+    credential=$(api POST "app/installations/$installation/access_tokens" | field token '"ghs_[A-Za-z0-9_.-]+"')
     [[ -n $credential && $credential != null && $credential != *$'\n'* ]] || return 1
     # Absichtlich unbeschränkten Installationstoken prüfen: eine zu breite Installation ist ein Fehler.
     scope=$(api GET 'installation/repositories?per_page=100')
