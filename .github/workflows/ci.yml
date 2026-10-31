@@ -9,6 +9,10 @@ permissions:
   contents: read
   actions: read
 
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   # Mergify bearbeitet seinen Queue-Entwurf selbst (edited); abgebrochene oder verdrängte Läufe werfen den PR
   # aus der Queue. Deshalb bekommt jeder Queue-Lauf eine eigene Gruppe.

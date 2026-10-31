@@ -4,7 +4,21 @@ updates:
     directory: /kern
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      cargo-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
