@@ -50,15 +50,32 @@ field() {
     printf '%s' "$value"
 }
 quote_json() {
-    local value=$1 char code i
+    # Reines ASCII ausgeben: Windows-curl verfälscht Nicht-ASCII-Zeichen in argv (GitHub: „Problems parsing JSON“).
+    # UTF-8 byteweise selbst dekodieren: MSYS-bash zählt Zeichen außerhalb der BMP als UTF-16-Paar.
+    local LC_ALL=C value=$1 char n i b code len
+    n=${#value}
     printf '"'
-    for ((i=0; i<${#value}; i++)); do
+    for ((i=0; i<n; i++)); do
         char=${value:i:1}
-        case $char in
-            \"|\\) printf '\\%s' "$char" ;;
-            *) printf -v code '%d' "'$char"
-               if ((code<32)); then printf '\\u%04x' "$code"; else printf '%s' "$char"; fi ;;
-        esac
+        printf -v b '%d' "'$char"; ((b>=0)) || b=$((b+256))
+        if ((b<0x80)); then
+            case $char in
+                \"|\\) printf '\\%s' "$char" ;;
+                *) if ((b<32 || b==127)); then printf '\\u%04x' "$b"; else printf '%s' "$char"; fi ;;
+            esac
+            continue
+        fi
+        if ((b>=0xF0)); then len=3 code=$((b&0x07)); elif ((b>=0xE0)); then len=2 code=$((b&0x0F))
+        elif ((b>=0xC0)); then len=1 code=$((b&0x1F)); else return 1; fi
+        for ((; len>0; len--)); do
+            ((++i<n)) || return 1
+            printf -v b '%d' "'${value:i:1}"; ((b>=0)) || b=$((b+256))
+            ((b>=0x80 && b<0xC0)) || return 1
+            code=$(((code<<6)|(b&0x3F)))
+        done
+        if ((code>0xFFFF)); then
+            code=$((code-0x10000)); printf '\\u%04x\\u%04x' $((0xD800+(code>>10))) $((0xDC00+(code&0x3FF)))
+        else printf '\\u%04x' "$code"; fi
     done
     printf '"'
 }

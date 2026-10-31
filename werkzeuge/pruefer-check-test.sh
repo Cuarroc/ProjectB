@@ -57,6 +57,8 @@ for key in access_tokens_url token total_count full_name; do
     done
 done
 [[ $(quote_json $'A\\"\n\t\001') == '"A\\\"\u000a\u0009\u0001"' ]]
+# Windows-curl verfälscht Nicht-ASCII in argv: JSON muss reines ASCII sein (ü, ·, Emoji als Surrogat-Paar).
+[[ $(LC_ALL=C quote_json 'geprüft · 🙂') == '"gepr\u00fcft \u00b7 \ud83d\ude42"' ]]
 
 # Externer curl-Stub: prüft argv/Umgebung und speist echte JSON-Formate ohne Netz ein.
 curl_stub() {
