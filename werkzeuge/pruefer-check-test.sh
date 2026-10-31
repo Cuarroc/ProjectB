@@ -5,7 +5,7 @@ source ./pruefer-check.sh
 trap 'printf "Offline-Test fehlgeschlagen: Zeile %s\n" "$LINENO" >&2' ERR
 # Nur ein Wegwerf-Schlüssel im Prozessspeicher; niemals echte Zugangsdaten im Test.
 export PRUEFER_APP_KEY
-PRUEFER_APP_KEY=$("$openssl_cmd" genrsa 2048 2>/dev/null)
+PRUEFER_APP_KEY=$("$openssl_cmd" genrsa -traditional 2048 2>/dev/null)
 export PRUEFER_APP_ID=12345
 build_jwt
 IFS=. read -r header payload signature <<< "$jwt"
@@ -27,6 +27,22 @@ if printf '%s' "$header.${payload}x" | "$openssl_cmd" dgst -sha256 \
     -verify <(printf '%s' "$PRUEFER_APP_KEY" | "$openssl_cmd" pkey -pubout 2>/dev/null) \
     -signature <(decode "$signature" | "$openssl_cmd" base64 -d -A) >/dev/null 2>&1; then exit 1; fi
 
+# Derselbe Schlüssel muss auch mit Leerzeichen statt Zeilenumbrüchen signieren.
+multiline_key=$PRUEFER_APP_KEY
+export -n multiline_key
+PRUEFER_APP_KEY=${PRUEFER_APP_KEY//$'\n'/ }
+build_jwt
+IFS=. read -r header payload signature <<< "$jwt"
+printf '%s' "$header.$payload" | "$openssl_cmd" dgst -sha256 \
+    -verify <(printf '%s' "$multiline_key" | "$openssl_cmd" pkey -pubout 2>/dev/null) \
+    -signature <(decode "$signature" | "$openssl_cmd" base64 -d -A) >/dev/null
+# Ungültige Zeichen und unterschiedliche PEM-Typen dürfen nicht signiert werden.
+for invalid_key in "${PRUEFER_APP_KEY/-----END/!-----END}" "${PRUEFER_APP_KEY/-----END /-----END X}"; do
+    PRUEFER_APP_KEY=$invalid_key
+    if (build_jwt) 2>/dev/null; then exit 1; fi
+done
+PRUEFER_APP_KEY=$multiline_key
+unset multiline_key invalid_key
 # Jedes feste Antwortfeld: gültig, fehlend, doppelt und außerhalb seines Zeichensatzes.
 for key in access_tokens_url token total_count full_name; do
     case $key in
@@ -88,11 +104,13 @@ curl_stub() {
     esac
 }
 mkdir -p ../kern/target
-stub_dir=$(mktemp -d "$PWD/../kern/target/pruefer.XXXXXX")
+stub_dir=$(mktemp -d ../kern/target/pruefer.XXXXXX)
 trap 'rm -rf "$stub_dir"' EXIT
 { printf '#!/usr/bin/env bash\nset -Eeuo pipefail\n'; declare -f curl_stub; printf 'curl_stub "$@"\n'; } > "$stub_dir/curl"
 chmod +x "$stub_dir/curl"
 export PATH="$stub_dir:$PATH"
+[[ $(type -P curl) == "$stub_dir/curl" ]]
+bash -c '[[ $(type -P curl) == */kern/target/pruefer.*/curl ]]'
 sha=0123456789012345678901234567890123456789
 run() { bash -x ./pruefer-check.sh "$@" 2>&1; }
 safe() { [[ $1 != *'PRIVATE KEY'* && $1 != *eyJ* && $1 != *installation_token_test* ]]; }
