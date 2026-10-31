@@ -28,7 +28,9 @@ shared:
         - check-success=review/claude
     # CI-, Agenten- und Mergify-Dateien nur mit Elias' Ja. Nach dem Bot-Konto: label=elias-ok -> approved-reviews-by=Cuarroc.
     - or:
-        - -files~=^(\.github/|\.mergify\.yml$|\.mcp\.json$|\.claude/|\.agents/)
+        - and:
+            - -files~=^(\.github/|\.mergify\.yml$)
+            - -files~=(?i)^(?:.*/)?(?:\.mcp\.json$|\.claude/|\.agents/)
         - label=elias-ok
 
 queue_rules:
