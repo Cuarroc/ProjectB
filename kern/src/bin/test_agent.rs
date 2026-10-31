@@ -42,5 +42,8 @@ fn main() {
     if hat("--haengen") {
         std::thread::sleep(std::time::Duration::from_secs(60));
     }
+    if hat("--fehler") {
+        std::process::exit(7);
+    }
     writeln!(aus, r#"{{"type":"result","is_error":false,"result":"erledigt"}}"#).unwrap();
 }
