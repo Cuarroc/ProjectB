@@ -8,6 +8,10 @@ on:
 
 permissions: {}
 
+defaults:
+  run:
+    shell: bash
+
 # Läufe für denselben PR nacheinander, damit kein älterer Stand einen neueren überschreibt.
 concurrency:
   group: codex-status-${{ github.event.issue.number }}
