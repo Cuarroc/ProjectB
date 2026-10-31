@@ -7,7 +7,9 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 /// Was ein Agent gerade tut.
 #[derive(Debug, Clone, PartialEq)]
@@ -20,6 +22,12 @@ pub enum Ereignis {
     Fertig {
         erfolg: bool,
         zusammenfassung: String,
+    },
+    /// Der Anbieter hat ein Ergebnis angekündigt, dessen Erfolg noch vom Exit-Code abhängt.
+    ErgebnisAusstehend,
+    Beendet {
+        code: Option<i32>,
+        erfolg: bool,
     },
     /// Hinweis: Zeile auf der Fehlerausgabe (z. B. „nicht angemeldet“) oder ein Befehl, der scheiterte.
     Meldung(String),
@@ -73,7 +81,8 @@ pub fn lies_claude(v: &Value) -> Vec<Ereignis> {
             })
             .collect(),
         Some("result") => vec![Ereignis::Fertig {
-            erfolg: v.get("is_error").and_then(Value::as_bool) == Some(false),
+            erfolg: text(v, "/subtype").as_deref() == Some("success")
+                && v.get("is_error").and_then(Value::as_bool) == Some(false),
             // Bei Abbrüchen (error_during_execution, error_max_turns) steht der Grund in `errors`.
             zusammenfassung: text(v, "/result").unwrap_or_else(|| {
                 let fehler = v.get("errors").and_then(Value::as_array).into_iter().flatten();
@@ -107,7 +116,7 @@ pub fn lies_codex(v: &Value) -> Vec<Ereignis> {
             Some(andere) => vec![Ereignis::Werkzeug(andere.into())],
             None => vec![],
         },
-        Some("turn.completed") => vec![Ereignis::Fertig { erfolg: true, zusammenfassung: String::new() }],
+        Some("turn.completed") => vec![Ereignis::ErgebnisAusstehend],
         Some("turn.failed") | Some("error") => vec![Ereignis::Fertig {
             erfolg: false,
             zusammenfassung: text(v, "/error/message").or_else(|| text(v, "/message")).unwrap_or_default(),
@@ -118,7 +127,8 @@ pub fn lies_codex(v: &Value) -> Vec<Ereignis> {
 
 /// Ein laufender Agent.
 pub struct Lauf {
-    kind: Child,
+    kind: Arc<Mutex<Child>>,
+    pid: u32,
     #[cfg(windows)]
     job: std::sync::Arc<job::Griff>,
     pub ereignisse: Receiver<Ereignis>,
@@ -129,14 +139,19 @@ impl Lauf {
         let mut befehl = Command::new(finde_programm(a.programm));
         befehl.args(a.argumente).current_dir(ordner);
         befehl.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        let (tx, rx) = channel();
+        let (tx, eingang) = channel();
+        let (ausgang, rx) = channel();
         #[cfg(windows)]
         let (mut kind, job) = job::starten(&mut befehl, tx.clone())?;
         #[cfg(not(windows))]
         let mut kind = befehl.spawn()?;
         let lesen = a.lesen;
         mitlesen(kind.stdout.take().expect("stdout"), tx.clone(), move |zeile| {
-            serde_json::from_str(zeile).map(|v| lesen(&v)).unwrap_or_default()
+            if zeile.trim().is_empty() {
+                vec![]
+            } else {
+                serde_json::from_str(zeile).map(|v| lesen(&v)).unwrap_or_else(|_| vec![Ereignis::Meldung(zeile.into())])
+            }
         });
         mitlesen(kind.stderr.take().expect("stderr"), tx.clone(), |zeile| vec![Ereignis::Meldung(zeile.into())]);
         // Erst lesen, dann schreiben, und zwar in einem eigenen Thread: ein großer Auftrag füllt sonst die
@@ -147,8 +162,46 @@ impl Lauf {
                 let _ = tx.send(Ereignis::Meldung(format!("Auftrag nicht vollständig übergeben: {e}")));
             }
         });
+        let pid = kind.id();
+        let kind = Arc::new(Mutex::new(kind));
+        let waechter = Arc::clone(&kind);
+        thread::spawn(move || {
+            let (mut ergebnis, mut ausstehend) = (None, false);
+            for ereignis in eingang {
+                match &ereignis {
+                    Ereignis::ErgebnisAusstehend => {
+                        ausstehend = true;
+                        continue;
+                    }
+                    Ereignis::Fertig { erfolg, .. } => ergebnis = Some(ergebnis.unwrap_or(true) && *erfolg),
+                    _ => {}
+                }
+                let _ = ausgang.send(ereignis);
+            }
+            let status = loop {
+                let status = waechter.lock().unwrap().try_wait();
+                match status {
+                    Ok(Some(status)) => break Some(status),
+                    Ok(None) => thread::sleep(Duration::from_millis(10)),
+                    Err(e) => {
+                        let _ = ausgang.send(Ereignis::Meldung(format!("Prozessstatus nicht lesbar: {e}")));
+                        break None;
+                    }
+                }
+            };
+            let prozess_ok = status.is_some_and(|s| s.success());
+            if ausstehend && ergebnis != Some(false) {
+                ergebnis = Some(prozess_ok);
+                let _ = ausgang.send(Ereignis::Fertig { erfolg: prozess_ok, zusammenfassung: String::new() });
+            }
+            let _ = ausgang.send(Ereignis::Beendet {
+                code: status.and_then(|s| s.code()),
+                erfolg: prozess_ok && ergebnis == Some(true),
+            });
+        });
         Ok(Lauf {
             kind,
+            pid,
             #[cfg(windows)]
             job,
             ereignisse: rx,
@@ -157,33 +210,34 @@ impl Lauf {
 
     /// Hält den Agenten samt allen Unterprozessen an.
     pub fn anhalten(&mut self) -> io::Result<()> {
+        let mut kind = self.kind.lock().unwrap();
         // Den ganzen Job beenden, auch wenn der Agent selbst schon fertig ist: verwaiste Enkel
         // hängen nicht mehr im Prozessbaum, sind aber im Job (LEHREN.md).
         #[cfg(windows)]
         if let Err(e) = job::beenden(&self.job) {
             // Exit-Code nicht verstecken: nie unbegrenzt warten, sondern den Agenten selbst beenden und melden.
             // Scheitert auch das, bleibt der Job-Fehler `e` in der Meldung.
-            let agent = match self.kind.try_wait() {
+            let agent = match kind.try_wait() {
                 Ok(Some(_)) => Ok(()),
-                _ => self.kind.kill().and_then(|_| self.kind.wait().map(|_| ())),
+                _ => kind.kill().and_then(|_| kind.wait().map(|_| ())),
             };
             let agent = agent.err().map(|f| format!(", Agent nicht beendet ({f})")).unwrap_or_default();
             return Err(io::Error::other(format!("Job nicht beendet ({e}){agent}; Unterprozesse laufen evtl. weiter")));
         }
         #[cfg(not(windows))]
-        if self.kind.try_wait()?.is_none() {
-            self.kind.kill()?;
+        if kind.try_wait()?.is_none() {
+            kind.kill()?;
         }
-        self.kind.wait().map(|_| ())
+        kind.wait().map(|_| ())
     }
 
     /// Prozessnummer des Agenten, z. B. um nach dem Anhalten gezielt nach Resten zu suchen.
     pub fn pid(&self) -> u32 {
-        self.kind.id()
+        self.pid
     }
 
     pub fn warten(&mut self) -> io::Result<ExitStatus> {
-        self.kind.wait()
+        self.kind.lock().unwrap().wait()
     }
 }
 
@@ -193,8 +247,26 @@ fn mitlesen(
     lesen: impl Fn(&str) -> Vec<Ereignis> + Send + 'static,
 ) {
     thread::spawn(move || {
-        for zeile in BufReader::new(quelle).lines().map_while(Result::ok) {
-            for e in lesen(zeile.trim()) {
+        let mut quelle = BufReader::new(quelle);
+        let mut bytes = Vec::new();
+        loop {
+            bytes.clear();
+            match quelle.read_until(b'\n', &mut bytes) {
+                Ok(0) => break,
+                Ok(_) => {}
+                Err(e) => {
+                    let _ = tx.send(Ereignis::Meldung(format!("Ausgabe nicht vollständig gelesen: {e}")));
+                    break;
+                }
+            }
+            if bytes.last() == Some(&b'\n') {
+                bytes.pop();
+                if bytes.last() == Some(&b'\r') {
+                    bytes.pop();
+                }
+            }
+            let zeile = String::from_utf8_lossy(&bytes);
+            for e in lesen(&zeile) {
                 if tx.send(e).is_err() {
                     return;
                 }
@@ -342,6 +414,13 @@ impl fmt::Display for Ereignis {
             Ereignis::Fertig { erfolg: true, zusammenfassung } if zusammenfassung.is_empty() => write!(f, "fertig"),
             Ereignis::Fertig { erfolg: true, zusammenfassung } => write!(f, "fertig: {}", kurz(zusammenfassung)),
             Ereignis::Fertig { erfolg: false, zusammenfassung } => write!(f, "PROBLEM: {}", kurz(zusammenfassung)),
+            Ereignis::ErgebnisAusstehend => write!(f, "Ergebnis ausstehend"),
+            Ereignis::Beendet { code, erfolg } => write!(
+                f,
+                "{}beendet (Exit-Code: {})",
+                if *erfolg { "" } else { "PROBLEM: " },
+                code.map_or_else(|| "unbekannt".into(), |c| c.to_string())
+            ),
             Ereignis::Meldung(m) => write!(f, "Meldung: {}", kurz(m)),
             Ereignis::Unbekannt(art) => write!(f, "unbekanntes Ereignis: {art}"),
         }

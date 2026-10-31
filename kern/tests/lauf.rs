@@ -1,4 +1,4 @@
-use projectb_kern::{lies_claude, Anbieter, Ereignis, Lauf};
+use projectb_kern::{lies_claude, lies_codex, Anbieter, Ereignis, Lauf};
 use std::time::{Duration, Instant};
 
 static TEST_AGENT: Anbieter =
@@ -39,10 +39,64 @@ fn anhalten_beendet_einen_haengenden_agenten() {
     assert!(!lauf.warten().unwrap().success());
     let rest: Vec<Ereignis> = lauf.ereignisse.iter().collect();
     assert!(!rest.iter().any(|e| matches!(e, Ereignis::Fertig { .. })), "{rest:?}");
+    assert!(matches!(rest.last(), Some(Ereignis::Beendet { erfolg: false, .. })), "{rest:?}");
 }
 
 fn agent(argumente: &'static [&'static str]) -> Anbieter {
     Anbieter { name: "test", programm: env!("CARGO_BIN_EXE_test_agent"), argumente, lesen: lies_claude }
+}
+
+fn sammeln(anbieter: &Anbieter) -> Vec<Ereignis> {
+    let mut lauf = Lauf::starten(anbieter, "x", &std::env::temp_dir()).unwrap();
+    let alle = lauf.ereignisse.iter().collect();
+    lauf.warten().unwrap();
+    alle
+}
+
+#[test]
+fn ungueltiges_utf8_unterbricht_das_lesen_nicht() {
+    let alle = sammeln(&agent(&["--kaputtes-utf8"]));
+    assert!(alle.contains(&Ereignis::Meldung("kaputt \u{fffd}".into())), "{alle:?}");
+    assert!(alle.contains(&Ereignis::Text("Auftrag: x".into())), "{alle:?}");
+}
+
+#[test]
+fn einfache_ausgabe_wird_gemeldet_leerzeilen_nicht() {
+    let alle = sammeln(&agent(&["--kein-json"]));
+    assert!(alle.contains(&Ereignis::Meldung("  einfache Ausgabe  ".into())), "{alle:?}");
+    assert!(!alle.contains(&Ereignis::Meldung(String::new())), "{alle:?}");
+}
+
+#[test]
+fn claude_erfolg_braucht_beide_felder() {
+    for (subtype, is_error, erfolg) in
+        [("success", false, true), ("error_max_turns", false, false), ("success", true, false)]
+    {
+        let zeile = serde_json::json!({"type":"result", "subtype":subtype, "is_error":is_error});
+        assert!(matches!(&lies_claude(&zeile)[..], [Ereignis::Fertig { erfolg: ist, .. }] if *ist == erfolg));
+    }
+}
+
+#[test]
+fn codex_erfolg_erfordert_exit_code_null() {
+    let fertig = serde_json::json!({"type":"turn.completed"});
+    assert!(!lies_codex(&fertig).iter().any(|e| matches!(e, Ereignis::Fertig { erfolg: true, .. })));
+    let codex = Anbieter { name: "codex", lesen: lies_codex, ..agent(&["--codex", "--exit-3"]) };
+    let alle = sammeln(&codex);
+    assert!(!alle.iter().any(|e| matches!(e, Ereignis::Fertig { erfolg: true, .. })), "{alle:?}");
+    assert_eq!(alle.last().unwrap().to_string(), "PROBLEM: beendet (Exit-Code: 3)");
+    let codex = Anbieter { name: "codex", lesen: lies_codex, ..agent(&["--codex"]) };
+    let alle = sammeln(&codex);
+    assert!(alle.iter().any(|e| matches!(e, Ereignis::Fertig { erfolg: true, .. })), "{alle:?}");
+    assert_eq!(alle.last().unwrap().to_string(), "beendet (Exit-Code: 0)");
+}
+
+#[test]
+fn prozessende_kommt_zuletzt_und_fehlt_keine_ergebnismeldung() {
+    let alle = sammeln(&TEST_AGENT);
+    assert_eq!(alle.last().unwrap().to_string(), "beendet (Exit-Code: 0)");
+    let ohne = sammeln(&agent(&["--ohne-lesen"]));
+    assert_eq!(ohne.last().unwrap().to_string(), "PROBLEM: beendet (Exit-Code: 0)");
 }
 
 #[test]
