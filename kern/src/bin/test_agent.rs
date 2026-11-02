@@ -33,6 +33,26 @@ fn main() {
     let antwort = serde_json::json!({"type":"assistant","message":{"content":[
         {"type":"text","text":format!("Auftrag: {}", auftrag.trim())},{"type":"tool_use","name":"Read"}]}});
     writeln!(aus, r#"{{"type":"system","subtype":"init","model":"test-modell"}}"#).unwrap();
+    if hat("--kaputtes-utf8") {
+        aus.write_all(b"kaputt \xff\n").unwrap();
+    }
+    if hat("--kein-json") {
+        writeln!(aus, "  einfache Ausgabe  \n  ").unwrap();
+    }
+    if hat("--codex") {
+        if hat("--wiederverbindung") {
+            writeln!(aus, r#"{{"type":"error","message":"Reconnecting… 1/5"}}"#).unwrap();
+        }
+        if hat("--turn-failed") {
+            writeln!(aus, r#"{{"type":"turn.failed","error":{{"message":"Verbindung verloren"}}}}"#).unwrap();
+        } else {
+            writeln!(aus, r#"{{"type":"turn.completed"}}"#).unwrap();
+        }
+        if hat("--exit-3") {
+            std::process::exit(3);
+        }
+        return;
+    }
     writeln!(aus, "{antwort}").unwrap();
     aus.flush().unwrap();
     eprintln!("eine Meldung");
@@ -42,5 +62,5 @@ fn main() {
     if hat("--haengen") {
         std::thread::sleep(std::time::Duration::from_secs(60));
     }
-    writeln!(aus, r#"{{"type":"result","is_error":false,"result":"erledigt"}}"#).unwrap();
+    writeln!(aus, r#"{{"type":"result","subtype":"success","is_error":false,"result":"erledigt"}}"#).unwrap();
 }
