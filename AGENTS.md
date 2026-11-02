@@ -13,8 +13,9 @@ Elias ist kein Programmierer. Schreib für ihn einfach und kurz.
 4. **Review durch die ANDERE Modellfamilie** auf dem aktuellen Stand (eins reicht). Oberflächen-PRs prüft zusätzlich
    ein Claude-Agent am Screenshot. Höchstens zwei Runden mit offenen Funden, dann Label `stopp` und Frage an Elias.
    Im PR-Text steht „Geschrieben von: Claude|Codex“, dazu das Label `autor-claude` oder `autor-codex`.
-5. **Merge automatisch über Mergify,** wenn CI grün und Review ok. Änderungen an `.github/` und `.mergify.yml` nur mit
-   Elias' Ja (Label `elias-ok`). Ein roter `main` stoppt alles, der Orchestrator repariert ihn sofort.
+5. **Merge automatisch über Mergify,** wenn CI grün und Review ok. Änderungen an `.github/`, `.mergify.yml`,
+   `.mcp.json`, `.claude/` und `.agents/` nur mit Elias' Ja (Label `elias-ok`). Ein roter `main` stoppt alles,
+   der Orchestrator repariert ihn sofort.
 
 ## Sicherheit
 
