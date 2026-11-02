@@ -11,11 +11,13 @@ shared:
     - -draft
     - -label=stopp
     - and: *ci
-    # Geschrieben von Claude -> Codex prüft; geschrieben von Codex -> ein frischer Claude-Agent prüft.
+    # Geschrieben von Claude -> Codex prüft (Bot oder eigener Codex-Prüfer); geschrieben von Codex -> ein frischer Claude-Agent prüft.
     - or:
         - and:
             - label=autor-claude
-            - check-success=review-codex
+            - or:
+                - check-success=review-codex
+                - check-success=review/codex
         - and:
             - label=autor-codex
             - check-success=review/claude
