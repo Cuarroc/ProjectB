@@ -117,7 +117,8 @@ pub fn lies_codex(v: &Value) -> Vec<Ereignis> {
             None => vec![],
         },
         Some("turn.completed") => vec![Ereignis::ErgebnisAusstehend],
-        Some("turn.failed") | Some("error") => vec![Ereignis::Fertig {
+        Some("error") => vec![Ereignis::Meldung(text(v, "/message").unwrap_or_default())],
+        Some("turn.failed") => vec![Ereignis::Fertig {
             erfolg: false,
             zusammenfassung: text(v, "/error/message").or_else(|| text(v, "/message")).unwrap_or_default(),
         }],

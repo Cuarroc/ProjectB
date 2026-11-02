@@ -40,7 +40,14 @@ fn main() {
         writeln!(aus, "  einfache Ausgabe  \n  ").unwrap();
     }
     if hat("--codex") {
-        writeln!(aus, r#"{{"type":"turn.completed"}}"#).unwrap();
+        if hat("--wiederverbindung") {
+            writeln!(aus, r#"{{"type":"error","message":"Reconnecting… 1/5"}}"#).unwrap();
+        }
+        if hat("--turn-failed") {
+            writeln!(aus, r#"{{"type":"turn.failed","error":{{"message":"Verbindung verloren"}}}}"#).unwrap();
+        } else {
+            writeln!(aus, r#"{{"type":"turn.completed"}}"#).unwrap();
+        }
         if hat("--exit-3") {
             std::process::exit(3);
         }

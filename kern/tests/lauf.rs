@@ -92,6 +92,30 @@ fn codex_erfolg_erfordert_exit_code_null() {
 }
 
 #[test]
+fn codex_wiederverbindung_verhindert_erfolg_nicht() {
+    let codex = Anbieter { lesen: lies_codex, ..agent(&["--codex", "--wiederverbindung"]) };
+    let alle = sammeln(&codex);
+    assert!(alle.contains(&Ereignis::Meldung("Reconnecting… 1/5".into())), "{alle:?}");
+    assert_eq!(alle.last(), Some(&Ereignis::Beendet { code: Some(0), erfolg: true }), "{alle:?}");
+}
+
+#[test]
+fn codex_turn_failed_bleibt_problem() {
+    for argumente in [
+        &["--codex", "--wiederverbindung", "--turn-failed"][..],
+        &["--codex", "--wiederverbindung", "--turn-failed", "--exit-3"][..],
+    ] {
+        let codex = Anbieter { lesen: lies_codex, ..agent(argumente) };
+        let alle = sammeln(&codex);
+        assert!(
+            alle.contains(&Ereignis::Fertig { erfolg: false, zusammenfassung: "Verbindung verloren".into() }),
+            "{alle:?}"
+        );
+        assert!(matches!(alle.last(), Some(Ereignis::Beendet { erfolg: false, .. })), "{alle:?}");
+    }
+}
+
+#[test]
 fn prozessende_kommt_zuletzt_und_fehlt_keine_ergebnismeldung() {
     let alle = sammeln(&TEST_AGENT);
     assert_eq!(alle.last().unwrap().to_string(), "beendet (Exit-Code: 0)");
