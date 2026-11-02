@@ -48,6 +48,10 @@ fn main() {
         } else {
             writeln!(aus, r#"{{"type":"turn.completed"}}"#).unwrap();
         }
+        if hat("--haengen") {
+            aus.flush().unwrap();
+            std::thread::sleep(std::time::Duration::from_secs(60));
+        }
         if hat("--exit-3") {
             std::process::exit(3);
         }
@@ -61,6 +65,9 @@ fn main() {
     }
     if hat("--haengen") {
         std::thread::sleep(std::time::Duration::from_secs(60));
+    }
+    if hat("--fehler") {
+        std::process::exit(7);
     }
     writeln!(aus, r#"{{"type":"result","subtype":"success","is_error":false,"result":"erledigt"}}"#).unwrap();
 }
