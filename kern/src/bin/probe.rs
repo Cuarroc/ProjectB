@@ -74,10 +74,23 @@ pub fn ausfuehren(
             match lauf.ereignisse.try_recv() {
                 Ok(e) => {
                     gelesen = true;
+                    let stoppfolge = *angehalten
+                        && matches!(&e, Ereignis::Fertig { erfolg: false, zusammenfassung } if zusammenfassung.is_empty());
                     if let Ereignis::Fertig { erfolg: false, zusammenfassung } = &e {
-                        *problem = Some(zusammenfassung.clone());
+                        if !stoppfolge {
+                            *problem = Some(if zusammenfassung.is_empty() {
+                                "Agent mit Fehler beendet".into()
+                            } else {
+                                zusammenfassung.clone()
+                            });
+                        }
                     }
-                    zeile(name, &e.to_string());
+                    if matches!(e, Ereignis::Beendet { erfolg: false, .. }) && !*angehalten && problem.is_none() {
+                        *problem = Some("Agent mit Fehler beendet".into());
+                    }
+                    if !stoppfolge && !matches!(e, Ereignis::Beendet { .. }) {
+                        zeile(name, &e.to_string());
+                    }
                 }
                 Err(TryRecvError::Disconnected) => {
                     let (name, mut lauf, angehalten, mut problem) = laeufe.swap_remove(index);

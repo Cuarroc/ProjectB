@@ -2,7 +2,7 @@
 #[path = "../src/bin/probe.rs"]
 mod probe;
 
-use projectb_kern::{lies_claude, Anbieter, Ereignis};
+use projectb_kern::{lies_claude, lies_codex, Anbieter, Ereignis};
 use std::time::{Duration, Instant};
 
 fn agent(name: &'static str, argumente: &'static [&'static str]) -> Anbieter {
@@ -54,6 +54,33 @@ fn anhalten_beendet_beide_gleichzeitigen_laeufe() {
 #[test]
 fn fehler_exitcode_ergibt_eins() {
     pruefen(&["--fehler"], None, 1, "Problem: Agent mit Fehler beendet, Exit-Code 7");
+}
+
+#[test]
+fn kern_ergebnis_bestimmt_den_abschluss() {
+    for (argumente, erwartet, ende) in [
+        (&["--ohne-lesen"][..], 1, "Problem: Agent mit Fehler beendet, Exit-Code 0"),
+        (&["--codex", "--wiederverbindung"][..], 0, "fertig, Exit-Code 0"),
+        (&["--codex", "--exit-3"][..], 1, "Problem: Agent mit Fehler beendet, Exit-Code 3"),
+        (&["--codex", "--wiederverbindung", "--turn-failed"][..], 1, "Problem: Verbindung verloren, Exit-Code 0"),
+    ] {
+        let codex = Anbieter { lesen: lies_codex, ..agent("codex", argumente) };
+        let mut zeilen = Vec::new();
+        let code = probe::ausfuehren(&[&codex], "x", &std::env::temp_dir(), None, |z| zeilen.push(z.to_owned()));
+        assert_eq!(code, erwartet, "{zeilen:?}");
+        assert!(zeilen.last().unwrap().contains(ende), "{zeilen:?}");
+    }
+}
+
+#[test]
+fn absichtlicher_codex_stopp_bleibt_erfolgreich() {
+    let codex = Anbieter { lesen: lies_codex, ..agent("codex", &["--codex", "--haengen"]) };
+    let mut zeilen = Vec::new();
+    let code = probe::ausfuehren(&[&codex], "x", &std::env::temp_dir(), Some(Duration::from_secs(2)), |z| {
+        zeilen.push(z.to_owned());
+    });
+    assert_eq!(code, 0, "{zeilen:?}");
+    assert!(zeilen.last().unwrap().contains("angehalten, Exit-Code"), "{zeilen:?}");
 }
 
 #[test]
