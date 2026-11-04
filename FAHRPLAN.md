@@ -1,6 +1,6 @@
 # ProjectB – Fahrplan
 
-Stand: 30.10.2026 · Aktueller Schritt: **3** · Version 0.1 eingefroren (Elias, 30.10.2026) · Ziel: siehe `README.md`
+Stand: 04.11.2026 · Aktueller Schritt: **4a** · Version 0.1 eingefroren (Elias, 30.10.2026) · Ziel: siehe `README.md`
 
 ## Schritte
 
@@ -9,7 +9,7 @@ Stand: 30.10.2026 · Aktueller Schritt: **3** · Version 0.1 eingefroren (Elias,
 | 0 | ProjectA einfrieren | Elias | keine neuen Pläne oder Pakete, automatische Starter aus (Elias prüft Roots Antwort) ✅ |
 | 1 | Bestand von ProjectA prüfen | Elias + Claude | `UEBERNAHME.md` steht ✅ |
 | 2 | Version 0.1 festlegen, Repo anlegen | Elias + Claude | Version 0.1 unten von Elias abgenommen; Repo mit den fünf Seiten ✅ |
-| 3 | Technik-Probe | Claude oder AgentsRoom | ProjectB startet Claude und Codex ohne Terminal, zeigt den Fortschritt live und hält sie an; ein weiterer Anbieter ist nur ein kleiner Zusatz |
+| 3 | Technik-Probe | Claude oder AgentsRoom | ProjectB startet Claude und Codex ohne Terminal, zeigt den Fortschritt live und hält sie an; ein weiterer Anbieter ist nur ein kleiner Zusatz ✅ |
 | 4a | Designsystem und Hauptbildschirme | Elias + Claude | Designsystem in Claude; Bildschirme von 0.1 als Entwurf, von Elias abgenommen |
 | 4b | Oberfläche bauen | AgentsRoom | nur Bildschirme von 0.1, mit Beispieldaten über eine feste Datenschnittstelle; startet unter Windows |
 | 5 | Funktionen anschließen | AgentsRoom | je Funktion: Beispieldaten durch echte ersetzt, Elias hat es selbst geprüft |
