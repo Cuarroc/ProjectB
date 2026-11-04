@@ -18,12 +18,12 @@ Stand: 04.11.2026 · Aktueller Schritt: **4a** · Version 0.1 eingefroren (Elias
 ## Version 0.1 (höchstens 5 Funktionen)
 
 1. **Projekt wählen:** einen lokalen Ordner mit Git-Repo öffnen.
-2. **Auftrag geben:** ein Feld für den Auftrag in deinen Worten. Der Orchestrator (Claude) teilt ihn in höchstens 3 Teilaufgaben.
+2. **Mit dem Orchestrator chatten:** Aufträge in deinen Worten, in einem Chat mit Verlauf und einer Liste der Chats. Modus Ausführen, Planen oder Interview: Im Interview fragt der Orchestrator erst nach, bis die Richtung klar ist. Im Verlauf stehen seine Aktionen, sein Plan und seine Fragen an dich. Einen Auftrag teilt er in höchstens 3 Teilaufgaben.
 3. **Team arbeitet:** höchstens 3 Agenten parallel (Claude Code oder Codex), jeder in einem eigenen Worktree.
    Eine Liste zeigt „arbeitet“, „wartet auf dich“, „fertig“ und „Problem“, live. Jeder Agent lässt sich anhalten.
 4. **Grün heißt bewiesen:** Tests im Worktree, PR, Review durch Codex und Claude.
    Erst danach steht „fertig“ da, mit Beleg und Link zum PR.
-5. **Rollen einstellen:** welcher Anbieter und welches Modell für Orchestrator, Worker und Reviewer.
+5. **Rollen und Kontingent:** Anbieter, Modell und Effort für Orchestrator, Worker und Reviewer, im Chat schnell umschaltbar. Der Verbrauch von Claude und Codex ist immer sichtbar.
 
 0.1 ist fertig, wenn Elias damit drei echte Aufträge von Anfang bis Ende erledigt hat, ohne selbst in den Code
 einzugreifen, und dabei jede der fünf Funktionen oben mindestens einmal funktioniert hat. Was dabei hakt, wird
@@ -45,3 +45,4 @@ behoben, bevor 0.2 beginnt.
 - Weitere Anbieter mit Abo: OpenCode, Kimi, Ollama (erste Kandidaten für 0.2)
 - Anpassung über Dateien: Teams, Rollen, Prüfstufen
 - Updater
+- Chat-Werkzeuge: Befehle mit /, Verweise mit @, Anhänge, /kompakt (aus Schritt 4a, 04.11.2026)
