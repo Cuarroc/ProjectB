@@ -5,6 +5,9 @@ shared:
     - check-success=test (ubuntu-latest)
     - check-success=test (windows-latest)
     - check-success=secrets
+    - check-success=zizmor
+    - check-success=deny
+    - check-success=Testzahl-Wächter
   # Am ursprünglichen PR geprüft, auch bei „@mergifyio queue“ (queue_conditions).
   freigabe: &freigabe
     - base=main
