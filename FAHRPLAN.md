@@ -51,3 +51,4 @@ wird vor 0.2 behoben.
 - Ziel 0.2: im Plan Aufwand und Risiko je Schritt, zwei Fassungen zum Vergleich
 - Ziel 0.2: Berechtigung „Maximal“ und Zeitlimit („4 Stunden“, „Bis morgen 8 Uhr“)
 - Vorschau und Kommentare an die Vorschau: über AgentsRoom gelöst (05.11.2026)
+- Leitstand-Prüfer-Benchmark: die zwei P3 aus Leitstand-PR #7 (Blindheit nur per Anweisung, Zusatzfunde in Fehler-Fällen)

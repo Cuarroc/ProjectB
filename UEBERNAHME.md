@@ -37,9 +37,9 @@ nur Claude und Codex; Bildschirme und Bausteine neu. Wissen und Windows-Fallen s
 
 | Nr. | Freigabe | Grenze |
 |---|---|---|
-| 1 | Werkzeug-Updates auf PC und Server | Nur installierte Werkzeuge aus offizieller Quelle |
+| 1 | Werkzeug-Updates auf PC und Server | Nur installierte Werkzeuge aus offizieller Quelle; Neues nur mit Ja |
 | 2 | Aufräumen nach Merge | Nur ProjectB, nie main, nichts Ungesichertes, nichts aus ProjectA |
-| 3 | AgentsRoom für ProjectB einrichten | Nie kostenpflichtig; Webhooks und Tresor bleiben bei Elias |
+| 3 | AgentsRoom für ProjectB einrichten | Nur wie in freigegebenen Konzepten, nie kostenpflichtig; Webhooks und Tresor bleiben bei Elias |
 | 4 | Server-Betrieb für ProjectB | Kein Server-Neustart, keine Admin-Rechte |
 | 5 | Alte ProjectA-Quota-Regeln aus | Einmalig, erledigt |
 | 6 | Weitergabe durch die Aufsicht | Elias' Entscheidungen über das Postfach gelten wie direkt gesagt; nicht für Geld, Rechte, Löschen außerhalb, neue Programme, Releases |
