@@ -5,19 +5,46 @@ body {
   font: var(--schrift-text);
 }
 
-main {
+.app-rahmen {
+  --chats-breite: calc(4 * var(--leiste-breite));
+  --team-breite: minmax(0, 1fr);
+  box-sizing: border-box;
+  height: 100dvh;
   display: grid;
-  grid-template-columns: repeat(3, max-content);
-  align-items: start;
+  grid-template-rows: var(--kopf-hoehe) minmax(0, 1fr);
   gap: var(--abstand-3);
   padding: var(--abstand-4);
 }
 
-section {
+.app-kopf {
+  display: flex;
+  align-items: center;
+  padding-inline: var(--abstand-6);
+  background: var(--flaeche-1);
+  border-radius: var(--rund-bereich);
+  box-shadow: var(--schatten-kante);
+}
+
+.app-kopf h1 {
+  margin: 0;
+  font: var(--schrift-titel);
+  letter-spacing: var(--laufweite-titel);
+}
+
+.hauptbildschirm {
+  display: grid;
+  grid-template-columns: var(--chats-breite) minmax(0, 1fr) var(--team-breite);
+  min-height: 0;
+  gap: var(--abstand-3);
+}
+
+.hauptbildschirm > section {
+  min-width: 0;
+  overflow: auto;
   padding: var(--abstand-6);
   background: var(--flaeche-1);
   border-radius: var(--rund-bereich);
   box-shadow: var(--schatten-kante);
 }
 
-h2 { margin: 0; font: var(--schrift-ueberschrift); }
+.hauptbildschirm h2 { margin: 0; font: var(--schrift-ueberschrift); }
