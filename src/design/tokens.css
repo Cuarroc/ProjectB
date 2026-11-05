@@ -20,6 +20,8 @@
   --akzent-grund: rgba(176,140,255,0.18); /* Hintergrund des aktiven Umschalter-Teils und eigener Chat-Nachrichten. */
   --status-arbeitet: #67C2FF; /* Zustand „arbeitet“. Immer mit Symbol und Wort. */
   --status-wartet: #F5C063; /* Zustand „wartet auf dich“. Immer mit Symbol und Wort. */
+  --status-arbeitet-text: #DDF1FF; /* Text im laufenden Stück einer Zeitspur „Arbeitet“ (Fläche getönt, 26 % Deckkraft). */
+  --status-wartet-text: #FFF0CC; /* Text im laufenden Stück einer Zeitspur „Wartet auf dich“ (Fläche getönt, 26 % Deckkraft). */
   --status-fertig: #66D19E; /* Zustand „fertig“. Immer mit Haken und Wort. */
   --status-problem: #FF8F80; /* Zustand „Problem“, rote Tests. Immer mit Kreuz und Wort. */
   --status-arbeitet-grund: rgba(103,194,255,0.14); /* Grund der Statusmarke „arbeitet“ und Glanz von Karten. */
