@@ -1,0 +1,23 @@
+body {
+  margin: 0;
+  background: var(--grund);
+  color: var(--text-1);
+  font: var(--schrift-text);
+}
+
+main {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  align-items: start;
+  gap: var(--abstand-3);
+  padding: var(--abstand-4);
+}
+
+section {
+  padding: var(--abstand-6);
+  background: var(--flaeche-1);
+  border-radius: var(--rund-bereich);
+  box-shadow: var(--schatten-kante);
+}
+
+h2 { margin: 0; font: var(--schrift-ueberschrift); }
