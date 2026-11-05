@@ -1,0 +1,89 @@
+/* ProjectB Design-System, Version 1. Quelle: Design-System aus Schritt 4a (Elias, 05.11.2026). */
+/* Nur diese Werte verwenden (AGENTS.md Regel 11). Bedeutung je Token: siehe Kommentar. */
+
+:root {
+  color-scheme: dark;
+
+  /* Farben */
+  --grund: #0A0C11; /* Seitengrund hinter allen Bereichen. Nie für Text. */
+  --flaeche-1: #12151D; /* Bereiche (Chat, Team, Leisten). Darauf text-1 bis text-3. */
+  --flaeche-1-oben: #161A24; /* Nur als oberer Anfang des Bereichs-Verlaufs: von flaeche-1-oben (0 px) zu flaeche-1 (180 px). */
+  --flaeche-2: #191D27; /* Karten, Kacheln, Eingabefeld, Spuren im Zeitstrahl. */
+  --flaeche-3: #232836; /* Knöpfe, Spur des Umschalters, schwebende Felder. */
+  --text-1: #ECEEF4; /* Haupttext und Zahlen. 13:1 auf flaeche-2. */
+  --text-2: #A9B0C0; /* Zweittext: Modell, Zeiten, Beschriftungen. 7,7:1 auf flaeche-2. */
+  --text-3: #8E96A8; /* Leisester Text: Uhrzeiten, Platzhalter. 5,7:1 auf flaeche-2, 5,0:1 auf flaeche-3. Nie heller als hier gezeigt verwenden. */
+  --text-auf-farbe: #0B1220; /* Text und Symbole auf hellen Füllungen (Status, helle Phasen). */
+  --akzent: #B08CFF; /* Nur für Bedienung: Senden, aktive Ansicht, Auswahl, Fokus-Ring, Kommentar-Marke. Nie für einen Zustand. */
+  --akzent-text: #D9CCFF; /* Text und Symbole in akzent-grund, Links. 11:1 auf flaeche-2. */
+  --akzent-tinte: #120E22; /* Text auf einer akzent-Füllung (Senden). 7,2:1. */
+  --akzent-grund: rgba(176,140,255,0.18); /* Hintergrund des aktiven Umschalter-Teils und eigener Chat-Nachrichten. */
+  --status-arbeitet: #67C2FF; /* Zustand „arbeitet“. Immer mit Symbol und Wort. */
+  --status-wartet: #F5C063; /* Zustand „wartet auf dich“. Immer mit Symbol und Wort. */
+  --status-fertig: #66D19E; /* Zustand „fertig“. Immer mit Haken und Wort. */
+  --status-problem: #FF8F80; /* Zustand „Problem“, rote Tests. Immer mit Kreuz und Wort. */
+  --status-arbeitet-grund: rgba(103,194,255,0.14); /* Grund der Statusmarke „arbeitet“ und Glanz von Karten. */
+  --status-wartet-grund: rgba(245,192,99,0.16); /* Grund der Statusmarke „wartet auf dich“, Fragen im Chat. */
+  --status-fertig-grund: rgba(102,209,158,0.14); /* Grund der Statusmarke „fertig“. */
+  --status-problem-grund: rgba(255,143,128,0.14); /* Grund der Statusmarke „Problem“. */
+  --neutral-1: #C9D1DE; /* Neutrale Balken (Kontingent), helle Diagrammlinie. */
+  --neutral-2: #9AA3B2; /* Neutrale Kurven und Fortschritt ohne Zustand. */
+  --neutral-3: #6F7888; /* Ruhige Hilfslinien. */
+  --neutral-4: #4F5766; /* Achsenstriche, leere Stufen, gestrichelte Grundlinie. */
+  --phase-lesen: #4A5175; /* Phase Lesen, Planen, Suchen im Zeitstrahl. Text darauf: text-1 (6,6:1). */
+  --phase-bauen: #5B6390; /* Phase Bauen. Text darauf: text-1 (5,0:1). */
+  --phase-testen: #8D95C9; /* Phase Testen. Text darauf: text-auf-farbe (6,5:1). */
+  --phase-review: #BAC0EA; /* Phase Review. Text darauf: text-auf-farbe (10,6:1). */
+  --reihe-orchestrator: #9085E9; /* Diagramm-Reihe Orchestrator mit Subagenten, Avatar des Orchestrators. */
+  --reihe-agenten: #D55181; /* Diagramm-Reihe Agenten. Geprüft gegen reihe-orchestrator: Farbsehschwäche ΔE 16, normal 19,7. */
+  --marke-jetzt: #FFFFFF; /* Weiße Marke für „jetzt“ im Zeitstrahl und das Soll im Kontingent. */
+
+  /* Schriften */
+  --familie-sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --familie-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --schrift-titel: 650 15px/20px var(--familie-sans); /* Name der App im Kopf. */
+  --laufweite-titel: -0.01em;
+  --schrift-ueberschrift: 600 14px/20px var(--familie-sans); /* Kopf eines Bereichs, Name eines Agenten. */
+  --schrift-text: 400 14px/20px var(--familie-sans); /* Chat und alle Fließtexte. */
+  --schrift-eingabe: 400 15px/22px var(--familie-sans); /* Eingabefeld des Chats. */
+  --schrift-klein: 400 12px/16px var(--familie-sans); /* Metadaten, Beschriftungen. Kleiner wird nichts. */
+  --schrift-zahl-gross: 650 22px/28px var(--familie-sans); /* Zahl in einer Kachel, immer mit tabular-nums. */
+  --laufweite-zahl-gross: -0.01em;
+  --schrift-zahl-mittel: 600 16px/22px var(--familie-sans); /* Zahlen in den Details eines Agenten. */
+  --schrift-code: 400 12px/16px var(--familie-mono); /* Pfade, Befehle, Protokollzeilen. */
+
+  /* Abstände */
+  --abstand-1: 4px; /* Kleinster Abstand, zwischen Teilen eines Umschalters. */
+  --abstand-2: 8px; /* Zwischen Karten in einer Liste, zwischen Knöpfen. */
+  --abstand-3: 10px; /* Lücke zwischen den großen Bereichen. Die Lücke ersetzt jede Trennlinie. */
+  --abstand-4: 12px; /* Zwischen Ring und Text, Rand außen um die Bereiche. */
+  --abstand-5: 14px; /* Innenabstand oben und unten in Karten. */
+  --abstand-6: 16px; /* Innenabstand seitlich in Karten und Bereichen. */
+  --abstand-7: 20px; /* Innenabstand links im Kopf eines Bereichs. */
+  --abstand-8: 24px; /* Seitlicher Rand des Chatverlaufs, Abstand zwischen Nachrichten. */
+
+  /* Ecken */
+  --rund-segment: 7px; /* Teile eines Umschalters. */
+  --rund-knopf: 9px; /* Knöpfe und Felder. */
+  --rund-liste: 12px; /* Zeilen, Spuren-Zeilen, Kommentare. */
+  --rund-kachel: 14px; /* Kacheln, Felder im Board. */
+  --rund-karte: 16px; /* Agenten-Karten, Plan im Chat. */
+  --rund-eingabe: 18px; /* Eingabefeld, Details-Bereich, Chat-Blasen. */
+  --rund-bereich: 20px; /* Die großen Bereiche (Chat, Team, Leisten). */
+  --rund-voll: 999px; /* Statusmarken, Spuren, Kapseln. */
+
+  /* Schatten */
+  --schatten-kante: inset 0 1px 0 rgba(255,255,255,0.05); /* Feine helle Oberkante auf jeder Fläche statt eines Rahmens. */
+  --schatten-eingabe: 0 0 0 1px rgba(176,140,255,0.30), 0 12px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05); /* Eingabefeld des Chats: zeigt, wo geschrieben wird. */
+  --schatten-senden: 0 6px 18px rgba(176,140,255,0.35), inset 0 1px 0 rgba(255,255,255,0.35); /* Nur der Senden-Knopf. */
+  --schatten-auswahl: inset 0 0 0 2px rgba(176,140,255,0.85), 0 0 0 5px rgba(176,140,255,0.12); /* Gewählte Karte, Spur oder Zeile. */
+  --schatten-schwebend: 0 16px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05); /* Kommentar-Blasen, Aufklapp-Menüs. */
+  --schatten-leuchten-arbeitet: 0 0 14px rgba(103,194,255,0.45); /* Laufendes Stück einer Spur, Zustand arbeitet. */
+  --schatten-leuchten-wartet: 0 0 14px rgba(245,192,99,0.45); /* Laufendes Stück einer Spur, Zustand wartet auf dich. */
+
+  /* Maße */
+  --kopf-hoehe: 56px; /* Kopf der App und jedes Bereichs. */
+  --steuer-hoehe: 32px; /* Höhe von Knöpfen und Feldern. */
+  --leiste-breite: 56px; /* Eingeklappter Bereich. */
+  --schrift-minimum: 12px; /* Kleinste erlaubte Schrift. */
+}
