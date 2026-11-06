@@ -2,6 +2,7 @@
 //! JSON-Ereignisse live und kann sie anhalten (Technik-Probe, Schritt 3).
 
 use serde_json::Value;
+pub mod arbeitskopie;
 use std::fmt;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
