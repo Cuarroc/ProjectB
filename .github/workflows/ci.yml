@@ -1,7 +1,9 @@
 name: ci
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    # Ohne „edited“: Mergify schreibt jedes Prüfergebnis in seinen Queue-Entwurf. Jede Bearbeitung startete
+    # die CI neu, die Queue kam nie zum Merge (06.11.2026). Neue Zeile „Tests weniger:“ im PR-Text: Lauf neu starten.
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
 
@@ -14,8 +16,7 @@ defaults:
     shell: bash
 
 concurrency:
-  # Mergify bearbeitet seinen Queue-Entwurf selbst (edited); abgebrochene oder verdrängte Läufe werfen den PR
-  # aus der Queue. Deshalb bekommt jeder Queue-Lauf eine eigene Gruppe.
+  # Abgebrochene oder verdrängte Läufe werfen den PR aus der Queue. Deshalb bekommt jeder Queue-Lauf eine eigene Gruppe.
   group: ci-${{ startsWith(github.head_ref, 'mergify/') && github.run_id || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
