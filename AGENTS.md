@@ -5,13 +5,16 @@ Elias ist kein Programmierer. Schreib für ihn einfach und kurz.
 
 ## Arbeiten
 
-1. **Nur die laufende Version** aus `FAHRPLAN.md`. Eine Idee außerhalb davon wird eine Zeile auf der Später-Liste, mehr nicht.
+1. **0.1 hat Vorrang.** Gebaut wird, was im FAHRPLAN für die laufende Version steht. Die nächste Version wird nur im Leerlauf
+   gebaut: wenn für die laufende gerade nichts zu tun ist und ihr Gerüst und ihre Bausteine auf `main` sind. Jede andere Idee
+   wird eine Zeile auf der Später-Liste.
 2. **Ein Auftrag ist ein Branch, ein Worktree und ein PR,** mit höchstens 300 geänderten Zeilen einschließlich Tests.
    Automatisch erzeugte Dateien wie `Cargo.lock` zählen nicht mit. Größeres wird vorher geteilt.
 3. **Grün heißt bewiesen.** Tests laufen lokal und in CI. Ein Fehler bekommt zuerst einen Test, der ihn zeigt.
    Eine Oberflächen-Änderung braucht einen Screenshot, den jemand angesehen hat. Exit-Codes nie verstecken.
 4. **Review durch die ANDERE Modellfamilie** auf dem aktuellen Stand (eins reicht). Oberflächen-PRs prüft zusätzlich
-   ein Claude-Agent am Screenshot. Höchstens zwei Runden mit offenen Funden, dann Label `stopp` und Frage an Elias.
+   ein Claude-Agent am Screenshot. Höchstens drei Prüfrunden mit offenen Funden, dann Label `stopp`
+   und Frage an Elias. Ein Team-Lauf darf dafür bis zu fünf Zyklen haben.
    Im PR-Text steht „Geschrieben von: Claude|Codex“, dazu das Label `autor-claude` oder `autor-codex`.
 5. **Merge automatisch über Mergify,** wenn CI grün und Review ok. Änderungen an `.github/`, `.mergify.yml`,
    `.mcp.json`, `.claude/` und `.agents/` nur mit Elias' Ja (Label `elias-ok`). Ein roter `main` stoppt alles,
