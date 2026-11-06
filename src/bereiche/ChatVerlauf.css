@@ -1,0 +1,45 @@
+.hauptbildschirm > .chat-spalte { padding: 0; overflow: hidden; }
+.chat-kopf { display: flex; align-items: center; flex: 0 0 var(--kopf-hoehe); padding-inline: var(--abstand-7); }
+.chat-verlauf { flex: 1; min-height: 0; overflow-y: auto; padding: var(--abstand-4) var(--abstand-8) var(--abstand-8); scrollbar-width: thin; scrollbar-color: var(--neutral-3) transparent; }
+.chat-nachrichten { display: flex; flex-direction: column; gap: var(--abstand-5); max-width: var(--chat-max-breite); margin: auto; padding: 0; list-style: none; }
+.chat-nachrichten > li { min-width: 0; }
+.r-karte { display: flex; flex-direction: column; background: var(--flaeche-2); border-radius: var(--rund-karte); box-shadow: var(--schatten-kante); }
+.r-msg { gap: var(--abstand-3); padding: var(--abstand-4) var(--abstand-6) var(--abstand-6); }
+.r-msg-kopf { display: flex; align-items: center; gap: var(--abstand-2); min-height: var(--abstand-8); }
+.r-msg-kopf > .knopf { margin-left: auto; }
+.r-avatar { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--abstand-8); height: var(--abstand-8); border-radius: var(--rund-voll); background: var(--reihe-orchestrator); color: var(--akzent-tinte); box-shadow: var(--schatten-kante); }
+.r-msg-name { font: var(--schrift-beschriftung); font-weight: 600; }
+.r-msg-zeit { font: var(--schrift-klein); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.r-msg-text { margin: 0; font: var(--schrift-text); overflow-wrap: anywhere; white-space: pre-wrap; }
+.r-du { align-self: flex-end; max-width: 85%; }
+.r-du-blase { background: var(--akzent-grund); border-radius: var(--rund-eingabe); }
+.r-innen { display: flex; flex-direction: column; gap: var(--abstand-4); padding: var(--abstand-5); border-radius: var(--rund-liste); box-shadow: var(--schatten-kante); }
+.r-plan { background: radial-gradient(120% 120% at 0% 0%, var(--status-arbeitet-grund), transparent 60%), var(--flaeche-3); }
+.r-plan-kopf { display: flex; align-items: center; gap: var(--abstand-4); min-width: 0; }
+.r-plan-kopf > span:last-child { display: flex; flex-direction: column; min-width: 0; gap: calc(var(--abstand-1) / 4); }
+.r-plan-titel { font: var(--schrift-ueberschrift); }
+.r-plan-unter, .r-plan-risiko { font: var(--schrift-klein); color: var(--text-2); margin: 0; overflow-wrap: anywhere; }
+.r-plan-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--abstand-2); }
+.r-plan-zeile { display: flex; align-items: center; justify-content: space-between; gap: var(--abstand-2); font: var(--schrift-text); overflow-wrap: anywhere; }
+.r-plan-zeile > span:first-child { min-width: 0; }
+.r-plan .statusmarke { color: var(--status-farbe); background: var(--status-grund); }
+.r-bedingungen { font: var(--schrift-klein); color: var(--text-2); }
+.r-bedingungen summary { cursor: pointer; color: var(--text-1); border-radius: var(--rund-knopf); }
+.r-bedingungen summary:focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: calc(var(--abstand-1) / 2); }
+.r-bedingungen ul { margin: var(--abstand-3) 0 0; padding-left: var(--abstand-6); }
+.r-bedingungen p { display: flex; align-items: flex-start; gap: var(--abstand-2); }
+.r-bedingungen svg { flex-shrink: 0; color: var(--text-2); }
+.r-bedingungen [data-erfuellt=true] svg { color: var(--status-fertig); }
+.r-plan > .knopf { align-self: flex-start; }
+.r-frage { position: relative; background: radial-gradient(120% 140% at 0% 0%, var(--status-wartet-grund), transparent 62%), var(--flaeche-3); }
+.r-frage::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: var(--b-leuchten-wartet); pointer-events: none; animation: chat-leuchten var(--b-schleife-leuchten) var(--kurve-gleich) infinite; }
+.r-frage-kopf { display: flex; align-items: flex-start; gap: var(--abstand-2); font: var(--schrift-klein); color: var(--status-wartet); }
+.r-frage-kopf svg { flex-shrink: 0; }
+.r-frage-text { margin: 0; font: var(--schrift-text); overflow-wrap: anywhere; }
+.r-antworten, .r-aktionen { display: flex; flex-wrap: wrap; gap: var(--abstand-2); }
+.r-antworten .knopf[aria-pressed=true] { box-shadow: var(--schatten-auswahl); }
+.chat-meldung:empty { display: none; }
+.chat-meldung { align-self: center; padding: var(--abstand-2) var(--abstand-4); border-radius: var(--rund-knopf); background: var(--flaeche-2); font: var(--schrift-klein); }
+@keyframes chat-leuchten { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+:root[data-bewegung=reduziert] .r-frage::after { content: none; }
+@media (prefers-reduced-motion: reduce) { :root:not([data-bewegung=voll]) .r-frage::after { content: none; } }
