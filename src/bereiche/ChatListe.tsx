@@ -15,7 +15,7 @@ export default function ChatListe({ quelle, offen, umschalten }: Props) {
   const aendern = (neu: typeof daten) => quelle.aktualisieren(neu);
   return <section className="chat-rand" aria-label="Chats und Aufgaben" data-offen={offen}>
     <button type="button" className="rand-schalter" aria-expanded={offen} aria-controls="rand-inhalt" onClick={umschalten}
-      aria-label={offen ? "Chats und Aufgaben einklappen" : `Chats und Aufgaben öffnen, ${fertig} von ${gesamt} Aufgaben fertig`}>
+      aria-label={offen ? "Chats und Aufgaben einklappen" : `${fertig} / ${gesamt} – Chats und Aufgaben öffnen`}>
       {offen ? <PanelLeftClose size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /> :
         <Fortschrittsring wert={gesamt ? fertig / gesamt * 100 : 0} zustand="ziel" groesse={40} text={`${fertig} / ${gesamt}`} />}
     </button>

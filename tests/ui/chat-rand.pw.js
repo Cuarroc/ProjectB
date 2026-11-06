@@ -10,6 +10,7 @@ test("Chat-Rand: Tastatur, Beispielzustand, Bilder und axe", async ({ page }, te
   await expect(rand.getByRole("button")).toHaveCount(1);
   await expect(schalter).toHaveAttribute("aria-expanded", "false");
   await expect(schalter).toContainText("2 / 5");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   const bild = async name => {
     const path = testInfo.outputPath(`${name}.png`);
     await page.screenshot({ path, animations: "disabled" });

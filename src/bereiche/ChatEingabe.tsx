@@ -27,7 +27,7 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, aendern, schre
           <span className="modell-punkt" /><span className="lang">{chat.modell}</span><span className="kurz">{chat.modell.split(/[ .-]/)[0]}</span>
         </Auswahl>
         <Auswahl name="Effort" wert={chat.effort} werte={efforts} aendern={effort => aendern({ effort: effort as Chat["effort"] })}>
-          <EffortSymbol wert={chat.effort} /><span className="wort">Effort</span>{chat.effort}
+          <EffortSymbol wert={chat.effort} /><span className="wort">Effort</span>{" "}{chat.effort}
         </Auswahl>
         <Kontext chat={chat} aendern={aendern} />
       </>} />
