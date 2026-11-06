@@ -9,7 +9,7 @@ test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe"
   const dialog = page.getByRole("dialog", { name: /^Plan:/ });
   await expect(dialog).toBeVisible();
   expect(await dialog.evaluate(e => e.getBoundingClientRect().top - document.querySelector(".kopf").getBoundingClientRect().bottom)).toBe(0);
-  await dialog.getByRole("button", { name: "Mit Kommentaren zurückgeben", exact: true }).click();
+  await dialog.getByRole("button", { name: /^Mit Kommentaren zurückgeben,/ }).click();
   await expect(dialog.getByRole("status").last()).toContainText("Schreib einen Kommentar"); await expect(dialog).toBeVisible();
   const karte = dialog.locator(".pl-schritt").first();
   const simpler = karte.getByRole("button", { name: "Simpler, Türkis", exact: true }), kommentarKnopf = karte.getByRole("button", { name: "Kommentar, Silbergrau", exact: true });
@@ -59,7 +59,7 @@ test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe"
     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); e.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })); });
   await karte.getByRole("button", { name: "Kommentar, Silbergrau", exact: true }).click(); await kommentar.fill("Bitte ändern.");
   await karte.getByRole("button", { name: "Innovativer, Pink", exact: true }).click();
-  await dialog.getByRole("button", { name: "Mit Kommentaren zurückgeben", exact: true }).click(); await expect(dialog).toHaveCount(0);
+  await dialog.getByRole("button", { name: /^Mit Kommentaren zurückgeben,/ }).click(); await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("status").filter({ hasText: /^Zurückgegeben$/ })).toBeVisible();
   await oeffnen.click(); await expect(kommentar).toHaveValue("Bitte ändern.");
   await expect.soft(karte.locator("mark")).toHaveText("liste");
@@ -74,6 +74,8 @@ test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe"
   await oeffnen.click(); await karte.getByRole("button", { name: "Simpler, Türkis", exact: true }).click();
   const dritter = dialog.locator(".pl-schritt").nth(2); await dritter.getByRole("button", { name: "Kommentar, Silbergrau", exact: true }).click();
   await dritter.getByRole("textbox").fill("Frag mich vorher nach dem Speicherort."); await dritter.getByRole("button", { name: "Ausarbeiten, Violett", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Mit Kommentaren zurückgeben, 2 Schritte markiert", exact: true })).toContainText("2");
+  await expect(dialog.locator(".pl-einheit")).toHaveText("2 Schritte"); await expect(dialog.locator(".pl-werkzeuge .pl-farbpunkt")).toHaveCount(5);
   await dialog.locator(".pl-liste").evaluate(e => e.scrollTop = 0);
   await page.evaluate(() => document.documentElement.dataset.bewegung = "voll");
   const bild = process.env.PLAN_BILD ? `${process.env.PLAN_BILD}_${testInfo.project.name}.png` : testInfo.outputPath("plan.png");
