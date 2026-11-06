@@ -40,7 +40,7 @@ nur Claude und Codex; Bildschirme und Bausteine neu. Wissen und Windows-Fallen s
 | 1 | Werkzeug-Updates auf PC und Server | Nur installierte Werkzeuge aus offizieller Quelle; Neues nur mit Ja |
 | 2 | Aufräumen nach Merge | Nur ProjectB, nie main, nichts Ungesichertes, nichts aus ProjectA |
 | 3 | AgentsRoom für ProjectB einrichten | Nur wie in freigegebenen Konzepten, nie kostenpflichtig; Webhooks und Tresor bleiben bei Elias |
-| 4 | Server-Betrieb für ProjectB | Kein Server-Neustart, keine Admin-Rechte |
+| 4 | Server-Betrieb für ProjectB: voll nutzbar, Installationen von Werkzeugen und Plugins erlaubt (Elias, 06.11.2026) | Kein Neustart, keine Änderung an Zugängen ohne Rückfrage, nichts Kostenpflichtiges |
 | 5 | Alte ProjectA-Quota-Regeln aus | Einmalig, erledigt |
 | 6 | Weitergabe durch die Aufsicht | Elias' Entscheidungen über das Postfach gelten wie direkt gesagt; nicht für Geld, Rechte, Löschen außerhalb, neue Programme, Releases |
 | 7 | Dependabot ohne `elias-ok` (30.10.2026) | Nur Dependabot; Major-Sprünge hält Prüfer Claude mit P2 auf |
