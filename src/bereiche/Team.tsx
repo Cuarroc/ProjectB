@@ -3,17 +3,15 @@ import { ChartGantt, Kanban, LayoutGrid, OctagonPause, Users } from "lucide-reac
 import { Agentenkarte } from "../bausteine/Agentenkarte";
 import { Kachel } from "../bausteine/Kachel";
 import { Knopf } from "../bausteine/Knopf";
-import type { Phase, ZeitspurProps } from "../bausteine/Zeitspur";
 import { BeispielQuelle } from "../daten/quelle";
 import { orchestratorBeispiel, teamTestverlauf } from "../daten/quelle";
 import { Umschalter } from "../bausteine/Umschalter";
-import { TeamBoard, TeamZeitstrahl } from "./TeamAnsichten";
+import { TeamBoard, TeamZeitstrahl, spur, teamAngehalten } from "./TeamAnsichten";
 import type { Datenstand, Agent } from "../daten/typen";
 import "./Team.css";
 
 const status = { Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fertig", Problem: "problem" } as const;
 const jetzt = orchestratorBeispiel.laufzeitSekunden;
-const sekunden = (zeit: string) => zeit.split(":").reduce((wert, teil) => wert * 60 + Number(teil), 0) - 14 * 3600 - 30 * 60;
 const dauer = (wert: number) => `${Math.floor(wert / 60)}:${String(wert % 60).padStart(2, "0")}`;
 const tokens = (wert: number) => wert >= 999950 ? `${(wert / 1000000).toLocaleString("de-DE", { maximumFractionDigits: 1 })}M` : wert >= 1000 ? `${(wert / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })}k` : String(wert);
 type TeamAgent = Agent & { vorPause?: Pick<Agent, "zustand" | "liveZeile"> };
@@ -24,22 +22,12 @@ export function anhalten(daten: Datenstand, id?: string): Datenstand {
     ? { ...a, vorPause: { zustand: a.zustand, liveZeile: a.liveZeile }, zustand: "Wartet auf dich", liveZeile: "Angehalten. Weiter mit Fortsetzen." } : a) };
 }
 
-export function spur(agent: Agent): ZeitspurProps {
-  const angehalten = agent.liveZeile.startsWith("Angehalten.");
-  const phasen: Phase[] = agent.phasen.map(p => ({ name: p.name, art: p.name.toLowerCase() as Phase["art"],
-    start: sekunden(p.start), ende: p.ende ? sekunden(p.ende) : jetzt, laufend: p.ende === null && !angehalten }));
-  return { phasen, jetzt, bis: 600, zustand: status[agent.zustand],
-    wartebeginn: angehalten ? jetzt : phasen.at(-1)?.ende ?? jetzt, wartezeit: angehalten ? "0:00" : dauer(jetzt - (phasen.at(-1)?.ende ?? jetzt)),
-    ereignisse: agent.zustand === "Fertig" ? [{ zeit: phasen.at(-1)?.ende ?? jetzt, art: "fertig", text: "Fertig" }] : [],
-    schaetzung: agent.schaetzung ? sekunden(`${agent.schaetzung.fertigUm}:00`) : undefined };
-}
-
 type Props = { daten: Datenstand; auswahl: string | null; waehlen: (id: string | null) => void; aendern: (daten: Datenstand) => void; ansicht?: string; umschalten?: (wert: string) => void };
 export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karten", umschalten = () => {} }: Props) {
   const agenten = daten.agenten.slice(0, 3).sort((a, b) => Number(a.zustand === "Fertig") - Number(b.zustand === "Fertig"));
   const details = auswahl === "orchestrator" ? { name: "Orchestrator", liveZeile: `Koordiniert ${agenten.length} Agenten`, anbieter: "Claude", modell: daten.chats[0]?.modell, arbeitskopie: null } : agenten.find(a => a.id === auswahl);
   const fertig = daten.plan.schritte.filter(s => s.zustand === "Fertig").length;
-  const alleAngehalten = agenten.filter(a => a.zustand !== "Fertig").every(a => a.liveZeile.startsWith("Angehalten."));
+  const alleAngehalten = teamAngehalten(agenten);
   const tests = agenten.reduce((summe, a) => ({ gruen: summe.gruen + (a.tests?.gruen ?? 0), gesamt: summe.gesamt + (a.tests?.gesamt ?? 0) }), { gruen: 0, gesamt: 0 });
   const gesamtTokens = orchestratorBeispiel.tokens + agenten.reduce((summe, a) => summe + a.tokens, 0);
   return <section className="team-bereich" aria-labelledby="team">

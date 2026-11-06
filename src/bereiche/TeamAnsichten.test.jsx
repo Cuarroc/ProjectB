@@ -4,6 +4,7 @@ import { Children } from "react";
 import { Umschalter } from "../bausteine/Umschalter";
 import { TeamBoard, TeamZeitstrahl } from "./TeamAnsichten";
 import { BeispielQuelle } from "../daten/quelle";
+import { TeamAnsicht } from "./Team";
 
 const { fokus } = vi.hoisted(() => ({ fokus: [vi.fn(), vi.fn(), vi.fn()] }));
 vi.mock("react", async original => ({ ...await original(), useLayoutEffect: () => {},
@@ -30,6 +31,21 @@ describe("Team-Ansichten", () => {
     for (const wort of ["Wartet", "Arbeitet", "Offen", "Fertig", "Problem"]) expect(html).toContain(wort);
     expect(html).toMatch(/data-zustand="problem"[^]*?<svg/);
     expect(html).toContain("Gesamtergebnis prüfen");
+  });
+  it("zeigt die Antwortknöpfe der offenen Frage im Board", () => {
+    const html = renderToStaticMarkup(<TeamBoard {...props} />);
+    for (const text of daten.fragen[0].antwortknoepfe.map(a => a.text)) expect(html).toContain(text);
+    expect(html).toContain('aria-pressed="false"');
+  });
+  it("verdrahtet Board, Symbole und Umschalten in der Team-Ansicht", () => {
+    const umschalten = vi.fn(), ansicht = TeamAnsicht({ ...props, auswahl: null, aendern: vi.fn(), ansicht: "Board", umschalten });
+    const schalter = Children.toArray(ansicht.props.children)[0].props.children.find(el => el.type === Umschalter);
+    expect(schalter.props.symbole).toHaveLength(3); schalter.props.onChange("Zeitstrahl"); expect(umschalten).toHaveBeenCalledWith("Zeitstrahl");
+    expect(renderToStaticMarkup(ansicht)).toContain('class="team-board"');
+  });
+  it("zeigt bei vollständig fertigen Agenten keinen angehaltenen Orchestrator", () => {
+    const agenten = daten.agenten.map(a => ({ ...a, zustand: "Fertig" }));
+    for (const Ansicht of [TeamBoard, TeamZeitstrahl]) expect(renderToStaticMarkup(<Ansicht {...props} agenten={agenten} />).match(/data-agent="orchestrator"[^]*?data-zustand="(.*?)"/)[1]).toBe("arbeitet");
   });
   it("benennt beide Achsen, Reihenwerte, Phasendauern und jeden Zustand", () => {
     const html = renderToStaticMarkup(<TeamZeitstrahl {...props} />);
