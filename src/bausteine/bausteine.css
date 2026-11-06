@@ -66,15 +66,15 @@
 
 .ring[data-unbekannt] { color: var(--text-2); }
 /* Der Paketvertrag lässt die Team-Pille in beiden Modi springen. */
-:root[data-bewegung="reduziert"] .statusmarke { transition-duration: var(--dauer-mittel); }
+:root[data-bewegung="reduziert"] .statusmarke { transition-duration: var(--dauer-mittel); transition-timing-function: var(--kurve-raus); }
 :root[data-bewegung="reduziert"] .statusmarke.hinweis::after { animation: none; }
 :root[data-bewegung="reduziert"] .knopf:not(:disabled) { transition: background-color var(--dauer-kurz) var(--kurve-raus), color var(--dauer-kurz) var(--kurve-raus); }
 :root[data-bewegung="reduziert"] .ring .ring-bogen { transition: stroke-dashoffset var(--dauer-daten) var(--kurve-gleich), stroke var(--dauer-mittel) var(--kurve-raus); }
-:root[data-bewegung="reduziert"] .ring-mitte { transition-duration: var(--dauer-mittel); }
+:root[data-bewegung="reduziert"] .ring-mitte { transition-duration: var(--dauer-mittel); transition-timing-function: var(--kurve-raus); }
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-bewegung="voll"]) .statusmarke { transition-duration: var(--dauer-mittel); }
+  :root:not([data-bewegung="voll"]) .statusmarke { transition-duration: var(--dauer-mittel); transition-timing-function: var(--kurve-raus); }
   :root:not([data-bewegung="voll"]) .statusmarke.hinweis::after { animation: none; }
   :root:not([data-bewegung="voll"]) .knopf:not(:disabled) { transition: background-color var(--dauer-kurz) var(--kurve-raus), color var(--dauer-kurz) var(--kurve-raus); }
   :root:not([data-bewegung="voll"]) .ring .ring-bogen { transition: stroke-dashoffset var(--dauer-daten) var(--kurve-gleich), stroke var(--dauer-mittel) var(--kurve-raus); }
-  :root:not([data-bewegung="voll"]) .ring-mitte { transition-duration: var(--dauer-mittel); }
+  :root:not([data-bewegung="voll"]) .ring-mitte { transition-duration: var(--dauer-mittel); transition-timing-function: var(--kurve-raus); }
 }

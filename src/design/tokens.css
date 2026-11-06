@@ -187,11 +187,17 @@
   --dauer-druck: 100ms;   /* Druck auf einen Knopf */
   --dauer-kurz: 120ms;    /* Hover, Verschwinden, Tooltip, Symbolwechsel */
   --dauer-mittel: 160ms;  /* Statusfarbe, Menü öffnen, Details schließen */
+  --dauer-lang: 200ms;    /* Dialog, Toast, Details öffnen */
   --dauer-daten: 250ms;   /* Fortschrittsring */
   --dauer-hinweis: 600ms; /* Einmaliger Hinweis bei „Wartet auf dich“ */
   --kurve-raus: cubic-bezier(0.22, 1, 0.36, 1);   /* Erscheinen, Antwort auf eine Eingabe */
+  --kurve-weg: cubic-bezier(0.4, 0, 1, 1);        /* Nur Verschwinden */
   --kurve-gleich: cubic-bezier(0.65, 0, 0.35, 1); /* Weg von A nach B */
+  --weg-klein: 4px;    /* Tooltip */
+  --weg-mittel: 8px;   /* Dialog, Toast, neue Nachricht */
+  --weg-gross: 8px;    /* Details */
   --skala-druck: 0.97; /* Gedrückter Knopf, nur mit der Maus */
+  --skala-auf: 0.97;   /* Dialog und Menü beim Öffnen */
   /* Wartezeiten: Sie ändern sich in Reduziert nicht. */
   --verzoegerung-laden: 600ms;      /* Erst danach erscheinen Platzhalter */
   --verzoegerung-tooltip: 600ms;    /* Bis der erste Tooltip erscheint */
@@ -199,5 +205,5 @@
   --standzeit-toast-info: 6000ms;   /* Restzeit eines Info-Toasts */
 }
 
-:root[data-bewegung=reduziert]{--skala-druck:1;--dauer-kurz:80ms;--dauer-mittel:120ms;--dauer-daten:0ms;--dauer-hinweis:0ms}
-@media (prefers-reduced-motion: reduce){:root:not([data-bewegung=voll]){--skala-druck:1;--dauer-kurz:80ms;--dauer-mittel:120ms;--dauer-daten:0ms;--dauer-hinweis:0ms}html{scroll-behavior:auto}}
+:root[data-bewegung=reduziert]{--weg-klein:0px;--weg-mittel:0px;--weg-gross:0px;--skala-druck:1;--skala-auf:1;--dauer-kurz:80ms;--dauer-mittel:120ms;--dauer-lang:120ms;--dauer-daten:0ms;--dauer-hinweis:0ms}
+@media (prefers-reduced-motion: reduce){:root:not([data-bewegung=voll]){--weg-klein:0px;--weg-mittel:0px;--weg-gross:0px;--skala-druck:1;--skala-auf:1;--dauer-kurz:80ms;--dauer-mittel:120ms;--dauer-lang:120ms;--dauer-daten:0ms;--dauer-hinweis:0ms}html{scroll-behavior:auto}}
