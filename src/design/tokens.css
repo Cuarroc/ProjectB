@@ -1,4 +1,4 @@
-/* ProjectB Design-System, Version 1. Quelle: Design-System aus Schritt 4a (Elias, 05.11.2026). */
+/* ProjectB Design-System, Version 1. Quelle: Design-System nach dem Redesign (Elias, 06.11.2026). */
 /* Nur diese Werte verwenden (AGENTS.md Regel 11). Bedeutung je Token: siehe Kommentar. */
 
 :root {
@@ -32,13 +32,34 @@
   --neutral-2: #9AA3B2; /* Neutrale Kurven und Fortschritt ohne Zustand. */
   --neutral-3: #6F7888; /* Ruhige Hilfslinien. */
   --neutral-4: #4F5766; /* Achsenstriche, leere Stufen, gestrichelte Grundlinie. */
-  --phase-lesen: #4A5175; /* Phase Lesen, Planen, Suchen im Zeitstrahl. Text darauf: text-1 (6,6:1). */
-  --phase-bauen: #5B6390; /* Phase Bauen. Text darauf: text-1 (5,0:1). */
-  --phase-testen: #8D95C9; /* Phase Testen. Text darauf: text-auf-farbe (6,5:1). */
-  --phase-review: #BAC0EA; /* Phase Review. Text darauf: text-auf-farbe (10,6:1). */
+  --phase-lesen: #2E3A8C; /* Lesen, Planen, Suchen. Weiß: 10,00:1 bis 8,85:1 im Verlauf. */
+  --phase-lesen-ende: #35419A;
+  --phase-lesen-verlauf: linear-gradient(90deg, var(--phase-lesen), var(--phase-lesen-ende));
+  --phase-koordiniert: #1A6964; /* Nur Orchestrator. Weiß: 6,46:1 bis 5,86:1 im Verlauf. */
+  --phase-koordiniert-ende: #1F706A;
+  --phase-koordiniert-verlauf: linear-gradient(90deg, var(--phase-koordiniert), var(--phase-koordiniert-ende));
+  --phase-bauen: #6A4FB8; /* Bauen. Weiß: 6,13:1 bis 5,59:1 im Verlauf. */
+  --phase-bauen-ende: #7454BE;
+  --phase-bauen-verlauf: linear-gradient(90deg, var(--phase-bauen), var(--phase-bauen-ende));
+  --phase-testen: #A2457D; /* Testen. Weiß: 5,70:1 bis 5,05:1 im Verlauf. */
+  --phase-testen-ende: #AC4D86;
+  --phase-testen-verlauf: linear-gradient(90deg, var(--phase-testen), var(--phase-testen-ende));
+  --phase-review: #5B6386; /* Review. Weiß: 5,88:1 bis 5,14:1 im Verlauf. */
+  --phase-review-ende: #646C8F;
+  --phase-review-verlauf: linear-gradient(90deg, var(--phase-review), var(--phase-review-ende));
+  --phase-text: #FFFFFF; /* Schrift auf gefüllten Phasen, Gewicht 600. Mindestens 5,05:1. */
+  --phase-schaetzung: #C6C9DE; /* Restzeit: nur Schraffur (17 %) und gestrichelte Kontur (58 %), nie gefüllt. Text: text-1. */
   --reihe-orchestrator: #9085E9; /* Diagramm-Reihe Orchestrator mit Subagenten, Avatar des Orchestrators. */
   --reihe-agenten: #D55181; /* Diagramm-Reihe Agenten. Geprüft gegen reihe-orchestrator: Farbsehschwäche ΔE 16, normal 19,7. */
-  --marke-jetzt: #FFFFFF; /* Weiße Marke für „jetzt“ im Zeitstrahl und das Soll im Kontingent. */
+  --marke-jetzt: #D7C6FF; /* Violette Jetzt-Linie in Zeitachsen und Diagrammen. */
+  --marke-jetzt-verlauf: linear-gradient(180deg, var(--marke-jetzt), rgba(176,140,255,0.55));
+  --jetzt-punkt: #B08CFF; /* Leuchtender Punkt (6 px) im Jetzt-Chip. */
+  --jetzt-glas: rgba(22,19,38,0.92); /* Grund des Jetzt-Chips, mit blur(10px). */
+  --jetzt-text: #EDE6FF; /* Text im Jetzt-Chip: 15,03:1 auf jetzt-glas. */
+  --marke-soll: #FFFFFF; /* Nur dünne Soll-Marken im Kontingent und in „Genutzt“. Weiß ist nie eine Fläche. */
+  --genutzt: #5D5A82; /* Balken „Genutzt“ im Kontingent. */
+  --genutzt-verlauf: linear-gradient(90deg, var(--genutzt), #9A93C8);
+  --glas-grund: rgba(24,27,37,0.94); /* Menüs, Einstellungen, Tooltip: blur(24px) saturate(1.5). */
 
   /* Schriften */
   --font-sans: "Geist", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -109,28 +130,80 @@
   --schrift-beschriftung: 400 13px/18px var(--familie-sans);
   --schrift-abschnitt: 650 17px/24px var(--familie-sans);
 
-  /* Wartezeiten bleiben auch bei reduzierter Bewegung gleich. */
-  --verzoegerung-laden: 600ms;
-  --verzoegerung-tooltip: 600ms;
-  --fenster-tooltip-wechsel: 400ms;
-  --standzeit-toast-info: 6000ms;
+}
+
+:root {   /* gilt nur, wenn Voll aktiv ist; Reduziert setzt eigene Werte */
+  --b-feder:linear(0, 0.021, 0.076, 0.152, 0.242, 0.337, 0.432, 0.523, 0.609, 0.686, 0.754, 0.813, 0.864, 0.905, 0.939, 0.966, 0.987, 1.003, 1.014, 1.021, 1.026, 1.028, 1.028, 1.028, 1.026, 1.024, 1.021, 1.018, 1.016, 1.013, 1.011, 1.009, 1.007, 1.005, 1.004, 1.003, 1.002, 1.001, 1, 1, 1);
+  --b-feder-weich:linear(0, 0.019, 0.067, 0.132, 0.206, 0.283, 0.359, 0.432, 0.501, 0.563, 0.62, 0.671, 0.717, 0.757, 0.792, 0.822, 0.849, 0.871, 0.891, 0.908, 0.922, 0.934, 0.945, 0.953, 0.961, 0.967, 0.973, 0.977, 0.981, 0.984, 0.987, 0.989, 0.991, 0.992, 0.994, 0.995, 0.996, 0.996, 0.997, 0.997, 1);
+  --b-feder-knackig:linear(0, 0.039, 0.138, 0.273, 0.424, 0.576, 0.717, 0.84, 0.941, 1.018, 1.072, 1.106, 1.123, 1.126, 1.119, 1.105, 1.087, 1.068, 1.049, 1.032, 1.017, 1.005, 0.996, 0.99, 0.986, 0.984, 0.984, 0.985, 0.987, 0.99, 0.992, 0.994, 0.997, 0.998, 1, 1.001, 1.001, 1.002, 1.002, 1.002, 1);
+  --b-kurve-blende:cubic-bezier(0.25,1,0.5,1);
+  --b-kurve-zeichnen:cubic-bezier(0.45,0,0.15,1);
+  --b-kurve-zahl:cubic-bezier(0.16,1,0.3,1);
+  --b-kurve-glanz:cubic-bezier(0.45,0,0.25,1);
+  --b-dauer-auftritt:560ms;
+  --b-dauer-blende:260ms;
+  --b-staffel:40ms;
+  --b-staffel-max:6;
+  --b-dauer-ansicht:460ms;
+  --b-dauer-gleiten:460ms;
+  --b-dauer-hub:420ms;
+  --b-dauer-zurueck:460ms;
+  --b-dauer-menue:380ms;
+  --b-dauer-dialog:560ms;
+  --b-dauer-toast:600ms;
+  --b-dauer-tipp:300ms;
+  --b-dauer-details:520ms;
+  --b-dauer-scrim:280ms;
+  --b-dauer-zeichnen:640ms;
+  --b-dauer-zahl:640ms;
+  --b-dauer-glanz:900ms;
+  --b-schleife-glanz:3200ms;
+  --b-schleife-verlauf:6000ms;
+  --b-schleife-fluss:1600ms;
+  --b-schleife-leuchten:1400ms;
+  --b-schleife-dreh:6000ms;
+  --b-schleife-jetzt:1600ms;
+  --b-weg-auftritt:12px;
+  --b-skala-auftritt:0.97;
+  --b-unschaerfe:6px;
+  --b-unschaerfe-klein:2px;
+  --b-weg-ansicht:8px;
+  --b-skala-ansicht:0.99;
+  --b-weg-details:16px;
+  --b-weg-dialog:16px;
+  --b-skala-dialog:0.94;
+  --b-weg-toast:16px;
+  --b-skala-toast:0.96;
+  --b-skala-menue:0.92;
+  --b-skala-tipp:0.94;
+  --b-hub:-2px;
+  --b-skala-druck:0.96;
+  --b-glanz-staerke:0.5;
+  --b-leuchten-wartet:0 0 0 1px color-mix(in srgb, var(--status-wartet, #F5C063) 60%, transparent), 0 0 22px 2px color-mix(in srgb, var(--status-wartet, #F5C063) 38%, transparent);
+  --b-schatten-hub:0 18px 36px -14px rgba(0,0,0,0.70), 0 6px 14px -6px rgba(0,0,0,0.45);
 }
 
 :root {
   --dauer-druck: 100ms;   /* Druck auf einen Knopf */
-  --dauer-kurz: 150ms;    /* Hover, Verschwinden, Tooltip */
-  --dauer-mittel: 200ms;  /* Umschalter, Menü, Statuswechsel */
-  --dauer-lang: 250ms;    /* Dialog, Toast, Details öffnen */
-  --dauer-daten: 600ms;   /* Fortschrittsring */
-  --dauer-hinweis: 1200ms; /* Einmaliges Leuchten bei „Wartet auf dich“ */
+  --dauer-kurz: 120ms;    /* Hover, Verschwinden, Tooltip, Symbolwechsel */
+  --dauer-mittel: 160ms;  /* Statusfarbe, Menü öffnen, Details schließen */
+  --dauer-lang: 200ms;    /* Dialog, Toast, Details öffnen */
+  --dauer-daten: 250ms;   /* Fortschrittsring */
+  --dauer-hinweis: 600ms; /* Einmaliger Hinweis bei „Wartet auf dich“ */
   --kurve-raus: cubic-bezier(0.22, 1, 0.36, 1);   /* Erscheinen, Antwort auf eine Eingabe */
   --kurve-weg: cubic-bezier(0.4, 0, 1, 1);        /* Nur Verschwinden */
   --kurve-gleich: cubic-bezier(0.65, 0, 0.35, 1); /* Weg von A nach B */
   --weg-klein: 4px;    /* Tooltip */
-  --weg-mittel: 8px;   /* Dialog, Toast, neue Nachricht, Einklappen */
-  --weg-gross: 16px;   /* Details */
-  --skala-druck: 0.97; /* Gedrückter Knopf */
+  --weg-mittel: 8px;   /* Dialog, Toast, neue Nachricht */
+  --weg-gross: 8px;    /* Details */
+  --skala-druck: 0.97; /* Gedrückter Knopf, nur mit der Maus */
   --skala-auf: 0.97;   /* Dialog und Menü beim Öffnen */
+  /* Wartezeiten: Sie ändern sich in Reduziert nicht. */
+  --verzoegerung-laden: 600ms;      /* Erst danach erscheinen Platzhalter */
+  --verzoegerung-tooltip: 600ms;    /* Bis der erste Tooltip erscheint */
+  --fenster-tooltip-wechsel: 400ms; /* So lange öffnen weitere Tooltips sofort */
+  --standzeit-toast-info: 6000ms;   /* Restzeit eines Info-Toasts */
 }
 
-@media (prefers-reduced-motion: reduce){:root{--weg-klein:0px;--weg-mittel:0px;--weg-gross:0px;--skala-druck:1;--skala-auf:1;--dauer-mittel:120ms;--dauer-lang:120ms;--dauer-daten:0ms;--dauer-hinweis:0ms}html{scroll-behavior:auto}}
+:root[data-bewegung=reduziert]{--weg-klein:0px;--weg-mittel:0px;--weg-gross:0px;--skala-druck:1;--skala-auf:1;--dauer-kurz:80ms;--dauer-mittel:120ms;--dauer-lang:120ms;--dauer-daten:0ms;--dauer-hinweis:0ms}
+@media (prefers-reduced-motion: reduce){:root:not([data-bewegung=voll]){--weg-klein:0px;--weg-mittel:0px;--weg-gross:0px;--skala-druck:1;--skala-auf:1;--dauer-kurz:80ms;--dauer-mittel:120ms;--dauer-lang:120ms;--dauer-daten:0ms;--dauer-hinweis:0ms}html{scroll-behavior:auto}}
