@@ -1,6 +1,6 @@
-.planfenster{position:fixed;inset:calc(var(--kopf-hoehe) + var(--abstand-4) + var(--abstand-3)) var(--abstand-4) var(--abstand-4);margin:0;width:auto;max-width:none;height:auto;max-height:none;padding:0;border:0;background:var(--grund);color:var(--text-1);font:var(--schrift-text);overflow:hidden}
+.planfenster{position:fixed;inset:var(--kopf-hoehe) var(--abstand-4) var(--abstand-4);margin:0;width:auto;max-width:none;height:auto;max-height:none;padding:0;border:0;background:var(--grund);color:var(--text-1);font:var(--schrift-text);overflow:hidden}
 .planfenster[open]{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr);gap:var(--abstand-3)}
-.planfenster::backdrop{background:var(--grund);clip-path:inset(calc(var(--kopf-hoehe) + var(--abstand-4)) 0 0)}
+.planfenster::backdrop{background:var(--grund);clip-path:inset(var(--kopf-hoehe) 0 0)}
 .pl-links,.pl-rechts{min-width:0;min-height:0;display:flex;flex-direction:column;border-radius:var(--rund-bereich);background:linear-gradient(var(--flaeche-1-oben),var(--flaeche-1))}
 .pl-kopf{display:flex;align-items:center;gap:var(--abstand-4);padding:var(--abstand-4) var(--abstand-7);min-height:calc(var(--kopf-hoehe) + var(--abstand-7));box-sizing:border-box}
 .pl-kopf-symbol{display:inline-flex;align-items:center;justify-content:center;flex:none;width:calc(var(--steuer-hoehe) + var(--abstand-1));height:calc(var(--steuer-hoehe) + var(--abstand-1));border-radius:var(--rund-liste);background:var(--akzent);color:var(--akzent-tinte);box-shadow:var(--schatten-senden)}

@@ -8,6 +8,7 @@ test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe"
   await oeffnen.focus(); await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: /^Plan:/ });
   await expect(dialog).toBeVisible();
+  expect(await dialog.evaluate(e => e.getBoundingClientRect().top - document.querySelector(".kopf").getBoundingClientRect().bottom)).toBe(0);
   await dialog.getByRole("button", { name: "Mit Kommentaren zurückgeben", exact: true }).click();
   await expect(dialog.getByRole("status").last()).toContainText("Schreib einen Kommentar"); await expect(dialog).toBeVisible();
   const karte = dialog.locator(".pl-schritt").first();
