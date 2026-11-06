@@ -1,6 +1,6 @@
 # ProjectB – Fahrplan
 
-Stand: 06.11.2026 · Aktueller Schritt: **4b** · Version 0.1 eingefroren (Elias, 30.10.2026) · Ziel: siehe `README.md`
+Stand: 06.11.2026 · Aktueller Schritt: **4b**, der Kern von Schritt 5 läuft ab 06.11. parallel (Elias) · Version 0.1 eingefroren (Elias, 30.10.2026) · Ziel: siehe `README.md`
 
 ## Schritte
 
@@ -22,6 +22,8 @@ Stand: 06.11.2026 · Aktueller Schritt: **4b** · Version 0.1 eingefroren (Elias
    oder „Mit Kommentaren zurückgeben“. Höchstens 3 Teilaufgaben je Auftrag. Daneben seine Todo-Liste und das
    Postfach mit Zahl am Knopf für alles, was auf dich wartet; dringende Fragen auch im Chat. Ist ProjectB nicht
    vorne: Windows-Benachrichtigung, bei Fragen mit leisem Ton.
+   Für Ausführen und Planen gibt es Einstellungen je Modus (Agenten gleichzeitig, Prüfung, Prüfrunden, Plan-Tiefe,
+   Schätzung, Nachfragen), je Projekt gespeichert; die Empfehlungen sind die Startwerte (Elias, 06.11.2026).
 3. **Team arbeitet:** höchstens 3 Agenten parallel (Claude Code oder Codex), jeder in eigenem Worktree. Live:
    „Arbeitet“, „Wartet auf dich“, „Fertig“, „Problem“. Jeder Agent lässt sich anhalten; „Alles anhalten“ sichert
    den Stand mit einem WIP-Commit und stoppt in etwa 30 Sekunden. Liste der Dateien einer Sitzung mit „Ansehen“.
