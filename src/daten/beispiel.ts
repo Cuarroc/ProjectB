@@ -1,0 +1,70 @@
+import type { Datenstand, Planschritt } from "./typen";
+
+const schritt = (id: string, titel: string, agentId: string | null,
+  zustand: Planschritt["zustand"]): Planschritt => ({
+  id, titel, agentId, zustand, dauerMinuten: 5, kommentar: "", markierungen: [],
+  fertigWenn: [{ text: "Tests grün und Review durch die andere Modellfamilie", erfuellt: zustand === "Fertig" }],
+});
+
+export const beispiel: Datenstand = {
+  chat: {
+    id: "csv-export", titel: "Paketliste als CSV exportieren", modus: "Ausführen",
+    modell: "Opus 5.5", effort: "Hoch", kontextfenster: 1000000, kontextProzent: 10,
+    verlauf: [
+      { id: "auftrag", von: "Du", zeit: "14:30", aktionen: [],
+        text: "Exportiere die Paketliste als CSV, mit Spalten für Status und Dauer." },
+      { id: "plan", von: "Orchestrator", zeit: "14:31", planId: "csv-plan", aktionen: [],
+        text: "Ich teile das in 3 Teilaufgaben, jede in einer eigenen Arbeitskopie des Projekts. Fertig ist eine erst mit grünen Tests und Review durch die andere Modellfamilie." },
+      { id: "frage", von: "Orchestrator", zeit: "14:36", frageId: "speicherort", aktionen: [],
+        text: "Frage von Knopf „Als CSV speichern“" },
+    ],
+  },
+  agenten: [
+    { id: "dauer", name: "Spalte „Dauer“ berechnen", anbieter: "Codex", modell: "gpt-6.1-sol",
+      effort: "Hoch", zustand: "Fertig", fortschritt: 100, arbeitskopie: "csv-dauer",
+      liveZeile: "Tests grün", tokens: 28000, laufzeitSekunden: 180, phasen: [] },
+    { id: "kern", name: "CSV-Export im Kern", anbieter: "Codex", modell: "gpt-6.1-sol",
+      effort: "Hoch", zustand: "Arbeitet", fortschritt: 67, arbeitskopie: "csv-export",
+      liveZeile: "cargo test export · 14 von 21 grün", tokens: 132000, laufzeitSekunden: 372,
+      phasen: [{ name: "Lesen", start: "14:31:00", ende: "14:31:30" },
+        { name: "Bauen", start: "14:31:30", ende: "14:34:00" },
+        { name: "Testen", start: "14:34:00", ende: null }] },
+    { id: "knopf", name: "Knopf „Als CSV speichern“", anbieter: "Claude", modell: "Opus 5.5",
+      effort: "Hoch", zustand: "Wartet auf dich", fortschritt: 40, arbeitskopie: "csv-knopf",
+      liveZeile: "Wartet auf den Speicherort", tokens: 42000, laufzeitSekunden: 300, phasen: [] },
+  ],
+  plan: { id: "csv-plan", titel: "CSV-Export", schritte: [
+    schritt("lesen", "Paketliste lesen", null, "Fertig"),
+    schritt("dauer", "Spalte „Dauer“ berechnen", "dauer", "Fertig"),
+    schritt("kern", "CSV-Export im Kern, mit Tests", "kern", "Arbeitet"),
+    schritt("knopf", "Knopf „Als CSV speichern“", "knopf", "Wartet auf dich"),
+    schritt("review", "Gesamtergebnis prüfen", null, "Offen"),
+  ] },
+  fragen: [{ id: "speicherort", agentId: "knopf",
+    text: "Wo soll die CSV-Datei standardmäßig gespeichert werden?",
+    antwortknoepfe: [{ id: "downloads", text: "In Downloads" }, { id: "projekt", text: "Im Projektordner" }] }],
+  todos: [{ id: "export", text: "CSV-Export fertigstellen", fertig: false }],
+  ausgaben: [], belege: [],
+  kopf: { projekt: "ProjectB", pfad: "C:\\ProjectB", zweig: "main",
+    kontingent: { claude: 42, codex: 51 }, postfach: 3 },
+  berechtigungen: {
+    aktuell: "Nur bei Wichtigem",
+    stufen: [
+      { name: "Vorsichtig", beschreibung: "Fragt vor jeder Änderung." },
+      { name: "Nur bei Wichtigem", beschreibung: "Arbeitet allein in der Arbeitskopie." },
+      { name: "Autonom", beschreibung: "Legt vor, was ein Ja braucht, und arbeitet weiter." },
+    ],
+    regeln: [
+      ...["Dateien in seiner Arbeitskopie ändern", "Tests und Build in der Arbeitskopie ausführen",
+        "Agenten und Subagenten starten", "PR öffnen und mergen, wenn Tests grün und Review ohne Funde",
+        "Im Internet suchen und Doku lesen"].map(text => ({ text,
+        stufen: { Vorsichtig: "Fragt dich", "Nur bei Wichtigem": "Allein", Autonom: "Allein" } as const })),
+      ...["Browser steuern, mit deinen Anmeldungen", "Werkzeuge außerhalb des Projekts", "Programme installieren"].map(text => ({ text,
+        stufen: { Vorsichtig: "Nie", "Nur bei Wichtigem": "Fragt dich", Autonom: "Legt es dir hin" } as const })),
+      ...["Releases und Tags", "Regeln für CI und Merge ändern"].map(text => ({ text,
+        stufen: { Vorsichtig: "Fragt dich", "Nur bei Wichtigem": "Fragt dich", Autonom: "Legt es dir hin" } as const })),
+    ],
+    giltImmer: ["Geld ausgeben oder bezahlte Schlüssel nutzen", "Schlüssel und Passwörter in Dateien, Chat oder Protokoll",
+      "Konten anlegen oder Passwörter eingeben", "Außerhalb des Projekts endgültig löschen"],
+  },
+};
