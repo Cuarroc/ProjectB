@@ -1,0 +1,61 @@
+.statusmarke { display: inline-flex; align-items: center; height: var(--abstand-8); padding-inline: var(--abstand-3); border-radius: var(--rund-voll); font: var(--schrift-klein); font-weight: 600; color: var(--status-farbe); background: var(--status-grund); transition: color var(--dauer-mittel) var(--kurve-raus), background-color var(--dauer-mittel) var(--kurve-raus); }
+.statusmarke > span { transition: opacity var(--dauer-mittel) var(--kurve-raus), transform var(--dauer-mittel) var(--kurve-raus); display: inline-flex; align-items: center; gap: var(--abstand-1); }
+[data-zustand="offen"] { --status-farbe: var(--status-offen); --status-grund: var(--status-offen-grund); }
+[data-zustand="arbeitet"] { --status-farbe: var(--status-arbeitet); --status-grund: var(--status-arbeitet-grund); }
+[data-zustand="wartet"] { --status-farbe: var(--status-wartet); --status-grund: var(--status-wartet-grund); }
+[data-zustand="fertig"] { --status-farbe: var(--status-fertig); --status-grund: var(--status-fertig-grund); }
+[data-zustand="problem"] { --status-farbe: var(--status-problem); --status-grund: var(--status-problem-grund); }
+@starting-style { .statusmarke > span { opacity: 0; transform: scale(.9); } }
+@media (prefers-reduced-motion: reduce) { @starting-style { .statusmarke > span { transform: none; } } }
+.hinweis { animation: hinweis var(--dauer-hinweis) var(--kurve-raus); border-radius: inherit; }
+@keyframes hinweis { 50% { box-shadow: var(--schatten-leuchten-wartet); } }
+.knopf, .umschalter button { box-sizing: border-box; border: 0; cursor: pointer; white-space: nowrap; font: var(--schrift-klein); color: var(--text-1); }
+.knopf { display: inline-grid; align-items: center; justify-items: center; height: var(--steuer-hoehe); padding-inline: var(--abstand-4); border-radius: var(--rund-knopf); background: var(--flaeche-3); box-shadow: var(--schatten-kante); font-weight: 600; transition: background-color var(--dauer-kurz) var(--kurve-raus), color var(--dauer-kurz) var(--kurve-raus), transform var(--dauer-druck) var(--kurve-raus); }
+.knopf-inhalt { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: var(--abstand-2); }
+.knopf[data-variante="haupt"] { font: var(--schrift-ueberschrift); background: var(--akzent); color: var(--akzent-tinte); box-shadow: var(--schatten-senden); }
+.knopf[data-variante="leise"], .knopf[data-variante="gefaehrlich"] { background: none; color: var(--text-2); box-shadow: none; }
+.knopf[data-variante="gefaehrlich"] { border: 1px solid var(--flaeche-4); }
+.knopf[data-variante="antwort"] { background: var(--status-wartet-grund); color: var(--status-wartet-text); }
+.knopf[data-symbol] { width: var(--steuer-hoehe); padding: 0; }
+.knopf:focus-visible, .umschalter button:focus-visible, .vorschau .fokus { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: calc(var(--abstand-1) / 2); }
+.knopf:active:not(:disabled), .vorschau .gedrueckt { transform: scale(var(--skala-druck)); background: var(--flaeche-4); }
+.knopf[data-variante="haupt"]:active:not(:disabled), .vorschau .knopf[data-variante="haupt"].gedrueckt { background: color-mix(in srgb, var(--akzent), var(--akzent-text) 20%); }
+.knopf:disabled:not([aria-busy="true"]) { background: var(--flaeche-3); color: var(--text-aus); box-shadow: none; cursor: not-allowed; transition: none; }
+.knopf:is([data-variante="leise"], [data-variante="gefaehrlich"]):disabled { background: none; }
+.knopf[aria-busy="true"] { cursor: wait; transition: none; }
+.knopf[data-variante="haupt"][aria-busy="true"] { background: var(--akzent); color: var(--akzent-tinte); }
+.umschalter { display: inline-grid; position: relative; grid-auto-flow: column; padding: calc(var(--abstand-1) / 2); border-radius: var(--rund-knopf); background: var(--flaeche-3); }
+.umschalter button { position: relative; display: grid; place-items: center; height: calc(var(--steuer-hoehe) - var(--abstand-1)); padding: 0 var(--abstand-3); border-radius: var(--rund-segment); background: none; color: var(--text-2); transition: background-color var(--dauer-kurz) var(--kurve-raus), color var(--dauer-kurz) var(--kurve-raus); }
+.umschalter button > * { grid-area: 1 / 1; }
+.umschalter button b { visibility: hidden; }
+.umschalter button[aria-checked="true"] { font-weight: 600; color: var(--akzent-text); }
+.umschalter-pille { position: absolute; inset: 0; background: var(--akzent-grund); border-radius: var(--rund-segment); clip-path: inset(calc(var(--abstand-1) / 2) var(--rechts, 100%) calc(var(--abstand-1) / 2) var(--links, 0) round var(--rund-segment)); transition: clip-path var(--dauer-mittel) var(--kurve-gleich); }
+@media (hover: hover) and (pointer: fine) {
+  .knopf:hover:not(:disabled), .umschalter button:hover:not([aria-checked="true"]) { background: var(--flaeche-4); color: var(--text-1); }
+  .knopf[data-variante="haupt"]:hover:not(:disabled) { background: color-mix(in srgb, var(--akzent), var(--akzent-text) 20%); color: var(--akzent-tinte); }
+  .knopf:is([data-variante="leise"], [data-variante="gefaehrlich"]):hover:not(:disabled) { background: var(--flaeche-3); }
+  .knopf[data-variante="antwort"]:hover:not(:disabled) { background: var(--status-wartet-grund); color: var(--status-wartet-text); }
+}
+.vorschau .hover { background: var(--flaeche-4); color: var(--text-1); }
+.vorschau .knopf[data-variante="haupt"].hover { background: color-mix(in srgb, var(--akzent), var(--akzent-text) 20%); color: var(--akzent-tinte); }
+.vorschau .knopf:is([data-variante="leise"], [data-variante="gefaehrlich"]):is(.hover, .gedrueckt) { background: var(--flaeche-3); color: var(--text-1); }
+.knopf[data-variante="antwort"]:active:not(:disabled), .vorschau .knopf[data-variante="antwort"]:is(.hover, .gedrueckt) { background: var(--status-wartet-grund); color: var(--status-wartet-text); }
+.ring { position: relative; display: inline-grid; width: var(--ring-groesse); height: var(--ring-groesse); vertical-align: middle; font: var(--schrift-klein); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-1); }
+.ring > svg { width: 100%; height: 100%; fill: none; stroke: var(--flaeche-3); stroke-width: calc(var(--abstand-1) * .875); }
+.ring circle { vector-effect: non-scaling-stroke; }
+.ring[data-klein] > svg { stroke-width: calc(var(--abstand-1) * .75); }
+.ring .ring-bogen { stroke: var(--ring-farbe); stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset var(--dauer-daten) var(--kurve-gleich), stroke var(--dauer-mittel) var(--kurve-raus); }
+.ring-mitte { position: absolute; inset: 0; display: grid; place-items: center; }
+.ring-mitte { transition: opacity var(--dauer-mittel) var(--kurve-raus); }
+.ring-haken, .ring[data-fertig] .ring-zahl { opacity: 0; }
+.ring[data-fertig] .ring-haken { opacity: 1; }
+.ring-mitte svg { color: var(--status-fertig); }
+.vorschau { background: var(--flaeche-1); padding: var(--abstand-7); display: grid; gap: var(--abstand-8); justify-items: start; }
+.vorschau section { display: grid; gap: var(--abstand-6); }
+.vorschau h1, .vorschau h2, .vorschau p { margin: 0; font: var(--schrift-text); color: var(--text-2); }
+.vorschau h1 { font: var(--schrift-abschnitt); color: var(--text-1); }
+.vorschau-zeile { display: flex; align-items: center; gap: var(--abstand-4); flex-wrap: wrap; }
+.vorschau figure { display: grid; justify-items: center; gap: var(--abstand-2); margin: 0; font: var(--schrift-klein); color: var(--text-3); }
+.vorschau table { border-spacing: var(--abstand-4); margin: calc(-1 * var(--abstand-4)); font: var(--schrift-klein); }
+.vorschau th { font-weight: 400; text-align: left; color: var(--text-3); }
+.vorschau-kontext { display: inline-flex; align-items: center; padding-left: var(--abstand-3); border-radius: var(--rund-knopf); background: var(--flaeche-3); font: var(--schrift-klein); color: var(--text-3); }
