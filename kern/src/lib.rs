@@ -6,6 +6,8 @@ pub mod einstellungen;
 
 pub mod start;
 
+pub mod pr;
+
 use serde_json::Value;
 use std::fmt;
 use std::io::{self, BufRead, BufReader, Read, Write};
