@@ -1,6 +1,6 @@
 .team-details{box-sizing:border-box;flex:none;max-height:54%;min-height:0;overflow:auto;margin:0 var(--abstand-4) var(--abstand-4);padding:var(--abstand-5);border-radius:var(--rund-eingabe);background:radial-gradient(120% 90% at 0% 0%,var(--detail-glanz),transparent 55%),var(--glas-grund);backdrop-filter:blur(var(--abstand-7));box-shadow:var(--schatten-schwebend);font:var(--schrift-klein);animation:team-details var(--dauer-lang) var(--kurve-raus)}
 .team-bereich:has(.team-details) .team-kacheln{display:none}
-.team-liste>[data-agent]{flex:none;scroll-margin-bottom:var(--abstand-4)}
+.team-bereich:has(.team-details) .team-liste>[data-agent]{flex:none;scroll-margin-bottom:var(--abstand-4)}
 .team-details:focus-visible{outline:1px solid var(--akzent)}
 .tm-det{display:flex;flex-direction:column;gap:var(--abstand-4);min-width:0}
 .tm-det-kopf{display:flex;align-items:center;gap:var(--abstand-4);min-width:0}
