@@ -3,6 +3,7 @@
 pub mod anhalten;
 
 pub mod einstellungen;
+pub mod regeln;
 
 pub mod start;
 
