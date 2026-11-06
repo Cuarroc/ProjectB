@@ -1,5 +1,12 @@
 import { beispiel } from "./beispiel";
 import type { Datenstand, Plan } from "./typen";
+export { orchestratorBeispiel, teamTestverlauf } from "./beispiel";
+
+// Beispielmessungen je 30 Sekunden, in Tausend Tokens; fehlende Zukunft bleibt leer.
+export const teamTokenverlauf = [
+  [0, 10], [0, 10], [0, 10], [3, 11], [12, 9], [19, 8], [21, 6], [23, 8],
+  [21, 7], [25, 7], [23, 9], [21, 9], [19, 8], [17, 7], [15, 6], [13, 7],
+];
 
 export interface Datenquelle {
   // Lesende Aufrufe liefern unabhängige Kopien. Änderungen werden danach gemeldet.
