@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { ArrowUp, CircleX, Plus } from "lucide-react";
 import "./Eingabefeld.css";
 
@@ -10,9 +10,13 @@ type Props = {
   onAnhaengen?: () => void;
   sendet?: boolean;
   fehler?: string;
+  kopf?: ReactNode;
+  werkzeuge?: ReactNode;
+  beschreibungId?: string;
+  ohneAnhaengen?: boolean;
 };
 
-export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, sendet = false, fehler }: Props) {
+export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, sendet = false, fehler, kopf, werkzeuge, beschreibungId, ohneAnhaengen }: Props) {
   const senden = () => { if (!sendet && text.trim()) onSenden(text); };
   const tastatur = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -20,15 +24,16 @@ export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, se
     senden();
   };
   return <form className="ein" onSubmit={event => { event.preventDefault(); senden(); }}>
-    <label htmlFor={id} className="ein-sr">Nachricht an den Orchestrator</label>
+    <>{kopf}<label htmlFor={id} className="ein-sr">Nachricht an den Orchestrator</label></>
     <textarea id={id} rows={2} placeholder="Schreib, was gebaut werden soll …" value={text}
       onChange={event => onTextAendern(event.target.value)} onKeyDown={tastatur}
-      aria-describedby={fehler ? `${id}-meldung` : undefined} />
+      aria-describedby={[beschreibungId, fehler ? `${id}-meldung` : undefined].filter(Boolean).join(" ") || undefined} />
     <div className="ein-leiste">
-      <button type="button" className="kn kn-leise kn-symbol" aria-label="Bild oder Datei anhängen"
+      {!ohneAnhaengen && <button type="button" className="kn kn-leise kn-symbol" aria-label="Bild oder Datei anhängen"
         title="Bild oder Datei anhängen" disabled={!onAnhaengen || sendet} onClick={onAnhaengen}>
         <Plus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />
-      </button>
+      </button>}
+      {werkzeuge}
       <span id={`${id}-meldung`} className={fehler ? "ein-meldung" : "ein-sr"} aria-live="polite" aria-atomic="true">
         {fehler && <><CircleX size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{fehler}</>}
       </span>
