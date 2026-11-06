@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ToastSpeicher, Toast } from "./Toast";
 import { TooltipZeit } from "./Tooltip";
+import { Leerzustand } from "./Leerzustand";
 
 const ms = name => ({ "verzoegerung-tooltip": 600, "fenster-tooltip-wechsel": 400, "standzeit-toast-info": 6000, "dauer-kurz": 120 }[name]);
 const meldung = (id, art = "info") => ({ id, art, agent: "Codex", titel: id, zeile: "Meldung", handlung: "Öffnen" });
@@ -43,6 +44,24 @@ it("hat anfangs leere Live-Regionen und sagt Agentenmeldungen nur einmal an", ()
 });
 it("entfernt bei 0 ms sofort ohne transitionend", () => {
   const s = new ToastSpeicher(name => name === "dauer-kurz" ? 0 : ms(name)); s.melden(meldung("Export")); s.schliessen("Export"); expect(s.bild().aktiv).toHaveLength(0);
+});
+it("zeigt und meldet denselben Toast nach dem Schließen erneut", () => {
+  const s = new ToastSpeicher(ms); s.melden(meldung("Problem", "problem")); s.schliessen("Problem"); vi.advanceTimersByTime(120);
+  expect(s.bild().hoeflich).toBe(""); s.melden(meldung("Problem", "problem"));
+  expect(s.bild().aktiv.map(x => x.id)).toEqual(["Problem"]);
+  expect(renderToStaticMarkup(<Toast speicher={s} />)).toContain('aria-live="polite" aria-atomic="true">Codex: Problem: Meldung');
+});
+it("zeichnet Toast- und Leerzustandssymbole mit absolut 1,5 px", () => {
+  const s = new ToastSpeicher(ms); s.melden(meldung("Problem", "problem"));
+  const html = renderToStaticMarkup(<><Toast speicher={s} /><Leerzustand bereich="chat" /></>);
+  expect(html.match(/stroke-width="2.25"/g)).toHaveLength(3);
+});
+it("bindet die Zusammenfassung an ihre eigene Protokoll-Handlung", () => {
+  const protokoll = vi.fn(), ordner = vi.fn(), s = new ToastSpeicher(ms, protokoll);
+  for (const id of ["A", "B", "C", "D"]) s.melden({ ...meldung(id), handlung: "Ordner öffnen", onHandlung: ordner });
+  const info = s.bild().aktiv[0]; expect(info.handlung).toBe("Protokoll öffnen"); info.onHandlung();
+  expect(protokoll).toHaveBeenCalledOnce(); expect(ordner).not.toHaveBeenCalled();
+  const ohne = new ToastSpeicher(ms); for (const id of ["A", "B", "C", "D"]) ohne.melden(meldung(id)); expect(ohne.bild().aktiv[0].handlung).toBeUndefined();
 });
 it("hält Infos hinter drei Fragen zurück und gibt sie erst nach dem Schließen frei", () => {
   const s = new ToastSpeicher(ms); for (const id of ["A", "B", "C"]) s.melden(meldung(id, "wartet")); s.melden(meldung("Info"));
