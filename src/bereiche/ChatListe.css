@@ -1,0 +1,33 @@
+.hauptbildschirm > .chat-rand { position: relative; padding: 0; overflow: hidden; background: linear-gradient(var(--flaeche-1-oben), var(--flaeche-1)); }
+.chat-rand > div:not([hidden]) { height: 100%; display: flex; flex-direction: column; }
+.chat-rand h2 { display: flex; align-items: center; min-height: var(--kopf-hoehe); padding-inline: var(--abstand-6); padding-right: var(--leiste-breite); }
+.rand-schalter { position: absolute; top: var(--abstand-4); right: var(--abstand-4); display: grid; place-items: center; width: var(--steuer-hoehe); height: var(--steuer-hoehe); padding: 0; border: 0; border-radius: var(--rund-knopf); background: transparent; color: var(--text-2); cursor: pointer; }
+.chat-rand[data-offen=false] .rand-schalter { top: var(--abstand-2); right: var(--abstand-1); width: calc(var(--leiste-breite) - 2 * var(--abstand-1)); height: calc(var(--leiste-breite) - 2 * var(--abstand-1)); background: var(--flaeche-2); border-radius: var(--rund-kachel); box-shadow: var(--schatten-kante); }
+.rand-inhalt { flex: 1; min-height: 0; overflow: auto; padding: 0 var(--abstand-5) var(--abstand-6); display: flex; flex-direction: column; gap: var(--abstand-4); }
+.rand-karte { padding: var(--abstand-5); background: var(--flaeche-2); border-radius: var(--rund-karte); box-shadow: var(--schatten-kante); }
+.rand-karte h3 { margin: 0 0 var(--abstand-3); font: var(--schrift-ueberschrift); }
+.rand-karte h3 span { display: block; color: var(--text-2); font: var(--schrift-klein); }
+.rand-karte ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--abstand-2); }
+.rand-chat, .rand-postfach { border: 0; width: 100%; text-align: left; color: var(--text-1); font: inherit; padding: var(--abstand-2); background: var(--flaeche-3); border-radius: var(--rund-knopf); display: flex; align-items: center; gap: var(--abstand-2); cursor: pointer; }
+.rand-chat[aria-current] { background: var(--akzent-grund); color: var(--akzent-text); }
+.rand-chat span, .rand-todo span { overflow-wrap: anywhere; min-width: 0; }
+.rand-chat svg { flex-shrink: 0; }
+.rand-todo { display: flex; align-items: start; gap: var(--abstand-2); padding-block: var(--abstand-1); cursor: pointer; }
+.rand-todo input { accent-color: var(--akzent); flex-shrink: 0; }
+.rand-todo:has(:checked) span { color: var(--text-2); text-decoration: line-through; }
+.rand-form { display: flex; gap: var(--abstand-1); margin-top: var(--abstand-4); }
+.rand-form > input { min-width: 0; width: 100%; padding: var(--abstand-2); background: var(--flaeche-3); border: 0; border-radius: var(--rund-knopf); color: var(--text-1); font: var(--schrift-text); }
+.rand-form input::placeholder { color: var(--text-3); }
+.rand-zaehler { margin-left: auto; padding-inline: var(--abstand-2); border-radius: var(--rund-voll); color: var(--status-wartet-text); background: var(--status-wartet-grund); font-variant-numeric: tabular-nums; }
+.rand-karte p { font: var(--schrift-klein); color: var(--text-2); margin-bottom: 0; }
+.chat-rand :focus-visible, .team-rand-schalter:focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) { .rand-schalter:hover, .rand-chat:hover, .rand-postfach:hover { background: var(--flaeche-3); color: var(--text-1); } }
+.app-rahmen:has(.chat-rand[data-offen=false]) { --chats-breite: var(--leiste-breite); }
+.app-rahmen:has(.chat-rand[data-offen=true]) { --chats-breite: calc(5 * var(--leiste-breite) + var(--abstand-3)); }
+.team-rand { display: none; background: var(--flaeche-1); border-radius: var(--rund-bereich); box-shadow: var(--schatten-kante); }
+.team-rand-schalter { display: grid; place-items: center; width: var(--steuer-hoehe); height: var(--steuer-hoehe); margin: var(--abstand-4) auto; background: transparent; color: var(--text-2); border: 0; border-radius: var(--rund-knopf); cursor: pointer; }
+@media (width < 80rem) {
+  .app-rahmen:has(.chat-rand[data-offen=true]) { --team-breite: var(--leiste-breite); }
+  .hauptbildschirm:has(.chat-rand[data-offen=true]) > .team-spalte { display: none; }
+  .hauptbildschirm:has(.chat-rand[data-offen=true]) > .team-rand { display: block; }
+}
