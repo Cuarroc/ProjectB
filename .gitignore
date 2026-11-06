@@ -9,5 +9,8 @@ src-tauri/gen/schemas/
 .mcp.json
 .claude/*
 !.claude/settings.json
+!.claude/agents/
+.claude/agents/*
+!.claude/agents/Explore.md
 .agentsroom/
 .codex/
