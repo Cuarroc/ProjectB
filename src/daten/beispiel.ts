@@ -1,5 +1,13 @@
 import type { Datenstand, Planschritt } from "./typen";
 
+export const orchestratorBeispiel = { tokens: 113000, laufzeitSekunden: 432,
+  phasen: [{ art: "lesen", name: "Lesen", start: 0, ende: 40 },
+    { art: "lesen", name: "Planen", start: 40, ende: 70 },
+    { art: "koordiniert", name: "Koordiniert", start: 70, ende: 432 }] } as const;
+export const teamTestverlauf = [{ zeit: "14:31", gruen: 0 }, { zeit: "14:32", gruen: 6 },
+  { zeit: "14:33", gruen: 10 }, { zeit: "14:34", gruen: 12 },
+  { zeit: "14:35", gruen: 9, rot: 3 }, { zeit: "14:36", gruen: 21 }, { zeit: "14:37", gruen: 26 }];
+
 const schritt = (id: string, titel: string, agentId: string | null,
   zustand: Planschritt["zustand"], beschreibung: string): Planschritt => ({
   id, titel, agentId, zustand, beschreibung, dauerMinuten: 5, kommentar: "", markierungen: [],
@@ -22,8 +30,12 @@ export const beispiel: Datenstand = {
   agenten: [
     { id: "dauer", name: "Spalte „Dauer“ berechnen", anbieter: "Codex", modell: "gpt-6.1-sol",
       effort: "Hoch", zustand: "Fertig", fortschritt: 100, arbeitskopie: "csv-dauer",
-      liveZeile: "Tests grün", tokens: 28000, laufzeitSekunden: 180, phasen: [],
-      dateien: [], letzteZeilen: [], tests: { gruenSeit: "14:34", gruen: 2, gesamt: 2, verlauf: [] }, schaetzung: null },
+      liveZeile: "Tests grün", tokens: 52000, laufzeitSekunden: 350,
+      phasen: [{ name: "Lesen", start: "14:30:00", ende: "14:30:25" },
+        { name: "Bauen", start: "14:30:25", ende: "14:32:40" },
+        { name: "Testen", start: "14:32:40", ende: "14:34:20" },
+        { name: "Review", start: "14:34:20", ende: "14:35:50" }],
+      dateien: [], letzteZeilen: [], tests: { gruenSeit: "14:33", gruen: 12, gesamt: 12, verlauf: [] }, schaetzung: null },
     { id: "kern", name: "CSV-Export im Kern", anbieter: "Codex", modell: "gpt-6.1-sol",
       effort: "Hoch", zustand: "Arbeitet", fortschritt: 67, arbeitskopie: "csv-export",
       liveZeile: "cargo test export · 14 von 21 grün", tokens: 132000, laufzeitSekunden: 372,
@@ -36,9 +48,11 @@ export const beispiel: Datenstand = {
       phasen: [{ name: "Lesen", start: "14:31:00", ende: "14:31:30" },
         { name: "Bauen", start: "14:31:30", ende: "14:34:00" },
         { name: "Testen", start: "14:34:00", ende: null }] },
-    { id: "knopf", name: "Knopf „Als CSV speichern“", anbieter: "Claude", modell: "Opus 5.5",
+    { id: "knopf", name: "Knopf „Als CSV speichern“", anbieter: "Claude", modell: "Sonnet 5.5",
       effort: "Hoch", zustand: "Wartet auf dich", fortschritt: 40, arbeitskopie: "csv-knopf",
-      liveZeile: "Wartet auf den Speicherort", tokens: 42000, laufzeitSekunden: 300, phasen: [],
+      liveZeile: "Wartet auf den Speicherort", tokens: 61000, laufzeitSekunden: 287,
+      phasen: [{ name: "Lesen", start: "14:31:00", ende: "14:31:30" },
+        { name: "Bauen", start: "14:31:30", ende: "14:36:00" }],
       dateien: [], letzteZeilen: [], tests: null, schaetzung: null },
   ],
   plan: { id: "csv-plan", titel: "CSV-Export", freigabe: "Freigegeben", schritte: [
