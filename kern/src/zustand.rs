@@ -52,11 +52,8 @@ impl AgentZustand {
                 self.beendet_ok = *erfolg;
             }
             Ereignis::Meldung(text) => {
-                self.problem |= text.to_lowercase().contains("nicht angemeldet")
-                    || text
-                        .rsplit_once(" endete mit Exit-Code ")
-                        .and_then(|(_, code)| code.parse::<i32>().ok())
-                        .is_some_and(|code| code != 0);
+                // Einzelne Werkzeugfehler sind kein Misserfolg des Agentenlaufs.
+                self.problem |= text.to_lowercase().contains("nicht angemeldet");
                 self.zeilen(text);
             }
             Ereignis::ErgebnisAusstehend | Ereignis::Unbekannt(_) => {}

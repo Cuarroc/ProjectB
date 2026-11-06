@@ -56,24 +56,43 @@ fn erfolg_braucht_ergebnis_und_prozessabschluss() {
 }
 
 #[test]
-fn anbieter_misserfolge_werden_problem() {
-    for (daten, lesen) in [
+fn anbieterfehler_und_befehlsmeldungen_unterscheiden() {
+    for (daten, lesen, erwartet) in [
         (
             r#"{"type":"result","subtype":"error_during_execution","is_error":true,"errors":["Fehler"]}"#,
             lies_claude as fn(&Value) -> Vec<Ereignis>,
+            "Problem",
         ),
-        (r#"{"type":"turn.failed","error":{"message":"Fehler"}}"#, lies_codex),
+        (r#"{"type":"turn.failed","error":{"message":"Fehler"}}"#, lies_codex, "Problem"),
         (
             r#"{"type":"item.completed","item":{"type":"command_execution","command":"cargo test","exit_code":1}}"#,
             lies_codex,
+            "Arbeitet",
         ),
     ] {
         let mut zustand = neu();
         for e in lesen(&serde_json::from_str(daten).unwrap()) {
             zustand.anwenden(&e);
         }
-        assert_eq!(zustand.als_json()["zustand"], "Problem");
+        assert_eq!(zustand.als_json()["zustand"], erwartet);
     }
+}
+
+#[test]
+fn roter_befehl_verhindert_erfolgreichen_lauf_nicht() {
+    let daten = r#"{"type":"item.completed","item":{"type":"command_execution","command":"cargo test","exit_code":1}}
+{"type":"item.completed","item":{"type":"agent_message","text":"Fehler behoben"}}
+{"type":"turn.completed"}"#;
+    let mut zustand = neu();
+    for zeile in daten.lines() {
+        for e in lies_codex(&serde_json::from_str(zeile).unwrap()) {
+            zustand.anwenden(&e);
+        }
+    }
+    // Das Ergebnis wird wie im Lauf-Wächter nach Prozessende bestätigt.
+    zustand.anwenden(&Ereignis::Fertig { erfolg: true, zusammenfassung: String::new() });
+    zustand.anwenden(&Ereignis::Beendet { code: Some(0), erfolg: true });
+    assert_eq!(zustand.als_json()["zustand"], "Fertig");
 }
 
 #[test]
