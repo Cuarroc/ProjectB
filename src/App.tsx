@@ -1,15 +1,23 @@
 import "./App.css";
 import Vorschau from "./bausteine/Vorschau";
+import Kopf from "./bereiche/Kopf";
+import ChatListe from "./bereiche/ChatListe";
+import ChatVerlauf from "./bereiche/ChatVerlauf";
+import ChatEingabe from "./bereiche/ChatEingabe";
+import Team from "./bereiche/Team";
 
 export default function App() {
   if (new URLSearchParams(window.location.search).get("vorschau") === "bausteine") return <Vorschau />;
   return (
     <div className="app-rahmen">
-      <header className="app-kopf"><h1>ProjectB</h1></header>
+      <Kopf />
       <main className="hauptbildschirm" aria-label="Hauptbildschirm">
-        <section aria-labelledby="chats"><h2 id="chats">Chats</h2></section>
-        <section aria-labelledby="chat"><h2 id="chat">Chat</h2></section>
-        <section aria-labelledby="team"><h2 id="team">Team</h2></section>
+        <ChatListe />
+        <section className="chat-spalte" aria-labelledby="chat">
+          <ChatVerlauf />
+          <ChatEingabe />
+        </section>
+        <Team />
       </main>
     </div>
   );
