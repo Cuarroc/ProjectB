@@ -54,7 +54,7 @@ fn sichern(ordner: &Path) -> Result<Ordnerstatus, String> {
     if !git(ordner, &["rev-parse", "--show-prefix"])?.trim().is_empty() {
         return Err("Ordner ist nicht die Wurzel einer Arbeitskopie".into());
     }
-    if git(ordner, &["status", "--porcelain"])?.is_empty() {
+    if git(ordner, &["status", "--porcelain", "--untracked-files=all"])?.is_empty() {
         return Ok(Ordnerstatus::Sauber);
     }
     git(ordner, &["add", "-A"])?;
