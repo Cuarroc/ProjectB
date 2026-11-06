@@ -5,6 +5,7 @@ ui-baselines/
 test-results/
 playwright-report/
 .visual-base/
+.ui-cache/
 src-tauri/target/
 src-tauri/gen/schemas/
 # Lokale Agenten-Daten und Zugangsdaten nie einchecken

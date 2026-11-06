@@ -91,7 +91,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
     env:
-      PLAYWRIGHT_BROWSERS_PATH: node_modules/.cache/ms-playwright
+      PLAYWRIGHT_BROWSERS_PATH: .ui-cache/browsers
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

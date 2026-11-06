@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 import { resolve } from "node:path";
 
-process.env.PLAYWRIGHT_BROWSERS_PATH ??= resolve("node_modules/.cache/ms-playwright");
+process.env.PLAYWRIGHT_BROWSERS_PATH ??= resolve(".ui-cache/browsers");
 const baseline = process.env.UI_BASELINE === "1";
 if (baseline && (!process.env.CI || process.env.RUNNER_OS !== "Windows")) {
   throw new Error("Baselines nur auf windows-latest erzeugen.");
