@@ -76,7 +76,7 @@
 
   /* Schatten */
   --schatten-kante: inset 0 1px 0 rgba(255,255,255,0.05); /* Feine helle Oberkante auf jeder Fläche statt eines Rahmens. */
-  --schatten-eingabe: 0 0 0 1px rgba(176,140,255,0.30), 0 12px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05); /* Eingabefeld des Chats: zeigt, wo geschrieben wird. */
+  --schatten-eingabe: 0 12px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05); /* Tiefe ohne Akzent-Rand. */
   --schatten-senden: 0 6px 18px rgba(176,140,255,0.35), inset 0 1px 0 rgba(255,255,255,0.35); /* Nur der Senden-Knopf. */
   --schatten-auswahl: inset 0 0 0 2px rgba(176,140,255,0.85), 0 0 0 5px rgba(176,140,255,0.12); /* Gewählte Karte, Spur oder Zeile. */
   --schatten-schwebend: 0 16px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05); /* Kommentar-Blasen, Aufklapp-Menüs. */
@@ -88,4 +88,45 @@
   --steuer-hoehe: 32px; /* Höhe von Knöpfen und Feldern. */
   --leiste-breite: 56px; /* Eingeklappter Bereich. */
   --schrift-minimum: 12px; /* Kleinste erlaubte Schrift. */
+  --flaeche-4: #2B3142; /* Hover auf Flächen der Stufe 3, z. B. Zweitknopf. Darauf text-1 (11:1) und text-2 (6,0:1), nie text-3 (4,4:1). */
+  --scrim: rgba(5,7,12,0.62); /* Abdunkelung hinter Dialogen, mit scrim-unschaerfe. Blendet nur per opacity ein. */
+  --text-aus: #6F7888; /* Deaktivierter Text. Muss keinen Kontrast erfüllen (3,3:1 auf flaeche-3), trägt aber nie wichtige Information. */
+  --status-offen: #9AA3B2; /* Zustand „Offen“: noch nicht begonnen. Immer mit leerem Kreis und Wort. 5,4:1 auf status-offen-grund über flaeche-2. */
+  --status-offen-grund: rgba(154,163,178,0.12); /* Grund der Statusmarke „Offen“. */
+  --fenster-min-breite: 1024px; /* Kleinste Fensterbreite. In Tauri als minWidth. */
+  --fenster-min-hoehe: 640px; /* Kleinste Fensterhöhe. In Tauri als minHeight. */
+  --chat-max-breite: 760px; /* Höchste Breite des Chats. Er steht mittig in seiner Spalte. */
+  --scrim-unschaerfe: 3px; /* Unschärfe hinter dem Scrim: backdrop-filter: blur(3px). Nie animieren. */
+  --ebene-klebend: 10; /* Klebende Köpfe und Fußzeilen in scrollenden Bereichen. */
+  --ebene-details: 20; /* Details eines Agenten über dem Team. */
+  --ebene-menue: 30; /* Aufklapp-Menüs, /- und @-Menü. */
+  --ebene-scrim: 40; /* Abdunkelung hinter einem Dialog. */
+  --ebene-dialog: 50; /* Dialoge. */
+  --ebene-toast: 60; /* Benachrichtigungen (Toast), auch über einem Dialog. */
+  --ebene-tooltip: 70; /* Tooltips, über allem. */
+  --schrift-beschriftung: 400 13px/18px var(--familie-sans);
+  --schrift-abschnitt: 650 17px/24px var(--familie-sans);
+  --ring-20: 20px;
+  --ring-40: 40px;
+  --ring-44: 44px;
+  --ring-52: 52px;
 }
+
+:root {
+  --dauer-druck: 100ms;   /* Druck auf einen Knopf */
+  --dauer-kurz: 150ms;    /* Hover, Verschwinden, Tooltip */
+  --dauer-mittel: 200ms;  /* Umschalter, Menü, Statuswechsel */
+  --dauer-lang: 250ms;    /* Dialog, Toast, Details öffnen */
+  --dauer-daten: 600ms;   /* Fortschrittsring */
+  --dauer-hinweis: 1200ms; /* Einmaliges Leuchten bei „Wartet auf dich“ */
+  --kurve-raus: cubic-bezier(0.22, 1, 0.36, 1);   /* Erscheinen, Antwort auf eine Eingabe */
+  --kurve-weg: cubic-bezier(0.4, 0, 1, 1);        /* Nur Verschwinden */
+  --kurve-gleich: cubic-bezier(0.65, 0, 0.35, 1); /* Weg von A nach B */
+  --weg-klein: 4px;    /* Tooltip */
+  --weg-mittel: 8px;   /* Dialog, Toast, neue Nachricht, Einklappen */
+  --weg-gross: 16px;   /* Details */
+  --skala-druck: 0.97; /* Gedrückter Knopf */
+  --skala-auf: 0.97;   /* Dialog und Menü beim Öffnen */
+}
+
+@media (prefers-reduced-motion: reduce){:root{--weg-klein:0px;--weg-mittel:0px;--weg-gross:0px;--skala-druck:1;--skala-auf:1;--dauer-mittel:120ms;--dauer-lang:120ms;--dauer-daten:0ms;--dauer-hinweis:0ms}html{scroll-behavior:auto}}
