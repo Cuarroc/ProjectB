@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe", async ({ page }, testInfo) => {
+  test.skip(process.env.UI_BASELINE === "1", "Das Planfenster wird am Kandidaten geprüft; im Basisstand ist Plan öffnen deaktiviert.");
   await page.goto("/"); await page.evaluate(() => document.fonts.ready);
   const oeffnen = page.getByRole("button", { name: "Plan öffnen", exact: true });
   await oeffnen.focus(); await page.keyboard.press("Enter");
@@ -39,10 +40,17 @@ test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe"
   await expect(dialog.getByRole("textbox")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
   await expect(dialog).toHaveCount(0); await expect(page.getByRole("status", { name: "" }).filter({ hasText: /^Freigegeben$/ })).toBeVisible(); await expect(oeffnen).toBeFocused();
-  await oeffnen.click(); await karte.getByRole("button", { name: "Kommentar, Silbergrau", exact: true }).click(); await kommentar.fill("Bitte ändern.");
+  await oeffnen.click();
+  await karte.locator("h3").evaluate(e => { const r = document.createRange(); r.setStart(e.firstChild, 5); r.setEnd(e.firstChild, 10);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); e.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })); });
+  await karte.getByRole("button", { name: "Kommentar, Silbergrau", exact: true }).click(); await kommentar.fill("Bitte ändern.");
+  await karte.getByRole("button", { name: "Innovativer, Pink", exact: true }).click();
   await dialog.getByRole("button", { name: "Mit Kommentaren zurückgeben", exact: true }).click(); await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("status").filter({ hasText: /^Zurückgegeben$/ })).toBeVisible();
   await oeffnen.click(); await expect(kommentar).toHaveValue("Bitte ändern.");
+  await expect.soft(karte.locator("mark")).toHaveText("liste");
+  await page.keyboard.press("Escape"); await page.getByRole("radio", { name: "Planen", exact: true }).click(); await oeffnen.click();
+  await expect(kommentar).toHaveValue("Bitte ändern."); await expect(karte.locator("mark")).toHaveText("liste");
   await page.keyboard.press("Escape");
   // Soll-Beispieldaten: derselbe Datenweg, vier Schritte wie in plan.png.
   await page.evaluate(async () => { const { chatEingabeQuelle: q } = await import("/src/bereiche/ChatEingabe.tsx"); const d = q.lesen();

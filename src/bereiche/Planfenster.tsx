@@ -11,17 +11,18 @@ export const farben = [
   ["Innovativer", "innovativer", "Pink", Lightbulb],
 ] as const;
 type Marke = { name: Markierung; start: number; ende: number };
+export type PlanMarken = Record<string, Marke>;
 const farbe = (name: Markierung) => `var(--markierung-${farben.find(f => f[0] === name)![1]})`;
 export function MarkierterText({ text, marke }: { text: string; marke?: Marke }) {
   return marke ? <>{text.slice(0, marke.start)}<mark style={{ "--f": farbe(marke.name) } as CSSProperties}
     aria-label={`${marke.name}, ${farben.find(f => f[0] === marke.name)![2]}`}>{text.slice(marke.start, marke.ende)}</mark>{text.slice(marke.ende)}</> : <>{text}</>;
 }
-export default function Planfenster({ daten, onSchliessen, onEntscheiden }: {
-  daten: Datenstand; onSchliessen: () => void; onEntscheiden: (plan: Plan) => void;
+export default function Planfenster({ daten, gespeicherteMarken, onSchliessen, onEntscheiden }: {
+  daten: Datenstand; gespeicherteMarken: PlanMarken; onSchliessen: () => void; onEntscheiden: (plan: Plan, marken: PlanMarken) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [plan, setPlan] = useState(() => structuredClone(daten.plan));
-  const [marken, setMarken] = useState<Record<string, Marke>>({});
+  const [marken, setMarken] = useState<PlanMarken>(gespeicherteMarken);
   const auswahl = useRef<{ id: string; feld: string; start: number; ende: number } | null>(null);
   const [hinweis, setHinweis] = useState("");
   const [stil, setStil] = useState("Ausführlicher");
@@ -45,7 +46,7 @@ export default function Planfenster({ daten, onSchliessen, onEntscheiden }: {
   };
   const entscheiden = (freigeben: boolean) => {
     if (!freigeben && !plan.schritte.some(s => s.kommentar.trim())) { setHinweis("Schreib einen Kommentar, bevor du den Plan zurückgibst."); return; }
-    onEntscheiden({ ...plan, freigabe: freigeben ? "Freigegeben" : "Wartet auf dich" }); onSchliessen();
+    onEntscheiden({ ...plan, freigabe: freigeben ? "Freigegeben" : "Wartet auf dich" }, marken); onSchliessen();
   };
   return <dialog ref={dialog} className="planfenster" aria-labelledby="plan-titel" onCancel={e => { e.preventDefault(); onSchliessen(); }} onKeyDown={e => {
     if (e.key !== "Tab") return;

@@ -8,7 +8,7 @@ import { tokenMs } from "../bausteine/Tooltip";
 import type { Planschritt } from "../daten/typen";
 import "./ChatVerlauf.css";
 import "../bausteine/bausteine2.css";
-import Planfenster from "./Planfenster";
+import Planfenster, { type PlanMarken } from "./Planfenster";
 
 const standardQuelle = new BeispielQuelle();
 const zustaende: Record<Planschritt["zustand"], Zustand> = {
@@ -27,6 +27,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
   const [meldung, setMeldung] = useState("");
   const [planOffen, setPlanOffen] = useState(false);
   const [planFreigabe, setPlanFreigabe] = useState("");
+  const [planMarken, setPlanMarken] = useState<Record<string, PlanMarken>>({});
   useEffect(() => {
     if (!meldung) return;
     const timer = setTimeout(() => setMeldung(""), tokenMs("standzeit-toast-info"));
@@ -100,8 +101,10 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
       </ol>
     </div>
     <div className="chat-meldung" role="status">{meldung}</div>
-    {planOffen && <Planfenster daten={daten} onSchliessen={() => setPlanOffen(false)} onEntscheiden={plan => {
-      setDaten(d => ({ ...d, plan })); setPlanFreigabe(plan.freigabe === "Freigegeben" ? "Freigegeben" : "Zurückgegeben");
+    {planOffen && <Planfenster daten={daten} gespeicherteMarken={planMarken[daten.plan.id] ?? {}} onSchliessen={() => setPlanOffen(false)} onEntscheiden={(plan, marken) => {
+      if (quelle instanceof BeispielQuelle) quelle.aktualisieren({ ...quelle.lesen(), plan });
+      else setDaten(d => ({ ...d, plan }));
+      setPlanMarken(m => ({ ...m, [plan.id]: marken })); setPlanFreigabe(plan.freigabe === "Freigegeben" ? "Freigegeben" : "Zurückgegeben");
     }} />}
   </>;
 }
