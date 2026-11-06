@@ -5,6 +5,7 @@ import { Knopf } from "./Knopf";
 import { Umschalter } from "./Umschalter";
 import { Fortschrittsring } from "./Fortschrittsring";
 import "./bausteine.css";
+import VorschauMeldungen from "./VorschauMeldungen";
 
 export default function Vorschau() {
   const [status, setStatus] = useState<Zustand>("arbeitet");
@@ -14,6 +15,8 @@ export default function Vorschau() {
   const [aktionen, setAktionen] = useState(0);
   const bedienung = ["Ruhe", "Hover", "Gedrückt", "Fokus", "Deaktiviert", "Laden"];
   const klassen = ["", "hover", "gedrueckt", "fokus", "", ""];
+  const tafel = new URLSearchParams(window.location.search).get("tafel");
+  if (tafel && ["toast", "tooltip", "leerzustand"].includes(tafel)) return <main className="vorschau"><VorschauMeldungen tafel={tafel} /></main>;
   return <main className="vorschau">
     <h1>Bausteine · Vorschau</h1>
     <section aria-label="Statusmarke"><div className="vorschau-zeile">{(Object.keys(zustaende) as Zustand[]).map(zustand => <Statusmarke key={zustand} zustand={zustand} />)}</div>
@@ -43,5 +46,6 @@ export default function Vorschau() {
       <figure><Fortschrittsring wert={50} zustand="wartet" groesse={40} /><figcaption>Wartet auf dich</figcaption></figure><figure><Fortschrittsring wert={25} zustand="problem" /><figcaption>Problem</figcaption></figure>
     </div><h2>Zum Ausprobieren</h2><div className="vorschau-zeile"><Fortschrittsring wert={fortschritt} /><Knopf text="Weiter" variante="leise" onClick={() => setFortschritt(fortschritt === 100 ? 0 : Math.min(100, fortschritt + 10))} /></div>
     </section>
+    <VorschauMeldungen />
   </main>;
 }
