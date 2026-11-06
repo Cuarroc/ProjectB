@@ -1,0 +1,9 @@
+.interview h3 { margin: 0; }
+.interview form { display: flex; flex-direction: column; align-items: stretch; gap: var(--abstand-4); }
+.interview label { font: var(--schrift-klein); color: var(--text-2); }
+.interview textarea { resize: vertical; width: 100%; min-width: 0; max-height: calc(var(--kopf-hoehe) * 2); padding: var(--abstand-2); border: 0; border-radius: var(--rund-knopf); background: var(--flaeche-2); color: var(--text-1); font: var(--schrift-text); }
+.interview form > .knopf { align-self: flex-start; }
+.interview :focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: calc(var(--abstand-1) / 2); }
+.interview-ergebnis { margin: 0; padding-left: var(--abstand-7); overflow-wrap: anywhere; }
+.interview-ergebnis li + li { margin-top: var(--abstand-4); }
+.interview-ergebnis p { margin: var(--abstand-1) 0 0; white-space: pre-wrap; }
