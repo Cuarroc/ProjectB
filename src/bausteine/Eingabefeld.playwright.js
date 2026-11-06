@@ -5,6 +5,9 @@ async page => {
   await page.evaluate(() => document.fonts.ready);
   const feld = page.getByRole('textbox', { name: 'Nachricht an den Orchestrator' });
   const senden = page.locator('button[type=submit]');
+  await page.setViewportSize({ width: 640, height: 440 });
+  pruefe(await page.locator('.ein').evaluate(el => el.offsetWidth) === 600, 'Breite folgt dem Behälter');
+  await page.setViewportSize({ width: 980, height: 440 });
   for (const modus of ['voll', 'reduziert']) {
     await page.evaluate(modus => document.documentElement.dataset.bewegung = modus, modus);
     await feld.fill('Bau einen CSV-Export');
@@ -26,12 +29,12 @@ async page => {
       return { breite: el.offsetWidth, radius: css.borderRadius, ring: css.outlineStyle, gap: leiste.gap,
         schrift: [...el.querySelectorAll('textarea,button')].map(k => parseFloat(getComputedStyle(k).fontSize)) };
     });
-    pruefe(masse.breite === 680 && masse.radius === '18px' && masse.ring === 'none', 'Hülle wie Vorlage, ohne Akzent-Rand');
+    pruefe(masse.breite === 760 && masse.radius === '18px' && masse.ring === 'none', 'Chat-Maximalbreite aus Token, ohne Akzent-Rand');
     pruefe(masse.gap === '8px' && masse.schrift.every(n => n >= 12), '8-px-Lücken und Schrift mindestens 12 px');
-    await page.screenshot({ path: `C:/ProjectB-Postfach/an-claude-aufsicht/orchestrator/bilder/eingabefeld-${modus}.png` });
+    await page.screenshot({ path: `C:/ProjectB-Postfach/an-claude-aufsicht/orchestrator/bilder/PR132_eingabefeld_${modus}.png` });
     await feld.focus();
     pruefe(await page.locator('.ein').evaluate(el => getComputedStyle(el).outlineWidth) === '2px', 'Fokusring sofort');
-    await page.screenshot({ path: `C:/ProjectB-Postfach/an-claude-aufsicht/orchestrator/bilder/eingabefeld-${modus}-fokus.png` });
+    await page.screenshot({ path: `C:/ProjectB-Postfach/an-claude-aufsicht/orchestrator/bilder/PR132_eingabefeld_${modus}_fokus.png` });
     await feld.blur();
     await senden.hover(); await page.mouse.down(); await page.waitForTimeout(150);
     const zoom = await senden.evaluate(el => getComputedStyle(el).transform);
