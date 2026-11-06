@@ -20,6 +20,10 @@ export const orchestratorBeispiel = { tokens: 113000, laufzeitSekunden: 432,
 export const teamTestverlauf = [{ zeit: "14:31", gruen: 0 }, { zeit: "14:32", gruen: 6 },
   { zeit: "14:33", gruen: 10 }, { zeit: "14:34", gruen: 12 },
   { zeit: "14:35", gruen: 9, rot: 3 }, { zeit: "14:36", gruen: 21 }, { zeit: "14:37", gruen: 26 }];
+export const agentenTestverlauf: Record<string, { zeit: string; gruen: number }[]> = {
+  kern: [{ zeit: "14:31", gruen: 0 }, { zeit: "14:32", gruen: 4 }, { zeit: "14:34", gruen: 9 },
+    { zeit: "14:35", gruen: 9 }, { zeit: "14:36", gruen: 12 }, { zeit: "14:37", gruen: 14 }],
+};
 
 const schritt = (id: string, titel: string, agentId: string | null,
   zustand: Planschritt["zustand"], beschreibung: string): Planschritt => ({
@@ -81,7 +85,8 @@ export const beispiel: Datenstand = {
   todos: [{ id: "export", text: "CSV-Export fertigstellen", fertig: false },
     { id: "speicherort", text: "Speicherort auswählen", fertig: false },
     { id: "pruefen", text: "Gesamtergebnis prüfen", fertig: false }],
-  ausgaben: [], belege: [],
+  ausgaben: [{ id: "export-protokoll", sitzungId: "kern", name: "Testprotokoll", pfad: "Ausgaben/export-tests.txt" }],
+  belege: [{ id: "dauer-pr", agentId: "dauer", titel: "12 von 12 Tests grün · Review ohne Funde", prLink: "https://github.com/Cuarroc/ProjectB/pull/57" }],
   kopf: { projekt: "ProjectB", pfad: "C:\\ProjectB", zweig: "main",
     kontingent: { claude: 42, codex: 51 }, postfach: 3 },
   berechtigungen: {
