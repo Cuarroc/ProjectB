@@ -45,3 +45,26 @@ test("Interview und Berechtigungen: bild-und-axe, Fokus und Beispielzustand", as
   expect(await interview.evaluate(el => { const r = el.getBoundingClientRect(), spalte = el.closest(".chat-spalte").getBoundingClientRect(); return r.left >= spalte.left && r.right <= spalte.right && el.scrollWidth <= el.clientWidth; })).toBe(true);
   await bild("interview-zusammenfassung"); await axe();
 });
+
+test("Interview zeigt gesendete Nachrichten", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Neue Paketoberfläche fehlt im Basisstand.");
+  await page.goto("/"); await page.getByRole("radio", { name: "Interview", exact: true }).click();
+  await page.getByRole("textbox", { name: "Nachricht an den Orchestrator" }).fill("Zusatz zum Interview"); await page.getByRole("button", { name: "Senden", exact: true }).click();
+  await expect(page.getByRole("log", { name: "Chatverlauf" })).toContainText("Zusatz zum Interview");
+});
+test("Interview behält Antworten beim Chat- und Moduswechsel", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Neue Paketoberfläche fehlt im Basisstand.");
+  await page.goto("/"); await page.getByRole("radio", { name: "Interview", exact: true }).click();
+  await page.getByLabel("Deine Antwort oder Ergänzung").fill("Mein Entwurf"); await page.getByRole("button", { name: "Weiter", exact: true }).click();
+  await page.getByRole("radio", { name: "Ausführen", exact: true }).click(); await page.getByRole("radio", { name: "Interview", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Frage 2 von 3", exact: true })).toBeVisible();
+  const ursprung = await page.evaluate(async () => { const { chatEingabeQuelle: q } = await import("/src/bereiche/ChatEingabe.tsx"); const d = q.lesen(), id = d.aktiverChatId; d.chats.push({ ...structuredClone(d.chats[0]), id: "interview-zweit" }); d.aktiverChatId = "interview-zweit"; q.aktualisieren(d); return id; });
+  await expect(page.getByRole("heading", { name: "Frage 1 von 3", exact: true })).toBeVisible();
+  await page.getByLabel("Deine Antwort oder Ergänzung").fill("Anderer Chat"); await page.getByRole("button", { name: "Weiter", exact: true }).click();
+  await page.evaluate(async id => { const { chatEingabeQuelle: q } = await import("/src/bereiche/ChatEingabe.tsx"); const d = q.lesen(); d.aktiverChatId = id; q.aktualisieren(d); }, ursprung);
+  await expect(page.getByRole("heading", { name: "Frage 2 von 3", exact: true })).toBeVisible();
+  for (const knopf of ["Weiter", "Zusammenfassen"]) { await page.getByLabel("Deine Antwort oder Ergänzung").fill("Weitere Antwort"); await page.getByRole("button", { name: knopf, exact: true }).click(); }
+  await page.getByRole("radio", { name: "Ausführen", exact: true }).click(); await page.getByRole("radio", { name: "Interview", exact: true }).click();
+  await expect(page.getByRole("article", { name: "Interview", exact: true })).toContainText("Mein Entwurf");
+  await expect(page.getByRole("article", { name: "Interview", exact: true })).not.toContainText("Anderer Chat");
+});
