@@ -23,7 +23,37 @@ env:
   CARGO_BUILD_JOBS: 4
 
 jobs:
+  # Welche schweren Jobs der PR braucht. Übersprungen wird nur, was sicher nichts damit zu tun hat;
+  # im Zweifel (Fehler, unbekannte Datei, Push auf main) läuft alles. Die Jobs selbst laufen immer,
+  # nur ihre Schritte entfallen: so bleiben die Pflicht-Checks mit ihrem Namen grün.
+  aenderungen:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      kern: ${{ steps.f.outputs.kern }}
+      oberflaeche: ${{ steps.f.outputs.oberflaeche }}
+    steps:
+      - id: f
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          dateien=""
+          [ -n "$PR" ] && dateien=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename') || dateien=""
+          # nur MUSTER: true, wenn jede geänderte Datei auf MUSTER passt (leere Liste: false).
+          nur() { [ -n "$dateien" ] && ! printf '%s\n' "$dateien" | grep -qvE "$1"; }
+          kern=true; oberflaeche=true
+          nur '^(src|src-tauri|public)/|\.md$|^(package(-lock)?\.json|index\.html|vite\.config\.[jt]s|tsconfig[^/]*\.json)$' && kern=false
+          nur '\.md$' && oberflaeche=false # src-tauri hängt an kern/, deshalb nur bei reiner Doku
+          echo "kern=$kern oberflaeche=$oberflaeche"
+          echo "kern=$kern" >> "$GITHUB_OUTPUT"
+          echo "oberflaeche=$oberflaeche" >> "$GITHUB_OUTPUT"
+
   oberflaeche:
+    needs: aenderungen
     runs-on: windows-latest
     permissions:
       contents: read
@@ -31,14 +61,19 @@ jobs:
       CARGO_BUILD_JOBS: 3
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.aenderungen.outputs.oberflaeche == 'true'
         with:
           persist-credentials: false
       - run: npm ci
+        if: needs.aenderungen.outputs.oberflaeche == 'true'
       - run: npm run build
+        if: needs.aenderungen.outputs.oberflaeche == 'true'
       - run: cargo clippy --all-targets -- -D warnings
+        if: needs.aenderungen.outputs.oberflaeche == 'true'
         working-directory: src-tauri
 
   test:
+    needs: aenderungen
     strategy:
       fail-fast: false
       matrix:
@@ -49,20 +84,26 @@ jobs:
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: needs.aenderungen.outputs.kern == 'true'
         with:
           workspaces: kern -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo fmt --manifest-path kern/Cargo.toml --check
+        if: needs.aenderungen.outputs.kern == 'true'
       - run: cargo clippy --manifest-path kern/Cargo.toml --all-targets -- -D warnings
+        if: needs.aenderungen.outputs.kern == 'true'
       - name: Tests ausführen
+        if: needs.aenderungen.outputs.kern == 'true'
         shell: bash
         run: |
           set -o pipefail
           cargo test --manifest-path kern/Cargo.toml 2>&1 | tee testausgabe.txt
       - name: Testzahl erfassen
+        if: needs.aenderungen.outputs.kern == 'true'
         shell: pwsh
         run: ./\.github\scripts\testzahl.ps1 -Mode count -Log testausgabe.txt -Output testzahl.json -Platform '${{ matrix.os }}'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: needs.aenderungen.outputs.kern == 'true'
         with:
           name: testzahl-${{ matrix.os }}
           path: testzahl.json
@@ -70,13 +111,14 @@ jobs:
 
   testzahl:
     name: Testzahl-Wächter
-    needs: test
+    needs: [aenderungen, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Testzahlen laden und vergleichen
+        if: needs.aenderungen.outputs.kern == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
