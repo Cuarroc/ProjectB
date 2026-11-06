@@ -1,11 +1,13 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { OctagonPause, Users } from "lucide-react";
+import { ChartGantt, Kanban, LayoutGrid, OctagonPause, Users } from "lucide-react";
 import { Agentenkarte } from "../bausteine/Agentenkarte";
 import { Kachel } from "../bausteine/Kachel";
 import { Knopf } from "../bausteine/Knopf";
 import type { Phase, ZeitspurProps } from "../bausteine/Zeitspur";
 import { BeispielQuelle } from "../daten/quelle";
-import { orchestratorBeispiel, teamTestverlauf } from "../daten/beispiel";
+import { orchestratorBeispiel, teamTestverlauf } from "../daten/quelle";
+import { Umschalter } from "../bausteine/Umschalter";
+import { TeamBoard, TeamZeitstrahl } from "./TeamAnsichten";
 import type { Datenstand, Agent } from "../daten/typen";
 import "./Team.css";
 
@@ -22,7 +24,7 @@ export function anhalten(daten: Datenstand, id?: string): Datenstand {
     ? { ...a, vorPause: { zustand: a.zustand, liveZeile: a.liveZeile }, zustand: "Wartet auf dich", liveZeile: "Angehalten. Weiter mit Fortsetzen." } : a) };
 }
 
-function spur(agent: Agent): ZeitspurProps {
+export function spur(agent: Agent): ZeitspurProps {
   const angehalten = agent.liveZeile.startsWith("Angehalten.");
   const phasen: Phase[] = agent.phasen.map(p => ({ name: p.name, art: p.name.toLowerCase() as Phase["art"],
     start: sekunden(p.start), ende: p.ende ? sekunden(p.ende) : jetzt, laufend: p.ende === null && !angehalten }));
@@ -32,8 +34,8 @@ function spur(agent: Agent): ZeitspurProps {
     schaetzung: agent.schaetzung ? sekunden(`${agent.schaetzung.fertigUm}:00`) : undefined };
 }
 
-type Props = { daten: Datenstand; auswahl: string | null; waehlen: (id: string | null) => void; aendern: (daten: Datenstand) => void };
-export function TeamAnsicht({ daten, auswahl, waehlen, aendern }: Props) {
+type Props = { daten: Datenstand; auswahl: string | null; waehlen: (id: string | null) => void; aendern: (daten: Datenstand) => void; ansicht?: string; umschalten?: (wert: string) => void };
+export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karten", umschalten = () => {} }: Props) {
   const agenten = daten.agenten.slice(0, 3).sort((a, b) => Number(a.zustand === "Fertig") - Number(b.zustand === "Fertig"));
   const details = auswahl === "orchestrator" ? { name: "Orchestrator", liveZeile: `Koordiniert ${agenten.length} Agenten`, anbieter: "Claude", modell: daten.chats[0]?.modell, arbeitskopie: null } : agenten.find(a => a.id === auswahl);
   const fertig = daten.plan.schritte.filter(s => s.zustand === "Fertig").length;
@@ -42,7 +44,13 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern }: Props) {
   const gesamtTokens = orchestratorBeispiel.tokens + agenten.reduce((summe, a) => summe + a.tokens, 0);
   return <section className="team-bereich" aria-labelledby="team">
     <header className="team-kopf"><h2 id="team">Team</h2><span className="team-chip">{agenten.length} Agenten</span>
+      <Umschalter className="team-ansichten" moeglichkeiten={["Karten", "Board", "Zeitstrahl"]} wert={ansicht} beschriftung="Team-Ansicht" onChange={umschalten} symbole={[LayoutGrid, Kanban, ChartGantt].map((Symbol, i) => <Symbol key={i} size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />)} />
       <Knopf text="Alle anhalten" vorsatz={<OctagonPause size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="gefaehrlich" onClick={() => aendern(anhalten(daten))} /></header>
+    {ansicht !== "Karten" && <div className="team-wechsel" key={ansicht}>
+      <div className="team-summe"><span>Aufgaben <b>{fertig} / {daten.plan.schritte.length}</b></span><span>Tests grün <b>{tests.gruen} / {tests.gesamt}</b></span><span>Tokens <b>{tokens(gesamtTokens)}</b></span><span>Laufzeit <b>{dauer(jetzt)} min</b></span></div>
+      {ansicht === "Board" ? <TeamBoard daten={daten} agenten={agenten} waehlen={waehlen} auswahl={auswahl} /> : <TeamZeitstrahl daten={daten} agenten={agenten} waehlen={waehlen} auswahl={auswahl} />}
+    </div>}
+    <div className="team-standard" hidden={ansicht !== "Karten"}>
     <div className="team-kacheln">
       <Kachel titel="Aufgaben" thema="aufgaben" zusatz={`${Math.round(fertig / Math.max(1, daten.plan.schritte.length) * 100)} %`} zahl={`${fertig} / ${daten.plan.schritte.length}`} unterzeile={<span className="team-legende">{["Fertig", "Arbeitet", "Wartet auf dich", "Offen"].map(wort => <span key={wort}><i aria-hidden="true" style={{ background: `var(--status-${wort === "Offen" ? "offen" : status[wort as keyof typeof status]})` }} />{daten.plan.schritte.filter(s => s.zustand === wort).length} {wort}</span>)}</span>} grafik={<span className="team-aufgaben" aria-hidden="true">{daten.plan.schritte.map(s => <span key={s.id} style={{ background: `var(--status-${s.zustand === "Offen" ? "offen" : status[s.zustand]})` }} />)}</span>} />
       <Kachel titel="Tests grün" zusatz={`${Math.round(tests.gruen / Math.max(1, tests.gesamt) * 100)} %`} zahl={`${tests.gruen} / ${tests.gesamt}`} unterzeile={<span className="team-diagramm-zeiten"><span>14:31</span><span>14:34</span><span>Jetzt</span></span>}
@@ -66,7 +74,8 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern }: Props) {
           onAktion={() => aendern(a.liveZeile.startsWith("Angehalten.") ? { ...daten, agenten: daten.agenten.map(agent => agent.id === a.id ? fortsetzen(agent) : agent) } : anhalten(daten, a.id))} />
       </div>)}
     </div>
-    {details && <aside className="team-details" aria-label={`Details: ${details.name}`}>
+    </div>
+    {details && <aside id="team-details" className="team-details" aria-label={`Details: ${details.name}`}>
       <header><h3>{details.name}</h3><Knopf text="Schließen" variante="leise" onClick={() => waehlen(null)} /></header>
       <p>{details.liveZeile}</p><p>{details.anbieter} · {details.modell}{details.arbeitskopie && ` · Arbeitskopie ${details.arbeitskopie}`}</p>
     </aside>}
@@ -76,7 +85,8 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern }: Props) {
 export default function Team() {
   const [quelle] = useState(() => new BeispielQuelle());
   const [daten, setDaten] = useState(() => quelle.lesen()), [auswahl, waehlen] = useState<string | null>(null);
+  const [ansicht, umschalten] = useState("Karten");
   const bereich = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { if (auswahl) bereich.current?.querySelector(`[data-agent="${auswahl}"]`)?.scrollIntoView({ block: "nearest", behavior: "instant" }); }, [auswahl]);
-  return <div className="team-spalte" ref={bereich}><TeamAnsicht daten={daten} auswahl={auswahl} waehlen={waehlen} aendern={neu => { quelle.aktualisieren(neu); setDaten(quelle.lesen()); }} /></div>;
+  return <div className="team-spalte" ref={bereich}><TeamAnsicht daten={daten} auswahl={auswahl} waehlen={waehlen} ansicht={ansicht} umschalten={wert => { umschalten(wert); waehlen(null); }} aendern={neu => { quelle.aktualisieren(neu); setDaten(quelle.lesen()); }} /></div>;
 }
