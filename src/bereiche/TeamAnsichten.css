@@ -14,9 +14,9 @@
 .team-bfortschritt{display:flex;align-items:center;gap:var(--abstand-2);font:var(--schrift-klein)}.team-bfortschritt progress{appearance:none;width:0;flex:1;height:var(--abstand-1);accent-color:var(--status-arbeitet)}
 .team-bfortschritt progress::-webkit-progress-bar{background:var(--grund);border-radius:var(--rund-voll)}.team-bfortschritt progress::-webkit-progress-value{background:var(--status-arbeitet);border-radius:var(--rund-voll)}
 .team-bdetails{display:flex;flex-direction:column;gap:var(--abstand-2);background:transparent;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}.team-bantworten{display:flex;flex-wrap:wrap;gap:var(--abstand-2)}
-.team-bdetails:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}.team-bkarte:has([aria-expanded=true]){box-shadow:var(--schatten-auswahl)}
+.team-bdetails:focus-visible{outline:calc(var(--abstand-1) / 2) solid var(--akzent);outline-offset:calc(var(--abstand-1) / 2)}.team-bkarte:has([aria-expanded=true]){box-shadow:var(--schatten-auswahl)}
 .team-spuren .team-achse::after{display:none}.team-spurzeile .zs-wartet{color:transparent;overflow:hidden}
-.team-bkarte:focus-visible,.team-spurzeile button:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}
+.team-bkarte:focus-visible,.team-spurzeile button:focus-visible{outline:calc(var(--abstand-1) / 2) solid var(--akzent);outline-offset:calc(var(--abstand-1) / 2)}
 .team-bkarte[aria-expanded=true],.team-spurzeile:has([aria-expanded=true]){box-shadow:var(--schatten-auswahl)}
 .team-wechsel .statusmarke{color:var(--status-farbe);background:var(--status-grund)}
 .team-zeit{display:flex;flex-direction:column;gap:var(--abstand-3)}.team-tokenplot,.team-spuren,.team-phasenlegende{background:var(--flaeche-2);border-radius:var(--rund-karte);padding:var(--abstand-4);box-shadow:var(--schatten-kante)}
