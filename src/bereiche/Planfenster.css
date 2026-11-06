@@ -1,0 +1,39 @@
+.planfenster{position:fixed;inset:var(--kopf-hoehe) var(--abstand-4) var(--abstand-4);margin:0;width:auto;max-width:none;height:auto;max-height:none;padding:0;border:0;background:var(--grund);color:var(--text-1);font:var(--schrift-text);overflow:hidden}
+.planfenster[open]{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr);gap:var(--abstand-3)}
+.planfenster::backdrop{background:var(--grund);clip-path:inset(var(--kopf-hoehe) 0 0)}
+.pl-links,.pl-rechts{min-width:0;min-height:0;display:flex;flex-direction:column;border-radius:var(--rund-bereich);background:linear-gradient(var(--flaeche-1-oben),var(--flaeche-1))}
+.pl-kopf{display:flex;align-items:center;gap:var(--abstand-4);padding:var(--abstand-4) var(--abstand-7);min-height:calc(var(--kopf-hoehe) + var(--abstand-7));box-sizing:border-box}
+.pl-kopf-symbol{display:inline-flex;align-items:center;justify-content:center;flex:none;width:calc(var(--steuer-hoehe) + var(--abstand-1));height:calc(var(--steuer-hoehe) + var(--abstand-1));border-radius:var(--rund-liste);background:var(--akzent);color:var(--akzent-tinte);box-shadow:var(--schatten-senden)}
+.pl-kopftext{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--abstand-1)}
+.pl-kopf h2{font:var(--schrift-abschnitt);margin:0}.pl-meta{display:flex;gap:var(--abstand-4);color:var(--text-2);font:var(--schrift-klein)}
+.pl-liste{flex:1;min-height:0;overflow:auto;list-style:none;margin:0;padding:var(--abstand-1) var(--abstand-7) var(--abstand-7);display:flex;flex-direction:column;gap:var(--abstand-4)}
+.pl-schritt,.pl-karte{position:relative;flex:none;display:flex;flex-direction:column;gap:var(--abstand-4);padding:var(--abstand-6);border-radius:var(--rund-karte);background:linear-gradient(var(--flaeche-2),var(--flaeche-1-oben));box-shadow:var(--schatten-kante),inset 0 0 0 1px var(--flaeche-3)}
+.pl-schritt{overflow:hidden}.pl-streifen{position:absolute;top:0;left:0;right:0;height:var(--abstand-1);display:flex;gap:calc(var(--abstand-1) / 2)}.pl-streifen span{flex:1}
+.pl-kopfzeile{display:flex;gap:var(--abstand-5)}.pl-nr{display:inline-grid;place-items:center;flex:none;width:var(--steuer-hoehe);height:var(--steuer-hoehe);border-radius:var(--rund-knopf);background:var(--flaeche-3);font-weight:650}
+.pl-titelzeile{display:flex;align-items:center;flex-wrap:wrap;gap:var(--abstand-2);min-height:var(--steuer-hoehe)}
+.pl-titelzeile h3{font:var(--schrift-titel);letter-spacing:var(--laufweite-titel);margin:0;overflow-wrap:anywhere}.pl-warum{font:var(--schrift-beschriftung);color:var(--text-2);margin:0}
+.pl-chip{align-self:flex-start;display:inline-flex;align-items:center;gap:var(--abstand-2);margin-top:var(--abstand-1);padding:var(--abstand-1) var(--abstand-3);border-radius:var(--rund-voll);background:var(--flaeche-3);font:var(--schrift-klein)}
+.pl-einzug{margin-left:calc(var(--steuer-hoehe) + var(--abstand-5))}.pl-feld{display:flex;flex-direction:column;gap:var(--abstand-2);padding:var(--abstand-3) var(--abstand-4);border-radius:var(--rund-liste);background:var(--flaeche-1)}
+.pl-feld-kopf{display:flex;justify-content:space-between;gap:var(--abstand-2);font:var(--schrift-klein);font-weight:600;color:var(--text-2)}.pl-feld-kopf span{border-radius:var(--rund-voll);background:var(--flaeche-3);padding:0 var(--abstand-2)}
+.pl-bedingungen{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:var(--abstand-2);font:var(--schrift-beschriftung)}.pl-bedingungen li{display:flex;align-items:center;gap:var(--abstand-3)}.pl-bedingungen svg{width:var(--abstand-5);height:var(--abstand-5);stroke-width:1.5;flex:none;color:var(--text-3)}.pl-bedingungen [data-erfuellt=true] svg{color:var(--status-fertig)}
+.pl-kommentar{font:var(--schrift-klein);color:var(--text-2);background:var(--glas-grund);backdrop-filter:blur(var(--abstand-8)) saturate(1.5);box-shadow:var(--schatten-schwebend)}
+.pl-kommentar textarea{box-sizing:border-box;width:100%;min-height:var(--kopf-hoehe);resize:vertical;border:0;border-radius:var(--rund-knopf);padding:var(--abstand-1);font:var(--schrift-text);color:var(--text-1);background:var(--flaeche-1)}
+.pl-aktionen,.pl-stil{display:flex;flex-wrap:wrap;gap:var(--abstand-1)}.pl-aktionen{padding:var(--abstand-1);border-radius:var(--rund-liste);background:var(--flaeche-1);align-self:flex-start}
+.pl-aktionen button,.pl-stilknopf{display:inline-flex;align-items:center;gap:var(--abstand-2);min-height:var(--steuer-hoehe);padding:0 var(--abstand-2);border:0;border-radius:var(--rund-knopf);font:var(--schrift-beschriftung);color:var(--text-2);background:transparent;cursor:pointer}
+.pl-aktionen button svg{color:var(--f)}.pl-aktionen button[aria-pressed=true],.pl-marke{background:color-mix(in srgb,var(--f) 20%,transparent);color:color-mix(in srgb,var(--f) 82%,var(--text-1))}
+.pl-marke{display:inline-flex;align-items:center;gap:var(--abstand-1);border-radius:var(--rund-voll);padding:var(--abstand-1) var(--abstand-2);font:var(--schrift-klein);font-weight:600}
+.planfenster mark{color:var(--text-1);background:color-mix(in srgb,var(--f) 24%,transparent);border-radius:var(--rund-segment);padding:var(--abstand-1) 0}
+.planfenster mark,.pl-marke,.pl-streifen span{transition:background-color var(--dauer-kurz) var(--kurve-raus),color var(--dauer-kurz) var(--kurve-raus),opacity var(--dauer-kurz) var(--kurve-raus)}
+.pl-werkzeuge{display:flex;flex-direction:column;gap:var(--abstand-3);overflow:auto;min-height:0;padding:var(--abstand-4) var(--abstand-6)}.pl-karte h3{font:var(--schrift-ueberschrift);margin:0}.pl-hinweis{margin:0;padding:var(--abstand-2) var(--abstand-3);border-radius:var(--rund-liste);background:var(--flaeche-1);color:var(--text-2);font:var(--schrift-klein)}
+.pl-stilknopf{border:1px solid var(--flaeche-4);border-radius:var(--rund-voll)}.pl-stilknopf[aria-pressed=true]{background:var(--akzent-grund);color:var(--akzent-text);border-color:var(--akzent)}
+.pl-fuss{display:flex;flex-direction:column;gap:var(--abstand-2);padding:var(--abstand-4) var(--abstand-6) var(--abstand-6)}.pl-fuss p{margin:0;font:var(--schrift-klein);color:var(--text-2)}.pl-fuss p:empty{display:none}.pl-fuss .knopf{min-height:calc(var(--steuer-hoehe) + var(--abstand-2));white-space:normal}
+.pl-aktionen button:hover:not([aria-pressed=true]),.pl-stilknopf:hover:not([aria-pressed=true]){background:var(--flaeche-3);color:var(--text-1)}.planfenster :focus-visible{outline:calc(var(--abstand-1) / 2) solid var(--akzent);outline-offset:calc(var(--abstand-1) / 2)}
+.pl-rechts{align-self:start;max-height:100%}.pl-karte .knopf{align-self:flex-start;font:var(--schrift-beschriftung);background:var(--akzent-grund);color:var(--akzent-text)}.pl-fuss .knopf{font:var(--schrift-ueberschrift)}
+.planfenster .statusmarke{color:var(--status-farbe);background:var(--status-grund);box-shadow:inset 0 0 0 1px var(--status-farbe)}
+.planfenster .pl-kopf h2{font:var(--schrift-abschnitt)}
+.pl-chips{display:flex;flex-wrap:wrap;gap:var(--abstand-2)}
+.pl-karte-kopf{display:flex;align-items:center;justify-content:space-between;gap:var(--abstand-2)}.pl-einheit{font:var(--schrift-klein);color:var(--text-2);white-space:nowrap;border-radius:var(--rund-voll);padding:var(--abstand-1) var(--abstand-2);background:var(--flaeche-3)}
+.pl-farbpunkt{flex:none;width:calc(var(--abstand-2) - 1px);height:calc(var(--abstand-2) - 1px);border-radius:var(--rund-voll);background:var(--f)}
+.pl-zaehler{padding:0 var(--abstand-2);border-radius:var(--rund-knopf);background:var(--akzent-grund);color:var(--akzent-text);font:var(--schrift-klein);font-variant-numeric:tabular-nums}
+.pl-vorlesen{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@starting-style{.pl-marke{opacity:0}}
