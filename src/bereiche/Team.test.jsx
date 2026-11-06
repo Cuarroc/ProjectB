@@ -1,17 +1,31 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { Children, isValidElement } from "react";
 import { TeamAnsicht, anhalten } from "./Team";
 import { Agentenkarte } from "../bausteine/Agentenkarte";
 import { beispiel } from "../daten/beispiel";
 
 const ansicht = (daten = beispiel, aendern = vi.fn(), auswahl = null) => TeamAnsicht({ daten, aendern, auswahl, waehlen: vi.fn() });
-const karten = baum => baum.props.children[2].props.children[2].map(k => k.props.children);
+const karten = baum => Children.toArray(baum).flatMap(k => !isValidElement(k) ? [] : k.type === Agentenkarte ? [k] : karten(k.props.children));
 describe("Team", () => {
   it.each([...new Set(beispiel.agenten.map(a => a.zustand)), "Problem"])("zeigt %s mit Wort und Symbol", zustand => {
     const daten = { ...beispiel, agenten: [{ ...beispiel.agenten[0], zustand }] };
-    const html = renderToStaticMarkup(ansicht(daten));
-    expect(html).toContain(zustand); expect(html).toMatch(/class="mk"><svg/);
+    const html = renderToStaticMarkup(karten(ansicht(daten)).find(k => k.props.name === daten.agenten[0].name));
+    const marke = html.match(/<span class="mk">(.*?)<\/span><\/span>/)?.[1];
+    expect(marke).toContain(zustand); expect(marke).toMatch(/<svg[^>]*aria-hidden="true"/);
     expect(html).toContain(daten.agenten[0].modell);
+  });
+  it.each(["kern", "knopf"])("stellt bei %s nach einzelnem und gemeinsamem Anhalten den Vorzustand wieder her", id => {
+    for (const alle of [false, true]) {
+      let daten = structuredClone(beispiel);
+      const original = structuredClone(daten.agenten.find(a => a.id === id));
+      const aendern = neu => { daten = structuredClone(neu); };
+      const karte = () => karten(ansicht(daten, aendern)).find(k => k.props.name === original.name);
+      if (alle) aendern(anhalten(daten)); else karte().props.onAktion();
+      aendern(anhalten(daten, id));
+      karte().props.onAktion();
+      expect(daten.agenten.find(a => a.id === id)).toEqual(original);
+    }
   });
   it("ändert über die Kartenaktion nur den gewählten Agenten und lässt Fortsetzen zu", () => {
     let daten = structuredClone(beispiel);

@@ -14,10 +14,12 @@ const jetzt = orchestratorBeispiel.laufzeitSekunden;
 const sekunden = (zeit: string) => zeit.split(":").reduce((wert, teil) => wert * 60 + Number(teil), 0) - 14 * 3600 - 30 * 60;
 const dauer = (wert: number) => `${Math.floor(wert / 60)}:${String(wert % 60).padStart(2, "0")}`;
 const tokens = (wert: number) => wert >= 999950 ? `${(wert / 1000000).toLocaleString("de-DE", { maximumFractionDigits: 1 })}M` : wert >= 1000 ? `${(wert / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })}k` : String(wert);
+type TeamAgent = Agent & { vorPause?: Pick<Agent, "zustand" | "liveZeile"> };
+const fortsetzen = ({ vorPause, ...agent }: TeamAgent): Agent => ({ ...agent, ...vorPause });
 
 export function anhalten(daten: Datenstand, id?: string): Datenstand {
-  return { ...daten, agenten: daten.agenten.map(a => (!id || a.id === id) && a.zustand !== "Fertig"
-    ? { ...a, zustand: "Wartet auf dich", liveZeile: "Angehalten. Weiter mit Fortsetzen." } : a) };
+  return { ...daten, agenten: daten.agenten.map((a: TeamAgent) => (!id || a.id === id) && a.zustand !== "Fertig" && !a.vorPause
+    ? { ...a, vorPause: { zustand: a.zustand, liveZeile: a.liveZeile }, zustand: "Wartet auf dich", liveZeile: "Angehalten. Weiter mit Fortsetzen." } : a) };
 }
 
 function spur(agent: Agent): ZeitspurProps {
@@ -37,17 +39,18 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern }: Props) {
   const fertig = daten.plan.schritte.filter(s => s.zustand === "Fertig").length;
   const alleAngehalten = agenten.filter(a => a.zustand !== "Fertig").every(a => a.liveZeile.startsWith("Angehalten."));
   const tests = agenten.reduce((summe, a) => ({ gruen: summe.gruen + (a.tests?.gruen ?? 0), gesamt: summe.gesamt + (a.tests?.gesamt ?? 0) }), { gruen: 0, gesamt: 0 });
+  const gesamtTokens = orchestratorBeispiel.tokens + agenten.reduce((summe, a) => summe + a.tokens, 0);
   return <section className="team-bereich" aria-labelledby="team">
     <header className="team-kopf"><h2 id="team">Team</h2><span className="team-chip">{agenten.length} Agenten</span>
-      <Knopf text="Alle anhalten" symbol={OctagonPause} variante="gefaehrlich" onClick={() => aendern(anhalten(daten))} /></header>
+      <Knopf text="Alle anhalten" vorsatz={<OctagonPause size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="gefaehrlich" onClick={() => aendern(anhalten(daten))} /></header>
     <div className="team-kacheln">
-      <Kachel titel="Aufgaben" thema="aufgaben" zahl={`${fertig} / ${daten.plan.schritte.length}`} unterzeile={<span className="team-legende">{["Fertig", "Arbeitet", "Wartet auf dich", "Offen"].map(wort => <span key={wort}>{daten.plan.schritte.filter(s => s.zustand === wort).length} {wort}</span>)}</span>} grafik={<span className="team-aufgaben" aria-hidden="true">{daten.plan.schritte.map(s => <span key={s.id} style={{ background: `var(--status-${s.zustand === "Offen" ? "offen" : status[s.zustand]})` }} />)}</span>} />
-      <Kachel titel="Tests grün" zahl={`${tests.gruen} / ${tests.gesamt}`} unterzeile={<span className="team-diagramm-zeiten"><span>14:31</span><span>14:34</span><span>Jetzt</span></span>}
+      <Kachel titel="Aufgaben" thema="aufgaben" zusatz={`${Math.round(fertig / Math.max(1, daten.plan.schritte.length) * 100)} %`} zahl={`${fertig} / ${daten.plan.schritte.length}`} unterzeile={<span className="team-legende">{["Fertig", "Arbeitet", "Wartet auf dich", "Offen"].map(wort => <span key={wort}><i aria-hidden="true" style={{ background: `var(--status-${wort === "Offen" ? "offen" : status[wort as keyof typeof status]})` }} />{daten.plan.schritte.filter(s => s.zustand === wort).length} {wort}</span>)}</span>} grafik={<span className="team-aufgaben" aria-hidden="true">{daten.plan.schritte.map(s => <span key={s.id} style={{ background: `var(--status-${s.zustand === "Offen" ? "offen" : status[s.zustand]})` }} />)}</span>} />
+      <Kachel titel="Tests grün" zusatz={`${Math.round(tests.gruen / Math.max(1, tests.gesamt) * 100)} %`} zahl={`${tests.gruen} / ${tests.gesamt}`} unterzeile={<span className="team-diagramm-zeiten"><span>14:31</span><span>14:34</span><span>Jetzt</span></span>}
         grafik={<div className="team-testverlauf" role="img" aria-label={`Tests grün: von 0 auf ${tests.gruen} von ${tests.gesamt}. Um 14:35 waren 3 rot.`}>
           <span>{tests.gesamt}</span><svg viewBox="0 0 120 50" preserveAspectRatio="none" aria-hidden="true"><polyline points={teamTestverlauf.map((p, i) => `${i * 20},${48 - p.gruen / Math.max(1, tests.gesamt) * 46}`).join(" ")} fill="none" stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg><span className="team-rot">3 rot</span><span>0</span>
         </div>} />
-      <Kachel titel="Tokens" thema="tokens" zahl={tokens(orchestratorBeispiel.tokens + agenten.reduce((summe, a) => summe + a.tokens, 0))} unterzeile={<span className="team-legende"><span>Agenten {tokens(agenten.reduce((summe, a) => summe + a.tokens, 0))}</span><span>Orchestrator {tokens(orchestratorBeispiel.tokens)}</span></span>}
-        grafik={<span className="team-tokens" aria-hidden="true"><span style={{ flex: agenten.reduce((summe, a) => summe + a.tokens, 0) }} /><span style={{ flex: orchestratorBeispiel.tokens }} /></span>} />
+      <Kachel titel="Tokens" thema="tokens" zusatz="Seit 14:30" zahl={tokens(gesamtTokens)} unterzeile={<span className="team-legende team-reihen"><span><i aria-hidden="true" style={{ background: "var(--reihe-agenten)" }} />Agenten <b>{tokens(gesamtTokens - orchestratorBeispiel.tokens)}</b></span><span><i aria-hidden="true" style={{ background: "var(--reihe-orchestrator)" }} />Orchestrator <b>{tokens(orchestratorBeispiel.tokens)}</b></span></span>}
+        grafik={<><span className="team-rate">{tokens(Math.round(gesamtTokens / jetzt * 60 / 1000) * 1000)} / min</span><span className="team-tokens" aria-hidden="true"><span style={{ flex: gesamtTokens - orchestratorBeispiel.tokens }} /><span style={{ flex: orchestratorBeispiel.tokens }} /></span></>} />
     </div>
     <div className="team-liste" aria-label="Agenten">
       <div className="team-achse"><span className="team-jetzt">Jetzt 14:37</span><div><span>14:30</span><span>14:32</span><span>14:34</span><span>14:36</span><span>14:38</span><span>14:40</span></div></div>
@@ -59,8 +62,8 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern }: Props) {
         <Agentenkarte name={a.name} modell={`${a.anbieter} · ${a.modell}`} zustand={status[a.zustand]} fortschritt={a.fortschritt}
           zeitspur={spur(a)} zeile={a.liveZeile} tokens={tokens(a.tokens)} laufzeit={dauer(a.laufzeitSekunden)}
           gewaehlt={auswahl === a.id} onDetails={() => waehlen(auswahl === a.id ? null : a.id)}
-          aktion={a.liveZeile.startsWith("Angehalten.") ? "Fortsetzen" : "Anhalten"} aktionDeaktiviert={a.zustand === "Fertig"}
-          onAktion={() => aendern(a.liveZeile.startsWith("Angehalten.") ? { ...daten, agenten: daten.agenten.map(agent => agent.id === a.id ? { ...agent, zustand: "Arbeitet", liveZeile: "Arbeitet wieder." } : agent) } : anhalten(daten, a.id))} />
+          aktion={a.zustand === "Fertig" ? undefined : a.liveZeile.startsWith("Angehalten.") ? "Fortsetzen" : "Anhalten"}
+          onAktion={() => aendern(a.liveZeile.startsWith("Angehalten.") ? { ...daten, agenten: daten.agenten.map(agent => agent.id === a.id ? fortsetzen(agent) : agent) } : anhalten(daten, a.id))} />
       </div>)}
     </div>
     {details && <aside className="team-details" aria-label={`Details: ${details.name}`}>

@@ -9,12 +9,14 @@
 .team-kacheln .ka-zahl{font:var(--schrift-zahl-gross)}.team-kacheln .ka-unter{margin-top:auto}
 .team-aufgaben{display:flex;gap:calc(var(--abstand-1) / 2);height:var(--abstand-1);margin-top:auto}.team-aufgaben span{flex:1;border-radius:var(--rund-voll)}
 .team-legende{display:flex;flex-wrap:wrap;gap:var(--abstand-1) var(--abstand-2)}
+.team-legende>span{display:flex;align-items:center;gap:var(--abstand-1)}.team-legende i{flex:none;width:calc(var(--abstand-1) * 1.5);height:calc(var(--abstand-1) * 1.5);border-radius:var(--rund-voll)}
+.team-reihen>span{width:100%}.team-reihen b{margin-left:auto;font-weight:inherit}.team-rate{font:var(--schrift-klein);color:var(--text-2)}.team-kacheln .ka-kopf{flex-wrap:wrap}.team-kacheln .team-chip{padding-inline:var(--abstand-1)}
 .team-testverlauf{position:relative;color:var(--status-fertig);height:calc(var(--abstand-8) * 2);padding-left:var(--abstand-6);margin-top:auto}.team-testverlauf svg{width:100%;height:100%;overflow:visible}.team-testverlauf>span{position:absolute;left:0;top:0;color:var(--text-2);font:var(--schrift-klein)}.team-testverlauf>span:last-child{top:auto;bottom:0}
 .team-testverlauf .team-rot{left:55%;top:var(--abstand-3);color:var(--status-problem);background:var(--flaeche-3);padding-inline:var(--abstand-1);border-radius:var(--rund-voll)}
 .team-diagramm-zeiten{display:flex;justify-content:space-between}.team-diagramm-zeiten>span:last-child{color:var(--jetzt-text);background:var(--jetzt-glas);border-radius:var(--rund-voll);padding-inline:var(--abstand-1)}
 .team-tokens{display:flex;height:var(--abstand-1);gap:calc(var(--abstand-1) / 2);border-radius:var(--rund-voll);overflow:hidden;margin-top:auto}.team-tokens span:first-child{background:var(--reihe-agenten)}.team-tokens span+span{background:var(--reihe-orchestrator)}
-.team-orchestrator .ak{--glanz:color-mix(in srgb,var(--reihe-orchestrator) 16%,transparent)!important}.ak-avatar{display:grid;place-items:center;flex:none;width:calc(var(--steuer-hoehe) + var(--abstand-4));height:calc(var(--steuer-hoehe) + var(--abstand-4));border-radius:var(--rund-voll);color:var(--akzent-tinte);background:var(--reihe-orchestrator)}
-.team-liste .b2-kn:disabled{color:var(--text-aus);cursor:not-allowed}.team-liste .ak.wartet{box-shadow:var(--schatten-leuchten-wartet),var(--schatten-kante)}
+.ak-avatar{display:grid;place-items:center;flex:none;width:calc(var(--steuer-hoehe) + var(--abstand-4));height:calc(var(--steuer-hoehe) + var(--abstand-4));border-radius:var(--rund-voll);color:var(--akzent-tinte);background:var(--reihe-orchestrator)}
+.team-liste .ak.wartet{box-shadow:var(--schatten-leuchten-wartet),var(--schatten-kante)}
 .team-liste{min-height:0;overflow:auto;padding:0 var(--abstand-6) var(--abstand-6);display:flex;flex-direction:column;gap:var(--abstand-3);flex:1}
 .team-liste .ak{width:100%;padding:var(--abstand-4);gap:var(--abstand-3)}
 .team-liste .ak-name b{font:var(--schrift-ueberschrift)}.team-liste .ak-name span{overflow-wrap:anywhere}
@@ -30,4 +32,7 @@
 .team-details{flex:none;max-height:25%;overflow:auto;margin:0 var(--abstand-6) var(--abstand-4);padding:var(--abstand-4);border-radius:var(--rund-karte);background:var(--flaeche-2);box-shadow:var(--schatten-kante);font:var(--schrift-klein);animation:team-details var(--dauer-lang) var(--kurve-raus)}
 .team-details header{display:flex;align-items:center;justify-content:space-between;gap:var(--abstand-2)}.team-details h3,.team-details p{margin:0;font:inherit}.team-details p{margin-top:var(--abstand-2);overflow-wrap:anywhere;color:var(--text-2)}
 @keyframes team-details{from{opacity:0;transform:translateY(var(--weg-gross))}to{opacity:1;transform:translateY(0)}}
-@media(width < 80em){.app-rahmen{--chats-breite:var(--leiste-breite)}.team-kopf .team-chip{display:none}}
+@media(width < 80em){.team-kopf .team-chip{display:none}}
+@media(width < 80em){.team-kacheln .ka{padding:var(--abstand-2)}.team-kacheln .ka-unter{overflow-wrap:normal}.team-reihen>span{flex-wrap:wrap}.team-reihen b{flex-basis:100%;text-align:right}.team-diagramm-zeiten{flex-wrap:wrap;gap:var(--abstand-1)}.team-diagramm-zeiten>span{white-space:nowrap}.team-bereich:has(.team-details) .ka>:not(.ka-kopf,.ka-zahl),.team-bereich:has(.team-details) .ka-kopf .team-chip{display:none}}
+
+.team-liste .ak-meta{display:inline-flex;align-items:center;gap:var(--abstand-1)}
