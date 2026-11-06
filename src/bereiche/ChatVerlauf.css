@@ -19,9 +19,11 @@
 .r-plan-kopf > span:last-child { display: flex; flex-direction: column; min-width: 0; gap: calc(var(--abstand-1) / 4); }
 .r-plan-titel { font: var(--schrift-ueberschrift); }
 .r-plan-unter, .r-plan-risiko { font: var(--schrift-klein); color: var(--text-2); margin: 0; overflow-wrap: anywhere; }
-.r-plan-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--abstand-2); }
-.r-plan-zeile { display: flex; align-items: center; justify-content: space-between; gap: var(--abstand-2); font: var(--schrift-text); overflow-wrap: anywhere; }
-.r-plan-zeile > span:first-child { min-width: 0; }
+.r-plan-liste { list-style: none; margin: 0 calc(var(--abstand-4) / -2); padding: 0; display: flex; flex-direction: column; gap: calc(var(--abstand-1) / 2); }
+.r-plan-zeile { display: grid; grid-template-columns: calc(var(--abstand-6) + var(--abstand-1) / 2) minmax(0, 1fr) auto calc(var(--abstand-6) * 4); column-gap: var(--abstand-3); align-items: center; min-height: calc(var(--steuer-hoehe) + var(--abstand-1) / 2); padding-inline: calc(var(--abstand-4) / 2); font: var(--schrift-text); }
+.r-plan-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r-plan-symbol { display: inline-flex; color: var(--thema); }
+.r-plan-wer { font: var(--schrift-klein); color: var(--text-2); text-align: right; white-space: nowrap; }
 .r-plan .statusmarke { color: var(--status-farbe); background: var(--status-grund); }
 .r-bedingungen { font: var(--schrift-klein); color: var(--text-2); }
 .r-bedingungen summary { cursor: pointer; color: var(--text-1); border-radius: var(--rund-knopf); }
@@ -40,6 +42,6 @@
 .r-antworten .knopf[aria-pressed=true] { box-shadow: var(--schatten-auswahl); }
 .chat-meldung:empty { display: none; }
 .chat-meldung { align-self: center; padding: var(--abstand-2) var(--abstand-4); border-radius: var(--rund-knopf); background: var(--flaeche-2); font: var(--schrift-klein); }
-@keyframes chat-leuchten { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@keyframes chat-leuchten { 0%, 100% { opacity: var(--b-glanz-staerke); } 50% { opacity: 1; } }
 :root[data-bewegung=reduziert] .r-frage::after { content: none; }
 @media (prefers-reduced-motion: reduce) { :root:not([data-bewegung=voll]) .r-frage::after { content: none; } }

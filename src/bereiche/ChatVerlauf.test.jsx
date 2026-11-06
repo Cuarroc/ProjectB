@@ -11,6 +11,7 @@ it("liest den aktiven Chat, Fragen, Aktionen und Bedingungen aus der Quelle", ()
   daten.fragen[0].text = "Eine andere Frage";
   daten.fragen[0].antwortknoepfe[0].text = "Eine andere Antwort";
   daten.plan.schritte[2].fertigWenn[0].text = "Eine andere Bedingung";
+  daten.agenten[1].anbieter = "Claude"; daten.agenten[1].fortschritt = 23;
   quelle.aktualisieren(daten);
   const html = renderToStaticMarkup(<ChatVerlauf quelle={quelle} />);
   for (const text of ["Ein anderer Auftrag", "Merken", "Eine andere Frage", "Eine andere Antwort", "Eine andere Bedingung", "Plan · 1 / 3 fertig"])
@@ -18,6 +19,8 @@ it("liest den aktiven Chat, Fragen, Aktionen und Bedingungen aus der Quelle", ()
   expect(html).not.toContain("Exportiere die Paketliste als CSV");
   expect(html).toContain('data-erfuellt="false"');
   expect(html).toContain('aria-label="Offen"');
+  expect(html).toContain('aria-valuenow="23"');
+  expect(html.match(/class="r-plan-wer">Claude/g)).toHaveLength(2);
 });
 
 it("zeigt bei fehlendem aktiven Chat keinen fremden Verlauf", () => {

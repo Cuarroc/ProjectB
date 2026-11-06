@@ -4,11 +4,16 @@ async page => {
   await page.evaluate(async () => { document.documentElement.dataset.bewegung = 'voll'; await document.fonts.ready; });
   const log = page.getByRole('log', { name: 'Chatverlauf' });
   pruefe(await log.locator('article').count() === 3, 'Drei Nachrichtenkarten aus den Beispieldaten');
-  for (const el of await log.locator('.r-plan-zeile .statusmarke').all()) {
+  for (const el of await log.locator('.r-bedingungen .statusmarke').all()) {
     pruefe(await el.evaluate(el => getComputedStyle(el).color === getComputedStyle(el).getPropertyValue('--status-farbe').trim() || getComputedStyle(el).backgroundColor !== 'rgba(0, 0, 0, 0)'), 'Statusfarben trotz globaler Baustein-Stile');
   }
   for (const [width, height] of [[1440, 900], [1024, 700], [1024, 640]]) {
     await page.setViewportSize({ width, height });
+    for (const zeile of await log.locator('.r-plan-zeile').all()) {
+      pruefe(await zeile.locator('.r-plan-wer').count() === 1 && await zeile.locator('.ka-balken > span').count() === 1, 'Planzeile zeigt Anbieter und Fortschritt');
+      pruefe(await zeile.getByRole('img').getAttribute('aria-label') === (await zeile.getByRole('progressbar').getAttribute('aria-label')).split(': ').pop(), 'Zustandswort neben Symbol zugänglich');
+      pruefe(await zeile.locator('.r-plan-name').evaluate(el => el.getBoundingClientRect().height <= 20 && getComputedStyle(el).whiteSpace === 'nowrap' && el.title === el.textContent), 'Schritttitel bleibt einzeilig und vollständig abrufbar');
+    }
     pruefe(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Kein Fensterüberlauf');
     pruefe(await log.evaluate(el => el.scrollWidth <= el.clientWidth), 'Kein Chatüberlauf');
     const masse = await page.locator('.chat-nachrichten').evaluate(el => {
@@ -36,6 +41,9 @@ async page => {
   await page.locator('.r-bedingungen summary').click();
   pruefe(await page.locator('.r-bedingungen [data-erfuellt=false] svg').first().getAttribute('aria-label') === 'Offen', 'Offene Bedingung als leerer Kreis');
   pruefe(await page.locator('.r-plan-risiko').evaluate(el => getComputedStyle(el).color === 'rgb(169, 176, 192)'), 'Risiko neutral');
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await log.locator('article').last().getByRole('button', { name: 'Kopieren' }).click();
+  pruefe((await page.evaluate(() => navigator.clipboard.readText())).includes(await page.locator('.r-frage-text').innerText()), 'Kopieren der Frage enthält den Fragetext');
   await page.evaluate(async () => {
     const { default: React } = await import('/node_modules/.vite/deps/react.js');
     const { default: ReactDOM } = await import('/node_modules/.vite/deps/react-dom_client.js');
@@ -55,5 +63,6 @@ async page => {
   await page.locator('article').first().getByRole('button', { name: 'Kopieren' }).click();
   await page.getByRole('status').getByText('Kopiert.', { exact: true }).waitFor();
   pruefe(await page.evaluate(() => navigator.clipboard.readText()) === 'Aktualisierter Auftrag', 'Kopieren schreibt den Dateninhalt');
+  await page.getByRole('status').getByText('Kopiert.', { exact: true }).waitFor({ state: 'hidden', timeout: 7500 });
   return 'Grün: Datenabo, Kopieren, Tab/Enter/Fokus, 1440×900, 1024×700/640, Voll/Reduziert, Bedingungen und neutrales Risiko';
 }
