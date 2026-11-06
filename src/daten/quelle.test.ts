@@ -48,7 +48,8 @@ describe("BeispielQuelle", () => {
     expect(new Set(daten.agenten.map(a => a.zustand))).toEqual(new Set(["Arbeitet", "Wartet auf dich", "Fertig"]));
     expect(daten.fragen).toHaveLength(1);
     expect(daten.fragen[0].antwortknoepfe.map(a => a.text)).toEqual(["In Downloads", "Im Projektordner"]);
-    expect(daten.kopf.kontingent).toEqual({ claude: 42, codex: 51 });
+    expect(daten.kopf.kontingent).toEqual({ claude: 42, codex: 51, soll: 48 });
+    expect(daten.kopf.projekte).toEqual(["C:\\ProjectB", "C:\\ProjectB-Beispiel"]);
     expect(daten.kopf.postfach).toBe(3);
   });
 
