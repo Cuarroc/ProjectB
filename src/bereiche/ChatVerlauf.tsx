@@ -9,6 +9,7 @@ import type { Planschritt } from "../daten/typen";
 import "./ChatVerlauf.css";
 import "../bausteine/bausteine2.css";
 import Planfenster, { type PlanMarken } from "./Planfenster";
+import Interview from "./Interview";
 
 const standardQuelle = new BeispielQuelle();
 const zustaende: Record<Planschritt["zustand"], Zustand> = {
@@ -51,7 +52,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
   return <>
     <header className="chat-kopf"><h2 id="chat">Chat</h2></header>
     <div className="chat-verlauf" role="log" aria-label="Chatverlauf" aria-relevant="additions text">
-      <ol className="chat-nachrichten">
+      {chat?.modus === "Interview" ? <Interview key={chat.id} /> : <ol className="chat-nachrichten">
         {chat?.verlauf.map(n => {
           const frage = daten.fragen.find(f => f.id === n.frageId);
           const plan = n.planId === daten.plan.id ? daten.plan : null;
@@ -98,7 +99,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
             </article>
           </li>;
         })}
-      </ol>
+      </ol>}
     </div>
     <div className="chat-meldung" role="status">{meldung}</div>
     {planOffen && <Planfenster daten={daten} gespeicherteMarken={planMarken[daten.plan.id] ?? {}} onSchliessen={() => setPlanOffen(false)} onEntscheiden={(plan, marken) => {

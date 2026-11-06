@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Circle, CircleDot, Folder, IdCard, Shield } from "lucide-react";
+import { ChevronDown, Circle, CircleDot, Folder, IdCard } from "lucide-react";
 import { chatEingabeQuelle } from "./ChatEingabe";
 import { PostfachKnopf } from "./PostfachKnopf";
 import "./Kopf.css";
+import Berechtigungen from "./Berechtigungen";
 
 export type Bewegung = "auto" | "voll" | "reduziert";
 export function bewegungSetzen(wahl: Bewegung, wurzel = document.documentElement) { wurzel.dataset.bewegung = wahl; }
@@ -35,7 +36,6 @@ function KopfMenue({ name, inhalt, children, klasse = "", beschriftung = name }:
 export default function Kopf() {
   const [daten, setDaten] = useState(() => chatEingabeQuelle.lesen()), [projekt, waehleProjekt] = useState(daten.kopf.pfad);
   const [bewegung, waehleBewegung] = useState<Bewegung>("auto"), [ruhig, setRuhig] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null), berechtigungen = useRef<HTMLButtonElement>(null);
   useEffect(() => chatEingabeQuelle.abonnieren(() => setDaten(chatEingabeQuelle.lesen())), []);
   useEffect(() => { bewegungSetzen(bewegung); }, [bewegung]);
   useEffect(() => { const m = matchMedia("(prefers-reduced-motion: reduce)"), lesen = () => setRuhig(m.matches); lesen();
@@ -59,13 +59,10 @@ export default function Kopf() {
         {a === "claude" ? "Claude" : "Codex"}<span className="kopf-balken" aria-hidden="true"><span style={{ width: `${daten.kopf.kontingent[a]}%` }} /><i className="kopf-soll" style={{ left: `${daten.kopf.kontingent.soll}%` }} /></span><b>{daten.kopf.kontingent[a]} %</b>
       </span>)}
     </div>
-    <button type="button" className="kopf-knopf" aria-label={`Berechtigungen: ${daten.berechtigungen.aktuell}`} aria-haspopup="dialog" ref={berechtigungen} onClick={() => dialog.current?.showModal()}>
-      <Shield {...symbol} /><span>{daten.berechtigungen.aktuell}</span><span className="kopf-stufen" aria-hidden="true">{[0, 1, 2, 3].map(i => <i key={i} data-an={i <= daten.berechtigungen.stufen.findIndex(s => s.name === daten.berechtigungen.aktuell)} style={{ height: `${(i + 1) * 25}%` }} />)}</span><ChevronDown {...symbol} />
-    </button>
+    <Berechtigungen daten={daten.berechtigungen} quelle={chatEingabeQuelle} />
     <PostfachKnopf zahl={daten.kopf.postfach} />
     <KopfMenue name="Rollen" klasse="kopf-rollen" inhalt={<><IdCard {...symbol} /><span>Rollen</span></>}>
       <h2 role="presentation">Rollen</h2>{["Orchestrator", "Arbeiter Codex", "Prüfer Claude"].map(r => <button type="button" role="menuitem" aria-disabled="true" tabIndex={-1} key={r}>{r}</button>)}
     </KopfMenue>
-    <dialog className="kopf-dialog" aria-label="Berechtigungen" ref={dialog} onClose={() => berechtigungen.current?.focus()}><h2>Berechtigungen</h2><form method="dialog"><button className="kopf-knopf">Schließen</button></form></dialog>
   </header>;
 }

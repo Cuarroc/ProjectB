@@ -1,0 +1,54 @@
+.ber-dialog { width: calc(var(--leiste-breite) * 17 + var(--abstand-2)); max-width: calc(100vw - var(--abstand-8) * 2); max-height: calc(100dvh - var(--abstand-8) * 2); padding: 0; border: 0; border-radius: var(--rund-bereich); background: var(--glas-grund); backdrop-filter: blur(var(--abstand-8)) saturate(1.5); box-shadow: var(--schatten-schwebend); color: var(--text-1); font: var(--schrift-beschriftung); opacity: 0; transform: translateY(var(--weg-mittel)) scale(var(--skala-auf)); transition: opacity var(--dauer-kurz) var(--kurve-weg), transform var(--dauer-kurz) var(--kurve-weg), display var(--dauer-kurz) allow-discrete, overlay var(--dauer-kurz) allow-discrete; }
+.ber-dialog[open] { display: flex; flex-direction: column; opacity: 1; transform: none; transition-duration: var(--dauer-lang); }
+@starting-style { .ber-dialog[open] { opacity: 0; transform: translateY(var(--weg-mittel)) scale(var(--skala-auf)); } }
+.ber-dialog::backdrop { background: var(--scrim); backdrop-filter: blur(var(--scrim-unschaerfe)); }
+.ber-kopf { display: flex; gap: var(--abstand-5); padding: var(--abstand-7) var(--abstand-8) var(--abstand-6); background: radial-gradient(70% 160% at 0% 0%, var(--akzent-grund), transparent 70%); }
+.ber-kopf > div { flex: 1; min-width: 0; }
+.kopf .ber-dialog h2 { font: var(--schrift-abschnitt); }
+.ber-dialog h3 { margin: 0; font: var(--schrift-ueberschrift); }
+.ber-dialog p { margin: 0; }
+.ber-kopf p, .ber-z2 { color: var(--text-2); font: var(--schrift-beschriftung); }
+.ber-kopf-symbol { display: grid; place-items: center; flex: 0 0 calc(var(--abstand-7) * 2); height: calc(var(--abstand-7) * 2); border-radius: var(--rund-liste); color: var(--akzent-tinte); background: linear-gradient(145deg, var(--akzent-text), var(--akzent)); box-shadow: var(--schatten-senden); }
+.ber-inhalt { flex: 1; min-height: 0; overflow: auto; padding: var(--abstand-1) var(--abstand-8) var(--abstand-6); display: flex; flex-direction: column; gap: var(--abstand-5); scrollbar-width: thin; scrollbar-color: var(--neutral-3) transparent; }
+.ber-stufen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--abstand-3); padding: calc(var(--abstand-1) / 2); }
+.ber-stufe { display: flex; flex-direction: column; align-items: stretch; gap: calc(var(--abstand-3) - var(--abstand-1)); min-width: 0; min-height: calc(var(--kopf-hoehe) * 2 + var(--steuer-hoehe)); padding: var(--abstand-5); border: 0; border-radius: var(--rund-karte); background: var(--flaeche-1); color: var(--text-1); box-shadow: var(--schatten-kante); font: inherit; text-align: left; cursor: pointer; }
+.ber-stufe[aria-checked=true] { background: radial-gradient(120% 90% at 0% 0%, var(--akzent-grund), transparent 65%), var(--flaeche-1); box-shadow: var(--schatten-auswahl); }
+.ber-stufe strong { font: var(--schrift-titel); }
+.ber-stufe-kopf { display: flex; align-items: center; justify-content: space-between; min-height: var(--abstand-8); font: var(--schrift-klein); color: var(--text-2); }
+.ber-gilt, .ber-empf { border-radius: var(--rund-voll); padding: 0 var(--abstand-2); background: var(--flaeche-3); }
+.ber-empf { background: var(--akzent-grund); color: var(--akzent-text); }
+.ber-stufe-zahl { display: inline-flex; align-items: center; gap: var(--abstand-2); white-space: nowrap; }
+.ber-meter { display: inline-flex; align-items: end; gap: calc(var(--abstand-1) / 2); height: var(--abstand-3); }
+.ber-meter i { width: calc(var(--abstand-1) / 2); border-radius: 1px; background: var(--neutral-4); }
+.ber-meter i[data-aktiv=true] { background: var(--akzent); }
+.ber-raster { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--abstand-5); align-items: start; }
+.ber-karte, .ber-spalte { display: flex; flex-direction: column; gap: var(--abstand-4); min-width: 0; }
+.ber-karte { padding: var(--abstand-5) var(--abstand-6) var(--abstand-6); border-radius: var(--rund-karte); background: var(--flaeche-1); box-shadow: var(--schatten-kante); }
+.ber-vert { display: flex; gap: calc(var(--abstand-1) / 2); }
+.ber-vert > span { min-width: 0; padding: var(--abstand-1); border-radius: var(--rund-segment); text-align: center; font: var(--schrift-klein); background: var(--akzent-grund); color: var(--akzent-text); }
+.ber-vert > [data-art="Fragt dich"], .ber-vert > [data-art="Legt es dir hin"] { background: var(--status-wartet-grund); color: var(--status-wartet-text); }
+.ber-vert > [data-art="Fragt dich"] { background: var(--status-wartet); color: var(--text-auf-farbe); }
+.ber-achse { display: flex; justify-content: space-between; font: var(--schrift-klein); color: var(--text-3); margin-top: calc(var(--abstand-2) * -1); }
+.ber-legende { display: flex; flex-wrap: wrap; gap: var(--abstand-2); color: var(--text-2); font: var(--schrift-klein); }
+.ber-legende > span { display: inline-flex; align-items: center; gap: var(--abstand-1); }
+.ber-legende i { width: var(--abstand-3); height: var(--abstand-3); background: var(--akzent-grund); box-shadow: inset 0 0 0 1px var(--akzent); border-radius: calc(var(--abstand-1) / 2); }
+.ber-legende [data-art="Fragt dich"] i { background: var(--status-wartet); box-shadow: none; }
+.ber-legende [data-art="Legt es dir hin"] i { background: var(--status-wartet-grund); box-shadow: inset 0 0 0 1px var(--status-wartet); }
+.ber-legende [data-art="Nie"] i { background: var(--flaeche-3); box-shadow: inset 0 0 0 1px var(--neutral-4); }
+.ber-legende b { padding: 0 var(--abstand-1); border-radius: var(--rund-voll); background: var(--flaeche-3); color: var(--text-1); }
+.ber-liste, .ber-immer { list-style: none; padding: 0; margin: 0; }
+.ber-liste li, .ber-immer li { display: flex; align-items: center; gap: var(--abstand-3); padding: var(--abstand-1) 0; min-height: calc(var(--steuer-hoehe) + var(--abstand-1) * 2); }
+.ber-liste li > span:first-child { flex: 1; min-width: 0; }
+.ber-pille { display: inline-flex; align-items: center; gap: calc(var(--abstand-3) - var(--abstand-1)); flex-shrink: 0; border-radius: var(--rund-voll); background: var(--flaeche-3); padding: var(--abstand-1) var(--abstand-3); font: var(--schrift-klein); }
+.ber-pille[data-art="Fragt dich"], .ber-pille[data-art="Legt es dir hin"] { background: var(--status-wartet-grund); color: var(--status-wartet); }
+.ber-immer li { align-items: flex-start; min-height: 0; }
+.ber-immer svg { flex-shrink: 0; color: var(--text-2); }
+.ber-feld { padding: var(--abstand-2) var(--abstand-3); background: var(--flaeche-2); border-radius: var(--rund-knopf); color: var(--text-2); overflow-wrap: anywhere; }
+.ber-karte code { font: var(--schrift-code); }
+.ber-fuss { display: flex; align-items: center; flex-wrap: wrap; gap: var(--abstand-3); padding: var(--abstand-4) var(--abstand-8) var(--abstand-6); box-shadow: var(--schatten-kante); }
+.ber-probe { flex-basis: 100%; display: flex; align-items: center; gap: var(--abstand-2); font: var(--schrift-klein); color: var(--text-2); }
+.ber-probe input { accent-color: var(--akzent); }
+.ber-meldung { flex: 1; display: flex; align-items: center; gap: var(--abstand-2); font: var(--schrift-klein); color: var(--text-2); }
+.ber-meldung:has(svg) { color: var(--status-problem); }
+.ber-inhalt:focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: calc(var(--abstand-1) / -2); }
+@media (hover: hover) and (pointer: fine) { .ber-stufe[aria-checked=false]:hover { background: var(--flaeche-3); } }
