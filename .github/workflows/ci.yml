@@ -29,6 +29,7 @@ jobs:
   # nur ihre Schritte entfallen: so bleiben die Pflicht-Checks mit ihrem Namen grün.
   aenderungen:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: read
@@ -56,6 +57,7 @@ jobs:
   oberflaeche:
     needs: aenderungen
     runs-on: windows-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -65,11 +67,22 @@ jobs:
         if: needs.aenderungen.outputs.oberflaeche == 'true'
         with:
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: needs.aenderungen.outputs.oberflaeche == 'true'
+        with:
+          cache: npm
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: needs.aenderungen.outputs.oberflaeche == 'true'
+        with:
+          workspaces: src-tauri -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: npm ci
         if: needs.aenderungen.outputs.oberflaeche == 'true'
       - run: npm run build
         if: needs.aenderungen.outputs.oberflaeche == 'true'
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: npm test
+        if: needs.aenderungen.outputs.oberflaeche == 'true'
+      - run: cargo clippy --locked --all-targets -- -D warnings
         if: needs.aenderungen.outputs.oberflaeche == 'true'
         working-directory: src-tauri
 
@@ -80,6 +93,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,14 +105,14 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo fmt --manifest-path kern/Cargo.toml --check
         if: needs.aenderungen.outputs.kern == 'true'
-      - run: cargo clippy --manifest-path kern/Cargo.toml --all-targets -- -D warnings
+      - run: cargo clippy --locked --manifest-path kern/Cargo.toml --all-targets -- -D warnings
         if: needs.aenderungen.outputs.kern == 'true'
       - name: Tests ausführen
         if: needs.aenderungen.outputs.kern == 'true'
         shell: bash
         run: |
           set -o pipefail
-          cargo test --manifest-path kern/Cargo.toml 2>&1 | tee testausgabe.txt
+          cargo test --locked --manifest-path kern/Cargo.toml 2>&1 | tee testausgabe.txt
       - name: Testzahl erfassen
         if: needs.aenderungen.outputs.kern == 'true'
         shell: pwsh
@@ -114,6 +128,7 @@ jobs:
     name: Testzahl-Wächter
     needs: [aenderungen, test]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -166,6 +181,7 @@ jobs:
 
   secrets:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -178,6 +194,7 @@ jobs:
 
   zizmor:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -186,10 +203,13 @@ jobs:
 
   deny:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      # Fertiges Binary statt Docker-Action: spart den Image-Download. Gleiche Prüfung wie die Action (check, --all-features).
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
-          manifest-path: kern/Cargo.toml
+          tool: cargo-deny
+      - run: cargo deny --manifest-path kern/Cargo.toml --all-features --log-level warn check
