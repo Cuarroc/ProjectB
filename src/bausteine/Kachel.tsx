@@ -2,7 +2,7 @@ import { Check, CircleX, ListTodo, Zap } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import "./bausteine2.css";
 
-export type KachelProps = { titel: string; zahl?: string; unterzeile: string; thema?: "aufgaben" | "tests" | "tokens"; zustand?: "wert" | "laedt" | "leer" | "fehler"; balken?: number; grafik?: ReactNode; onWiederholen?: () => void };
+export type KachelProps = { titel: string; zahl?: string; unterzeile: ReactNode; thema?: "aufgaben" | "tests" | "tokens"; zustand?: "wert" | "laedt" | "leer" | "fehler"; balken?: number; grafik?: ReactNode; onWiederholen?: () => void };
 export function Kachel({ titel, zahl, unterzeile, thema = "tests", zustand = "wert", balken, grafik, onWiederholen }: KachelProps) {
   const farbe = thema === "tests" ? "status-fertig" : "akzent", Symbol = thema === "tests" ? Check : thema === "tokens" ? Zap : ListTodo;
   return <div className="ka" aria-busy={zustand === "laedt"} style={{ "--thema": `var(--${farbe})`, "--glanz": `var(--${farbe}-grund)` } as CSSProperties}>
