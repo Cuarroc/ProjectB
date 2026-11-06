@@ -9,7 +9,7 @@ export function Fortschrittsring({ wert, zustand = "arbeitet", groesse = 44, tex
   const wort = zustand === "ziel" ? "Ziel" : zustand === "kontext" ? "Kontext" : zustaende[zustand].wort;
   const farbe = fertig ? "status-fertig" : zustand === "ziel" ? "akzent" : zustand === "kontext" ? "neutral-2" : `status-${zustand}`;
   return <span role="img" aria-label={`${text ?? `${anteil} %`} · ${fertig ? "Fertig" : wort}`} className="ring" data-klein={groesse < 40 || undefined} data-fertig={fertig || undefined}
-    style={{ "--ring-groesse": `var(--ring-${groesse})`, "--ring-farbe": `var(--${farbe})` } as CSSProperties}>
+    style={{ "--ring-groesse": `calc(var(--abstand-1) * ${groesse / 4})`, "--ring-farbe": `var(--${farbe})` } as CSSProperties}>
     <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r={groesse < 40 ? 22 : 23} />
       <circle className="ring-bogen" cx="26" cy="26" r={groesse < 40 ? 22 : 23} pathLength="100" strokeDasharray="100" strokeDashoffset={100 - anteil} visibility={anteil === 0 ? "hidden" : undefined} />
     </svg>

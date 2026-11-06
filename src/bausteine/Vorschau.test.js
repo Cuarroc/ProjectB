@@ -4,6 +4,9 @@ async page => {
   const marken = page.locator('section[aria-label="Statusmarke"] > div:first-child .statusmarke');
   pruefe((await marken.allTextContents()).join('|') === 'Offen|Arbeitet|Wartet auf dich|Fertig|Problem', 'Fünf Statuswörter');
   pruefe(await marken.locator('svg[stroke-width="2.25"]').count() === 5, 'Symbol und absolute Strichbreite');
+  pruefe(await page.locator('.ring-zahl').evaluateAll(zahlen => zahlen.every(el => getComputedStyle(el).color === getComputedStyle(document.querySelector('h1')).color)), 'Ringzahlen müssen text-1 statt der Umgebungsfarbe zeigen');
+  pruefe(await page.locator('.knopf').evaluateAll(knoepfe => knoepfe.every(el => getComputedStyle(el).fontWeight === '600')), 'Knöpfe halbfett');
+  pruefe(await page.locator('tbody .knopf[data-variante="antwort"]').evaluateAll(knoepfe => knoepfe.slice(0, 4).every(el => getComputedStyle(el).backgroundColor === getComputedStyle(knoepfe[0]).backgroundColor)), 'Antwortfarbe bei Hover und Druck');
   await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
   pruefe(await page.locator(':focus').evaluate(el => el.matches(':focus-visible') && getComputedStyle(el).outlineWidth === '2px'), 'Tastaturfokus');
   await page.keyboard.press('Enter'); await page.keyboard.press('Space');
@@ -27,5 +30,5 @@ async page => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   pruefe(await page.locator('html').evaluate(el => getComputedStyle(el).getPropertyValue('--dauer-daten').trim()) === '0ms', 'Reduzierte Bewegung');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  return 'Grün: Status, Symbole, Tastatur, Ladebreite, Ringgeometrie und reduzierte Bewegung';
+  return 'Grün: Status, Symbole, Ringfarbe, Knopfschrift, Antwortfarbe, Tastatur, Ladebreite, Ringgeometrie und reduzierte Bewegung';
 }

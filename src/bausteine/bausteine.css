@@ -10,7 +10,7 @@
 .hinweis { animation: hinweis var(--dauer-hinweis) var(--kurve-raus); border-radius: inherit; }
 @keyframes hinweis { 50% { box-shadow: var(--schatten-leuchten-wartet); } }
 .knopf, .umschalter button { box-sizing: border-box; border: 0; cursor: pointer; white-space: nowrap; font: var(--schrift-klein); color: var(--text-1); }
-.knopf { display: inline-grid; align-items: center; justify-items: center; height: var(--steuer-hoehe); padding-inline: var(--abstand-4); border-radius: var(--rund-knopf); background: var(--flaeche-3); box-shadow: var(--schatten-kante); transition: background-color var(--dauer-kurz) var(--kurve-raus), color var(--dauer-kurz) var(--kurve-raus), transform var(--dauer-druck) var(--kurve-raus); }
+.knopf { display: inline-grid; align-items: center; justify-items: center; height: var(--steuer-hoehe); padding-inline: var(--abstand-4); border-radius: var(--rund-knopf); background: var(--flaeche-3); box-shadow: var(--schatten-kante); font-weight: 600; transition: background-color var(--dauer-kurz) var(--kurve-raus), color var(--dauer-kurz) var(--kurve-raus), transform var(--dauer-druck) var(--kurve-raus); }
 .knopf-inhalt { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: var(--abstand-2); }
 .knopf[data-variante="haupt"] { font: var(--schrift-ueberschrift); background: var(--akzent); color: var(--akzent-tinte); box-shadow: var(--schatten-senden); }
 .knopf[data-variante="leise"], .knopf[data-variante="gefaehrlich"] { background: none; color: var(--text-2); box-shadow: none; }
@@ -34,11 +34,13 @@
   .knopf:hover:not(:disabled), .umschalter button:hover:not([aria-checked="true"]) { background: var(--flaeche-4); color: var(--text-1); }
   .knopf[data-variante="haupt"]:hover:not(:disabled) { background: color-mix(in srgb, var(--akzent), var(--akzent-text) 20%); color: var(--akzent-tinte); }
   .knopf:is([data-variante="leise"], [data-variante="gefaehrlich"]):hover:not(:disabled) { background: var(--flaeche-3); }
+  .knopf[data-variante="antwort"]:hover:not(:disabled) { background: var(--status-wartet-grund); color: var(--status-wartet-text); }
 }
 .vorschau .hover { background: var(--flaeche-4); color: var(--text-1); }
 .vorschau .knopf[data-variante="haupt"].hover { background: color-mix(in srgb, var(--akzent), var(--akzent-text) 20%); color: var(--akzent-tinte); }
 .vorschau .knopf:is([data-variante="leise"], [data-variante="gefaehrlich"]):is(.hover, .gedrueckt) { background: var(--flaeche-3); color: var(--text-1); }
-.ring { position: relative; display: inline-grid; width: var(--ring-groesse); height: var(--ring-groesse); vertical-align: middle; font: var(--schrift-klein); font-weight: 600; font-variant-numeric: tabular-nums; }
+.knopf[data-variante="antwort"]:active:not(:disabled), .vorschau .knopf[data-variante="antwort"]:is(.hover, .gedrueckt) { background: var(--status-wartet-grund); color: var(--status-wartet-text); }
+.ring { position: relative; display: inline-grid; width: var(--ring-groesse); height: var(--ring-groesse); vertical-align: middle; font: var(--schrift-klein); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-1); }
 .ring > svg { width: 100%; height: 100%; fill: none; stroke: var(--flaeche-3); stroke-width: calc(var(--abstand-1) * .875); }
 .ring circle { vector-effect: non-scaling-stroke; }
 .ring[data-klein] > svg { stroke-width: calc(var(--abstand-1) * .75); }
@@ -56,3 +58,4 @@
 .vorschau figure { display: grid; justify-items: center; gap: var(--abstand-2); margin: 0; font: var(--schrift-klein); color: var(--text-3); }
 .vorschau table { border-spacing: var(--abstand-4); margin: calc(-1 * var(--abstand-4)); font: var(--schrift-klein); }
 .vorschau th { font-weight: 400; text-align: left; color: var(--text-3); }
+.vorschau-kontext { display: inline-flex; align-items: center; padding-left: var(--abstand-3); border-radius: var(--rund-knopf); background: var(--flaeche-3); font: var(--schrift-klein); color: var(--text-3); }

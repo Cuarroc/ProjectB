@@ -106,10 +106,6 @@
   --ebene-tooltip: 70; /* Tooltips, über allem. */
   --schrift-beschriftung: 400 13px/18px var(--familie-sans);
   --schrift-abschnitt: 650 17px/24px var(--familie-sans);
-  --ring-20: 20px;
-  --ring-40: 40px;
-  --ring-44: 44px;
-  --ring-52: 52px;
 }
 
 :root {
