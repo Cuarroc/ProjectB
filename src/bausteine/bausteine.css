@@ -6,6 +6,7 @@
 [data-zustand="fertig"] { --status-farbe: var(--status-fertig); --status-grund: var(--status-fertig-grund); }
 [data-zustand="problem"] { --status-farbe: var(--status-problem); --status-grund: var(--status-problem-grund); }
 @starting-style { .statusmarke > span { opacity: 0; transform: scale(.9); } }
+@media (prefers-reduced-motion: reduce) { @starting-style { .statusmarke > span { transform: none; } } }
 .hinweis { animation: hinweis var(--dauer-hinweis) var(--kurve-raus); border-radius: inherit; }
 @keyframes hinweis { 50% { box-shadow: var(--schatten-leuchten-wartet); } }
 .knopf, .umschalter button { box-sizing: border-box; border: 0; cursor: pointer; white-space: nowrap; font: var(--schrift-klein); color: var(--text-1); }
