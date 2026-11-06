@@ -1,0 +1,22 @@
+.ein-moduszeile { display: flex; align-items: center; gap: calc(var(--abstand-1) * 1.5); flex-wrap: wrap; }
+.einst-gruppe { display: inline-flex; align-items: center; gap: calc(var(--abstand-1) * 1.5); }
+.einst-gruppe .trenner { width: 1px; height: var(--abstand-7); margin-inline: calc(var(--abstand-1) / 2); background: var(--neutral-4); }
+.einst-anker { position: relative; display: inline-flex; }
+.ein-einst { position: absolute; z-index: var(--ebene-menue); bottom: calc(100% + var(--abstand-2)); right: 0; width: calc(var(--abstand-7) * 17); display: flex; flex-direction: column; gap: var(--abstand-5); padding: var(--abstand-5) var(--abstand-6); border-radius: var(--rund-kachel); background: var(--glas-grund); backdrop-filter: blur(var(--abstand-8)) saturate(1.5); box-shadow: var(--schatten-schwebend), var(--schatten-kante); font: var(--schrift-beschriftung); transform-origin: bottom right; animation: einst-auf var(--b-dauer-menue) var(--b-feder); }
+.ein-einst .titel { display: flex; flex-direction: column; gap: calc(var(--abstand-1) / 2); }
+.ein-einst .titel b { font-weight: 600; }
+.ein-einst .titel span { font: var(--schrift-klein); color: var(--text-2); }
+.ein-einst .zeile { display: flex; flex-direction: column; gap: calc(var(--abstand-1) * 1.5); }
+.ein-einst .kopf { display: flex; align-items: baseline; justify-content: space-between; gap: var(--abstand-4); }
+.ein-einst .empf { font: var(--schrift-klein); color: var(--text-3); white-space: nowrap; }
+.ein-einst .um { display: flex; width: 100%; box-sizing: border-box; }
+.ein-einst .um-teil { flex: 1; justify-content: center; font: var(--schrift-klein); }
+.ein-einst .um-teil[aria-checked=true] { background: var(--akzent-grund); font-weight: 600; }
+.ein-einst .um-pille { display: none; }
+.ein .einst-zurueck { margin-left: calc(-1 * var(--abstand-2)); padding-inline: var(--abstand-2); }
+.einst-pfeil { color: var(--text-3); }
+.einst-anker button[aria-expanded=true] .einst-pfeil { transform: rotate(180deg); }
+@keyframes einst-auf { from { opacity: 0; transform: scale(var(--b-skala-menue)); } to { opacity: 1; transform: none; } }
+:root[data-bewegung=reduziert] .ein-einst { animation: none; }
+@media (prefers-reduced-motion: reduce) { :root:not([data-bewegung=voll]) .ein-einst { animation: none; } }
+@container chat-eingabe (width < calc(30 * 1rem)) { .einst-wort, .einst-pfeil { display: none; } .einst-gruppe { margin-left: auto; } }
