@@ -8,6 +8,8 @@ pub mod start;
 
 pub mod pr;
 
+pub mod pruefung;
+
 use serde_json::Value;
 use std::fmt;
 use std::io::{self, BufRead, BufReader, Read, Write};
