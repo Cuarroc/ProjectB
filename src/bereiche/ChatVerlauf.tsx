@@ -8,6 +8,7 @@ import { tokenMs } from "../bausteine/Tooltip";
 import type { Planschritt } from "../daten/typen";
 import "./ChatVerlauf.css";
 import "../bausteine/bausteine2.css";
+import Planfenster, { type PlanMarken } from "./Planfenster";
 
 const standardQuelle = new BeispielQuelle();
 const zustaende: Record<Planschritt["zustand"], Zustand> = {
@@ -24,6 +25,9 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
   const [daten, setDaten] = useState(() => quelle.lesen());
   const [antworten, setAntworten] = useState<Record<string, string>>({});
   const [meldung, setMeldung] = useState("");
+  const [planOffen, setPlanOffen] = useState(false);
+  const [planFreigabe, setPlanFreigabe] = useState("");
+  const [planMarken, setPlanMarken] = useState<Record<string, PlanMarken>>({});
   useEffect(() => {
     if (!meldung) return;
     const timer = setTimeout(() => setMeldung(""), tokenMs("standzeit-toast-info"));
@@ -81,7 +85,8 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
                   </li>)}</ul>
                 </details>
                 {risiko.map(s => <p className="r-plan-risiko" key={s.id}>Risiko: {s.beschreibung}</p>)}
-                <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => onPlanOeffnen?.(plan.id)} disabled={!onPlanOeffnen} grund={onPlanOeffnen ? undefined : "Noch nicht verfügbar."} />
+                {planFreigabe && <p role="status">{planFreigabe}</p>}
+                <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen(true); onPlanOeffnen?.(plan.id); }} />
               </section>}
               {frage && <section className="r-innen r-frage" aria-label={n.text} aria-live="assertive">
                 <div className="r-frage-kopf"><MessageCircleQuestion size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /><strong>{n.text}</strong></div>
@@ -96,5 +101,10 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
       </ol>
     </div>
     <div className="chat-meldung" role="status">{meldung}</div>
+    {planOffen && <Planfenster daten={daten} gespeicherteMarken={planMarken[daten.plan.id] ?? {}} onSchliessen={() => setPlanOffen(false)} onEntscheiden={(plan, marken) => {
+      if (quelle instanceof BeispielQuelle) quelle.aktualisieren({ ...quelle.lesen(), plan });
+      else setDaten(d => ({ ...d, plan }));
+      setPlanMarken(m => ({ ...m, [plan.id]: marken })); setPlanFreigabe(plan.freigabe === "Freigegeben" ? "Freigegeben" : "Zurückgegeben");
+    }} />}
   </>;
 }
