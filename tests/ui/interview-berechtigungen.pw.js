@@ -13,6 +13,8 @@ test("Interview und Berechtigungen: bild-und-axe, Fokus und Beispielzustand", as
   const grenzen = await dialog.evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && el.scrollWidth <= el.clientWidth; });
   expect(grenzen).toBe(true);
   await dialog.getByRole("radio", { name: /Vorsichtig/ }).click();
+  const nieFarbe = await dialog.locator('.ber-legende [data-art="Nie"] i').evaluate(el => getComputedStyle(el).backgroundColor);
+  await expect(dialog.locator('.ber-vert > [data-art="Nie"]')).toHaveCSS("background-color", nieFarbe);
   await page.keyboard.press("End"); await expect(dialog.getByRole("radio", { name: /Autonom/ })).toBeFocused();
   await page.keyboard.press("Home"); await expect(dialog.getByRole("radio", { name: /Vorsichtig/ })).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("ArrowRight"); await expect(dialog.getByRole("radio", { name: /Nur bei Wichtigem/ })).toHaveAttribute("aria-checked", "true");

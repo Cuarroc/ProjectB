@@ -28,6 +28,10 @@
 .ber-vert > span { min-width: 0; padding: var(--abstand-1); border-radius: var(--rund-segment); text-align: center; font: var(--schrift-klein); background: var(--akzent-grund); color: var(--akzent-text); }
 .ber-vert > [data-art="Fragt dich"], .ber-vert > [data-art="Legt es dir hin"] { background: var(--status-wartet-grund); color: var(--status-wartet-text); }
 .ber-vert > [data-art="Fragt dich"] { background: var(--status-wartet); color: var(--text-auf-farbe); }
+.ber-vert > [data-art="Nie"] { background: var(--flaeche-3); color: var(--text-2); box-shadow: inset 0 0 0 1px var(--neutral-4); }
+.ber-kartenkopf { display: flex; align-items: center; justify-content: space-between; gap: var(--abstand-3); }
+.ber-chip { flex-shrink: 0; padding: var(--abstand-1) var(--abstand-2); border-radius: var(--rund-voll); background: var(--flaeche-3); color: var(--text-2); font: var(--schrift-klein); }
+.ber-technik code { display: block; overflow-wrap: normal; }
 .ber-achse { display: flex; justify-content: space-between; font: var(--schrift-klein); color: var(--text-3); margin-top: calc(var(--abstand-2) * -1); }
 .ber-legende { display: flex; flex-wrap: wrap; gap: var(--abstand-2); color: var(--text-2); font: var(--schrift-klein); }
 .ber-legende > span { display: inline-flex; align-items: center; gap: var(--abstand-1); }

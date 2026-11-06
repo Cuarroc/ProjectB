@@ -46,20 +46,20 @@ export default function Berechtigungen({ daten, quelle }: { daten: Rechte; quell
             {i === 1 && <span className="ber-empf">Empfohlen</span>}{s.name === daten.aktuell && <span className="ber-gilt">Gilt jetzt</span>}</span>
           <strong>{s.name}</strong><span>{saetze[i]}</span><span className="ber-z2">{hinweise[i]}</span>
         </button>)}</div>
-        <div className="ber-raster"><section className="ber-karte"><h3>Was er in der Stufe „{wahl}“ darf</h3>
-          <div className="ber-vert" aria-label="Verteilung der 10 Handlungen">{arten.map(art => anzahl(art) > 0 && <span key={art} data-art={art} style={{ flex: anzahl(art) }} aria-label={`${anzahl(art)} ${art}`}>{anzahl(art)}</span>)}</div>
-          <div className="ber-achse" aria-hidden="true"><span>0</span><span>5</span><span>10 Handlungen</span></div>
+        <div className="ber-raster"><section className="ber-karte"><div className="ber-kartenkopf"><h3>Was er in der Stufe „{wahl}“ darf</h3><span className="ber-chip">{daten.regeln.length} Handlungen</span></div>
+          <div className="ber-vert" aria-label={`Verteilung der ${daten.regeln.length} Handlungen`}>{arten.map(art => anzahl(art) > 0 && <span key={art} data-art={art} style={{ flex: anzahl(art) }} aria-label={`${anzahl(art)} ${art}`}>{anzahl(art)}</span>)}</div>
+          <div className="ber-achse" aria-hidden="true"><span>0</span><span>{daten.regeln.length / 2}</span><span>{daten.regeln.length} Handlungen</span></div>
           <div className="ber-legende">{arten.map(art => <span key={art} data-art={art}><i aria-hidden="true" />{art} <b>{anzahl(art)}</b></span>)}</div>
           <ul className="ber-liste">{daten.regeln.map(r => { const art = r.stufen[wahl], Symbol = symbole[art]; return <li key={r.text}>
             <span>{r.text}</span><span className="ber-pille" data-art={art}><Symbol {...symbol} fill={art === "Fragt dich" ? "currentColor" : "none"} />{art}</span>
           </li>; })}</ul>
         </section><div className="ber-spalte"><section className="ber-karte"><h3>Gilt immer, in jeder Stufe</h3><ul className="ber-immer">{daten.giltImmer.map(text => <li key={text}><Lock {...symbol} /><span>{text}</span></li>)}</ul>
-          <p className="ber-feld">Diese Grenzen stehen in den Regeln des Projekts und lassen sich hier nicht lockern.</p><p><FileText {...symbol} /> Jede Freigabe steht mit Uhrzeit im Protokoll.</p>
-        </section><section className="ber-karte"><h3>Technisch</h3><code className="ber-feld">{technik[index]}</code></section></div></div>
+          <p className="ber-feld">Diese Grenzen stehen in den Regeln des Projekts und lassen sich hier nicht lockern.</p><p>„Alle anhalten“ wirkt sofort.</p><p><FileText {...symbol} /> Jede Freigabe steht mit Uhrzeit im Protokoll.</p>
+        </section><section className="ber-karte"><div className="ber-kartenkopf"><h3>Technisch</h3><span className="ber-chip">{wahl}</span></div><div className="ber-feld ber-technik">{technik[index].split(" · ").map(zeile => <code key={zeile}>{zeile}</code>)}</div></section></div></div>
       </div>
       <div className="ber-fuss"><label className="ber-probe"><input type="checkbox" checked={probe} onChange={e => setProbe(e.target.checked)} />Nächstes Übernehmen schlägt fehl</label>
         <p id="ber-meldung" className="ber-meldung" aria-live="polite">{fehler ? <><CircleX {...symbol} />{fehler}</> : !geaendert ? "Wähl zuerst eine andere Stufe." : ""}</p>
-        <Knopf text="Abbrechen" variante="leise" className="ber-abbrechen" onClick={zu} /><Knopf text="Übernehmen" variante="haupt" disabled={!geaendert} aria-describedby="ber-meldung" onClick={() => {
+        <Knopf text="Abbrechen" variante="zweit" className="ber-abbrechen" onClick={zu} /><Knopf text="Übernehmen" variante="haupt" disabled={!geaendert} aria-describedby="ber-meldung" onClick={() => {
           const meldung = stufeUebernehmen(quelle, wahl, probe); setFehler(meldung); setProbe(false); if (!meldung) zu();
         }} />
       </div>
