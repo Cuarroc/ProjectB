@@ -1,6 +1,8 @@
 //! Kern von ProjectB: startet Coding-Agenten ohne Terminal, liest ihre
 //! JSON-Ereignisse live und kann sie anhalten (Technik-Probe, Schritt 3).
 
+pub mod pruefung;
+
 use serde_json::Value;
 use std::fmt;
 use std::io::{self, BufRead, BufReader, Read, Write};
