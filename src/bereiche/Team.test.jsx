@@ -4,10 +4,18 @@ import { Children, isValidElement } from "react";
 import { TeamAnsicht, anhalten } from "./Team";
 import { Agentenkarte } from "../bausteine/Agentenkarte";
 import { beispiel } from "../daten/beispiel";
+import { Knopf } from "../bausteine/Knopf";
 
 const ansicht = (daten = beispiel, aendern = vi.fn(), auswahl = null) => TeamAnsicht({ daten, aendern, auswahl, waehlen: vi.fn() });
-const karten = baum => Children.toArray(baum).flatMap(k => !isValidElement(k) ? [] : k.type === Agentenkarte ? [k] : karten(k.props.children));
+const karten = (baum, typ = Agentenkarte) => Children.toArray(baum).flatMap(k => !isValidElement(k) ? [] : k.type === typ ? [k] : karten(k.props.children, typ));
 describe("Team", () => {
+  it("speichert beim Anhalten ohne Beleg nur Originaldaten und erhält fertige Agenten", () => {
+    const daten = { ...beispiel, belege: [] }, aendern = vi.fn();
+    karten(ansicht(daten, aendern), Knopf).find(k => k.props.text === "Alle anhalten").props.onClick();
+    expect(aendern.mock.calls[0][0].agenten[0]).toEqual(beispiel.agenten[0]);
+    karten(ansicht(daten, aendern)).find(k => k.props.name === beispiel.agenten[1].name).props.onAktion();
+    expect(aendern.mock.calls[1][0].agenten[0]).toEqual(beispiel.agenten[0]);
+  });
   it.each([...new Set(beispiel.agenten.map(a => a.zustand)), "Problem"])("zeigt %s mit Wort und Symbol", zustand => {
     const daten = { ...beispiel, agenten: [{ ...beispiel.agenten[0], zustand }] };
     const html = renderToStaticMarkup(karten(ansicht(daten)).find(k => k.props.name === daten.agenten[0].name));

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ChartGantt, Kanban, LayoutGrid, OctagonPause, Users } from "lucide-react";
 import { Agentenkarte } from "../bausteine/Agentenkarte";
 import { Kachel } from "../bausteine/Kachel";
@@ -25,6 +25,7 @@ export function anhalten(daten: Datenstand, id?: string): Datenstand {
 
 type Props = { daten: Datenstand; auswahl: string | null; waehlen: (id: string | null) => void; aendern: (daten: Datenstand) => void; ansicht?: string; umschalten?: (wert: string) => void };
 export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karten", umschalten = () => {} }: Props) {
+  const original = daten;
   daten = mitBeleg(daten);
   const agenten = daten.agenten.slice(0, 3).sort((a, b) => Number(a.zustand === "Fertig") - Number(b.zustand === "Fertig"));
   const details = auswahl === "orchestrator" ? { id: "orchestrator", name: "Orchestrator", liveZeile: `Koordiniert ${agenten.length} Agenten`, anbieter: "Claude", modell: daten.chats[0]?.modell, zustand: teamAngehalten(agenten) ? "Wartet auf dich" : "Arbeitet", tokens: orchestratorBeispiel.tokens, laufzeitSekunden: jetzt, dateien: [], phasen: [], arbeitskopie: "", effort: "Hoch", fortschritt: 0, letzteZeilen: [], tests: null, schaetzung: null } as Agent : agenten.find(a => a.id === auswahl);
@@ -35,7 +36,7 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
   return <section className="team-bereich" aria-labelledby="team">
     <header className="team-kopf"><h2 id="team">Team</h2><span className="team-chip">{agenten.length} Agenten</span>
       <Umschalter className="team-ansichten" moeglichkeiten={["Karten", "Board", "Zeitstrahl"]} wert={ansicht} beschriftung="Team-Ansicht" onChange={umschalten} symbole={[LayoutGrid, Kanban, ChartGantt].map((Symbol, i) => <Symbol key={i} size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />)} />
-      <Knopf text="Alle anhalten" vorsatz={<OctagonPause size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="gefaehrlich" onClick={() => aendern(anhalten(daten))} /></header>
+      <Knopf text="Alle anhalten" vorsatz={<OctagonPause size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="gefaehrlich" onClick={() => aendern(anhalten(original))} /></header>
     {ansicht !== "Karten" && <div className="team-wechsel" key={ansicht}>
       <div className="team-summe"><span>Aufgaben <b>{fertig} / {daten.plan.schritte.length}</b></span><span>Tests grün <b>{tests.gruen} / {tests.gesamt}</b></span><span>Tokens <b>{tokens(gesamtTokens)}</b></span><span>Laufzeit <b>{dauer(jetzt)} min</b></span></div>
       {ansicht === "Board" ? <TeamBoard daten={daten} agenten={agenten} waehlen={waehlen} auswahl={auswahl} /> : <TeamZeitstrahl daten={daten} agenten={agenten} waehlen={waehlen} auswahl={auswahl} />}
@@ -61,7 +62,7 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
           zeitspur={spur(a)} zeile={a.liveZeile} tokens={tokens(a.tokens)} laufzeit={dauer(a.laufzeitSekunden)}
           gewaehlt={auswahl === a.id} onDetails={() => waehlen(auswahl === a.id ? null : a.id)}
           aktion={a.zustand === "Fertig" ? undefined : a.liveZeile.startsWith("Angehalten.") ? "Fortsetzen" : "Anhalten"}
-          onAktion={() => aendern(a.liveZeile.startsWith("Angehalten.") ? { ...daten, agenten: daten.agenten.map(agent => agent.id === a.id ? fortsetzen(agent) : agent) } : anhalten(daten, a.id))} />
+          onAktion={() => aendern(a.liveZeile.startsWith("Angehalten.") ? { ...original, agenten: original.agenten.map(agent => agent.id === a.id ? fortsetzen(agent) : agent) } : anhalten(original, a.id))} />
       </div>)}
     </div>
     </div>
@@ -73,7 +74,5 @@ export default function Team() {
   const [quelle] = useState(() => new BeispielQuelle());
   const [daten, setDaten] = useState(() => quelle.lesen()), [auswahl, waehlen] = useState<string | null>(null);
   const [ansicht, umschalten] = useState("Karten");
-  const bereich = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => { if (auswahl) bereich.current?.querySelector(`[data-agent="${auswahl}"]`)?.scrollIntoView({ block: "nearest", behavior: "instant" }); }, [auswahl]);
-  return <div className="team-spalte" ref={bereich}><TeamAnsicht daten={daten} auswahl={auswahl} waehlen={waehlen} ansicht={ansicht} umschalten={wert => { umschalten(wert); waehlen(null); }} aendern={neu => { quelle.aktualisieren(neu); setDaten(quelle.lesen()); }} /></div>;
+  return <div className="team-spalte"><TeamAnsicht daten={daten} auswahl={auswahl} waehlen={waehlen} ansicht={ansicht} umschalten={wert => { umschalten(wert); waehlen(null); }} aendern={neu => { quelle.aktualisieren(neu); setDaten(quelle.lesen()); }} /></div>;
 }

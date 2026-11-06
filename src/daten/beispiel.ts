@@ -20,6 +20,10 @@ export const orchestratorBeispiel = { tokens: 113000, laufzeitSekunden: 432,
 export const teamTestverlauf = [{ zeit: "14:31", gruen: 0 }, { zeit: "14:32", gruen: 6 },
   { zeit: "14:33", gruen: 10 }, { zeit: "14:34", gruen: 12 },
   { zeit: "14:35", gruen: 9, rot: 3 }, { zeit: "14:36", gruen: 21 }, { zeit: "14:37", gruen: 26 }];
+export const agentenTestverlauf: Record<string, { zeit: string; gruen: number }[]> = {
+  kern: [{ zeit: "14:31", gruen: 0 }, { zeit: "14:32", gruen: 4 }, { zeit: "14:34", gruen: 9 },
+    { zeit: "14:35", gruen: 9 }, { zeit: "14:36", gruen: 12 }, { zeit: "14:37", gruen: 14 }],
+};
 
 const schritt = (id: string, titel: string, agentId: string | null,
   zustand: Planschritt["zustand"], beschreibung: string): Planschritt => ({

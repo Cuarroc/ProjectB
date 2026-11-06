@@ -1,13 +1,19 @@
-.team-details{box-sizing:border-box;flex:none;max-height:54%;min-height:0;overflow:auto;margin:0 var(--abstand-4) var(--abstand-4);padding:var(--abstand-5);border-radius:var(--rund-eingabe);background:radial-gradient(120% 90% at 0% 0%,var(--detail-glanz),transparent 55%),var(--glas-grund);backdrop-filter:blur(var(--abstand-7));box-shadow:var(--schatten-schwebend);font:var(--schrift-klein);animation:team-details var(--dauer-lang) var(--kurve-raus)}
+.team-details{box-sizing:border-box;flex:none;max-height:54%;min-height:0;overflow:auto;isolation:isolate;margin:0 var(--abstand-4) var(--abstand-4);padding:var(--abstand-5);border-radius:var(--rund-eingabe);background:radial-gradient(120% 90% at 0% 0%,var(--detail-glanz),transparent 55%),var(--flaeche-1);box-shadow:var(--schatten-schwebend),var(--schatten-kante);font:var(--schrift-klein);animation:team-details var(--dauer-lang) var(--b-feder-weich)}
+.team-bereich:has(.team-details) .team-standard{overflow:hidden}
+.team-bereich:has(.team-details) .team-achse::before{content:"";position:absolute;inset:0 calc(-1 * var(--abstand-6));background:var(--flaeche-1);z-index:-1}
+.tm-arbeitskopie{display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 .team-bereich:has(.team-details) .team-kacheln{display:none}
 .team-bereich:has(.team-details) .team-liste>[data-agent]{flex:none;scroll-margin-bottom:var(--abstand-4)}
-.team-details:focus-visible{outline:1px solid var(--akzent)}
+.team-details:focus{outline:none}
 .tm-det{display:flex;flex-direction:column;gap:var(--abstand-4);min-width:0}
 .tm-det-kopf{display:flex;align-items:center;gap:var(--abstand-4);min-width:0}
 .tm-det-titel{flex:1;min-width:0}.tm-det-titel h3{font:var(--schrift-titel)}
-.team-details :is(h3,h4,p,dl){margin:0}.team-details p{color:var(--text-2);overflow-wrap:anywhere}
+.team-details :is(h3,h4,p,dl){margin:0}.team-details p{color:var(--text-2);overflow-wrap:break-word}.tm-det-titel p{overflow-wrap:normal}
 .tm-det-leiste{display:flex;align-items:center;flex-wrap:wrap;gap:var(--abstand-2);color:var(--text-2)}
-.team-details .statusmarke{color:var(--status-farbe);background:var(--status-grund)}
+.tm-status{display:flex;align-items:center;white-space:pre;color:var(--status-arbeitet-text);background:var(--status-arbeitet-grund);border-radius:var(--rund-voll);padding-right:var(--abstand-3)}
+.team-details .statusmarke{color:var(--status-farbe);background:var(--status-grund)}.tm-status .statusmarke{background:none;padding-right:0}
+.tm-status:has(.mk-wartet){color:var(--status-wartet-text);background:var(--status-wartet-grund)}.tm-status:has(.mk-fertig){color:var(--status-fertig);background:var(--status-fertig-grund)}.tm-status:has(.mk-problem){color:var(--status-problem);background:var(--status-problem-grund)}
+.tm-det-knoepfe{display:flex;gap:var(--abstand-2);margin-left:auto;flex-wrap:wrap}.tm-det-knoepfe .knopf-inhalt{white-space:nowrap}
 .tm-det-raster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--abstand-3)}
 .tm-dkarte{display:flex;flex-direction:column;gap:var(--abstand-3);min-width:0;padding:var(--abstand-4) var(--abstand-5) var(--abstand-5);border-radius:var(--rund-kachel);background:var(--flaeche-2);box-shadow:var(--schatten-kante)}
 .tm-dkarte h4{display:flex;align-items:center;gap:var(--abstand-2);font:var(--schrift-ueberschrift);flex-wrap:wrap}
@@ -20,10 +26,16 @@
 .tm-dateien{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--abstand-2)}
 .tm-dateien li{display:flex;align-items:center;gap:var(--abstand-2);min-width:0}.tm-dateien li>span{flex:1;min-width:0;overflow-wrap:anywhere}.tm-dateien small{display:block}
 .tm-dateien .knopf{flex:none}.tm-dkarte code{font:var(--schrift-code);overflow-wrap:anywhere}.tm-dkarte a{color:var(--akzent-text)}
-.tm-testplot{appearance:none;height:var(--abstand-2);width:100%;accent-color:var(--status-fertig)}
-.tm-testplot::-webkit-progress-bar{background:var(--grund);border-radius:var(--rund-voll)}.tm-testplot::-webkit-progress-value{background:var(--status-fertig);border-radius:var(--rund-voll)}
+.tm-zellen progress{display:block;margin-top:var(--abstand-2);appearance:none;height:var(--abstand-1);width:100%;accent-color:var(--status-arbeitet)}
+.tm-zellen progress::-webkit-progress-bar{background:var(--grund);border-radius:var(--rund-voll)}.tm-zellen progress::-webkit-progress-value{background:var(--status-arbeitet);border-radius:var(--rund-voll)}
+.tm-testplot{position:relative;height:calc(var(--abstand-8) * 3);color:var(--status-fertig)}.tm-testplot svg{width:100%;height:100%;overflow:visible}.tm-testplot polyline{fill:none;stroke:currentColor;stroke-width:1.5;vector-effect:non-scaling-stroke}.tm-testplot circle{fill:currentColor;stroke:var(--flaeche-2);stroke-width:2}
+.tm-testplot .tm-gitter{fill:none;stroke:var(--neutral-4);stroke-dasharray:2 3}.tm-testplot .tm-jetztlinie{stroke:var(--marke-jetzt);stroke-width:1}.tm-testplot .tm-rotpunkt{fill:var(--status-problem)}
+.tm-testplot>span{position:absolute;left:0;top:0;color:var(--text-2)}.tm-testplot .tm-null{top:auto;bottom:0}.tm-testplot>b{position:absolute;border-radius:var(--rund-voll);padding:0 var(--abstand-1);font:var(--schrift-klein)}.tm-testplot .tm-rot{left:50%;top:30%;color:var(--status-problem);background:var(--status-problem-grund)}.tm-testplot .tm-gruen{right:var(--abstand-1);bottom:0;background:var(--status-fertig-grund)}
+.team-details .tm-jetzt{color:var(--jetzt-text);background:var(--jetzt-glas);border-radius:var(--rund-voll);padding-inline:var(--abstand-2)}.tm-dkarte pre{font:var(--schrift-code);white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.team-details .zs{margin-top:var(--abstand-2)}.team-details .zs-schaetzung{overflow:hidden}.team-details .zs-ereignis{top:calc(-1 * var(--abstand-5))}
 @keyframes team-details{from{opacity:0;transform:translateY(var(--weg-gross))}to{opacity:1;transform:translateY(0)}}
 [data-bewegung=reduziert] .team-details{animation-name:team-details-ruhig}
 @keyframes team-details-ruhig{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){:root:not([data-bewegung=voll]) .team-details{animation-name:team-details-ruhig}}
 @media(width < 80em){.tm-det-raster{grid-template-columns:minmax(0,1fr)}.tm-zellen{grid-template-columns:repeat(2,minmax(0,1fr))}.team-details{max-height:42%}}
+@media(height < 54em) and (width >= 80em){.team-details{max-height:50%}}
