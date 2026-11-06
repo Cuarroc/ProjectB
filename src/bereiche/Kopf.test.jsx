@@ -14,6 +14,10 @@ describe("Kopf", () => {
     const html = renderToStaticMarkup(<Kopf />);
     for (const text of ["Claude", "Codex", "42", "51", "Genutzt", "Soll 48 %", "kopf-soll"]) expect(html).toContain(text);
   });
+  it("zeigt die benannte Berechtigung mit zwei von vier aktiven Stufenbalken", () => {
+    const html = renderToStaticMarkup(<Kopf />); expect(html).toContain("Berechtigungen: Nur bei Wichtigem");
+    expect(html.match(/data-an="true"/g)).toHaveLength(2); expect(html.match(/data-an="false"/g)).toHaveLength(2);
+  });
   it("liest geänderte Kontingente aus derselben Quelle wie der Chat", () => {
     const vorher = chatEingabeQuelle.lesen(), neu = structuredClone(vorher); neu.kopf.kontingent = { claude: 17, codex: 86 };
     try { chatEingabeQuelle.aktualisieren(neu); const html = renderToStaticMarkup(<Kopf />);

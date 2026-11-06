@@ -21,7 +21,10 @@
 .kopf-balken { position: relative; width: var(--leiste-breite); height: var(--abstand-1); background: var(--flaeche-3); border-radius: var(--rund-voll); }
 .kopf-balken > span { display: block; height: 100%; background: var(--genutzt-verlauf); border-radius: inherit; }
 .kopf-soll { position: absolute; top: calc(-1 * var(--abstand-1) / 2); height: var(--abstand-3); width: calc(var(--abstand-1) / 2); border-radius: 1px; background: var(--marke-soll); }
-.kopf-stufen, .kopf-knopf > .lucide-shield { color: var(--akzent); }
+.kopf-knopf > .lucide-shield { color: var(--akzent); }
+.kopf-stufen { display: flex; align-items: end; gap: calc(var(--abstand-1) / 2); height: var(--abstand-3); }
+.kopf-stufen i { width: calc(var(--abstand-1) / 2); background: var(--neutral-4); }
+.kopf-stufen i[data-an=true] { background: var(--akzent); }
 .kopf .rand-postfach { background: var(--flaeche-2); }
 .kopf-menue, .kopf .postfach-anker > p { position: absolute; z-index: var(--ebene-menue); top: calc(100% + var(--abstand-2)); left: 0; width: max-content; max-width: calc(100vw - 2 * var(--abstand-4)); box-sizing: border-box; margin: 0; padding: var(--abstand-5); border-radius: var(--rund-karte); background: var(--glas-grund); backdrop-filter: blur(var(--abstand-8)) saturate(1.5); box-shadow: var(--schatten-schwebend), inset 0 0 0 1px var(--neutral-4); color: var(--text-1); }
 .kopf-menue { display: flex; flex-direction: column; gap: var(--abstand-4); animation: kopf-auf var(--b-dauer-menue) var(--b-feder); transform-origin: top left; }

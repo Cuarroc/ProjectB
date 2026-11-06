@@ -62,7 +62,7 @@ export default function Kopf() {
       </span>)}
     </div>
     <button type="button" className="kopf-knopf" aria-label={`Berechtigungen: ${daten.berechtigungen.aktuell}`} aria-haspopup="dialog" ref={berechtigungen} onClick={() => dialog.current?.showModal()}>
-      <Shield {...symbol} /><span>{daten.berechtigungen.aktuell}</span><span className="kopf-stufen" aria-hidden="true">▂▃▅▇</span><ChevronDown {...symbol} />
+      <Shield {...symbol} /><span>{daten.berechtigungen.aktuell}</span><span className="kopf-stufen" aria-hidden="true">{[0, 1, 2, 3].map(i => <i key={i} data-an={i <= daten.berechtigungen.stufen.findIndex(s => s.name === daten.berechtigungen.aktuell)} style={{ height: `${(i + 1) * 25}%` }} />)}</span><ChevronDown {...symbol} />
     </button>
     <PostfachKnopf zahl={daten.kopf.postfach} />
     <KopfMenue name="Rollen" klasse="kopf-rollen" inhalt={<><IdCard {...symbol} /><span>Rollen</span></>}>
