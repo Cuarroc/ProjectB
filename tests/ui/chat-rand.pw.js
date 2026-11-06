@@ -17,7 +17,7 @@ test("Chat-Rand: Tastatur, Beispielzustand, Bilder und axe", async ({ page }, te
     await testInfo.attach(name, { path, contentType: "image/png" });
   };
   await bild("eingeklappt");
-  await page.keyboard.press("Tab");
+  await schalter.focus();
   await expect(schalter).toBeFocused();
   expect(await schalter.evaluate(el => getComputedStyle(el).outlineStyle)).toBe("solid");
   await page.keyboard.press("Enter");

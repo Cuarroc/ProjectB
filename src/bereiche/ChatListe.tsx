@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Mail, MessageSquare, PanelLeftClose, Plus } from "lucide-react";
+import { MessageSquare, PanelLeftClose, Plus } from "lucide-react";
+import { PostfachKnopf } from "./PostfachKnopf";
 import { BeispielQuelle } from "../daten/quelle";
 import { Fortschrittsring } from "../bausteine/Fortschrittsring";
 import { Knopf } from "../bausteine/Knopf";
@@ -10,8 +11,6 @@ export default function ChatListe({ quelle, offen, umschalten }: Props) {
   const [daten, setDaten] = useState(() => quelle.lesen()), [text, schreiben] = useState("");
   useEffect(() => { const lesen = () => setDaten(quelle.lesen()); lesen(); return quelle.abonnieren(lesen); }, [quelle]);
   const fertig = daten.plan.schritte.filter(s => s.zustand === "Fertig").length, gesamt = daten.plan.schritte.length;
-  const [postfachOffen, zeigePostfach] = useState(false);
-  const wartet = daten.kopf.postfach === 1 ? "wartet" : "warten";
   const aendern = (neu: typeof daten) => quelle.aktualisieren(neu);
   return <section className="chat-rand" aria-label="Chats und Aufgaben" data-offen={offen}>
     <button type="button" className="rand-schalter" aria-expanded={offen} aria-controls="rand-inhalt" onClick={umschalten}
@@ -35,11 +34,7 @@ export default function ChatListe({ quelle, offen, umschalten }: Props) {
             <Knopf text="Aufgabe hinzufügen" nurSymbol symbol={Plus} type="submit" />
           </form>
         </section>
-        <div className="rand-karte"><button type="button" className="rand-postfach" aria-expanded={postfachOffen} aria-controls="rand-postfach" onClick={() => zeigePostfach(!postfachOffen)}
-          aria-label={daten.kopf.postfach ? `Postfach ${daten.kopf.postfach > 99 ? "99+, " : ""}${daten.kopf.postfach} ${wartet} auf dich` : "Postfach"}>
-          <Mail size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />Postfach{" "}
-          {daten.kopf.postfach > 0 && <span className="rand-zaehler" aria-hidden="true">{daten.kopf.postfach > 99 ? "99+" : daten.kopf.postfach}</span>}
-        </button><p id="rand-postfach" hidden={!postfachOffen}>{daten.kopf.postfach ? `${daten.kopf.postfach} ${wartet} auf dich.` : "Nichts wartet auf dich."}</p></div>
+        <div className="rand-karte"><PostfachKnopf zahl={daten.kopf.postfach} /></div>
       </div>
     </div>
   </section>;
