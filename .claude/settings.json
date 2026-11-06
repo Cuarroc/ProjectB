@@ -26,5 +26,6 @@
     "engineering@synced": false,
     "rust-cli-skills@synced": false,
     "claude-review-loop@synced": false
-  }
+  },
+  "disableClaudeAiConnectors": true
 }

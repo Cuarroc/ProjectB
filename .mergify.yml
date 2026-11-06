@@ -8,6 +8,7 @@ shared:
     - check-success=zizmor
     - check-success=deny
     - check-success=Testzahl-Wächter
+    - check-success=oberflaeche
   # Am ursprünglichen PR geprüft, auch bei „@mergifyio queue“ (queue_conditions).
   freigabe: &freigabe
     - base=main
@@ -45,6 +46,10 @@ shared:
 queue_rules:
   - name: default
     merge_method: squash
+    # Bis zu 3 PRs in einem CI-Lauf (Elias, 06.11.2026). Feste Zeitgrenze, weil „auto“ PRs bei langsamer CI nach ~28 min warf.
+    batch_size: 3
+    batch_max_wait_time: 2 min
+    checks_timeout: 60 min
     queue_conditions: *freigabe
     # Am Entwurfs-PR der Queue geprüft: dort gibt es nur die CI, keine Review-Checks.
     merge_conditions:
