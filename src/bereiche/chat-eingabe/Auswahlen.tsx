@@ -58,7 +58,7 @@ export function Kontext({ chat, aendern }: { chat: Chat; aendern: (werte: Partia
   const fenster = chat.kontextfenster === 1000000 ? "1M" : "256k", prozent = Number.isFinite(chat.kontextProzent) ? `${Math.round(chat.kontextProzent)} %` : "–";
   return <Auswahl name="Kontext" wert={`Kontext ${prozent} · ${fenster}`} werte={["256k", "1M"]} fest={chat.modell !== "Opus 5.5"}
     aendern={w => aendern({ kontextfenster: w === "1M" ? 1000000 : 256000 })}>
-    <span className="wort">Kontext</span><Fortschrittsring wert={chat.kontextProzent} groesse={20} zustand="kontext" />
-    <span className="kontext-prozent">{prozent}<span className="wort-punkt"> ·</span></span>{fenster}
+    <span className="wort">Kontext</span>{" "}<Fortschrittsring wert={chat.kontextProzent} groesse={20} zustand="kontext" />
+    <span className="kontext-prozent">{prozent}<span className="wort-punkt"> ·</span></span>{" "}{fenster}
   </Auswahl>;
 }
