@@ -15,10 +15,10 @@ export function Umschalter({ moeglichkeiten, wert, beschriftung, onChange, class
     messen(); const beobachter = new ResizeObserver(messen); beobachter.observe(element);
     return () => beobachter.disconnect();
   }, [index, moeglichkeiten]);
-  return <div ref={gruppe} role="radiogroup" aria-label={beschriftung} className={`umschalter ${className}`}
+  return <div ref={gruppe} role="radiogroup" aria-label={beschriftung} className={`umschalter um ${className}`}
     >
-    <span className="umschalter-pille" aria-hidden="true" />
-    {moeglichkeiten.map((text, i) => <button type="button" role="radio" aria-checked={i === index} tabIndex={i === index ? 0 : -1}
+    <span className="umschalter-pille um-pille" aria-hidden="true" />
+    {moeglichkeiten.map((text, i) => <button type="button" role="radio" className="um-teil" aria-checked={i === index} tabIndex={i === index ? 0 : -1}
       key={text} onClick={() => onChange(text)} onKeyDown={event => {
         const schritte: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
         const ziel = event.key === "Home" ? 0 : event.key === "End" ? moeglichkeiten.length - 1
@@ -26,6 +26,6 @@ export function Umschalter({ moeglichkeiten, wert, beschriftung, onChange, class
         if (ziel === null) return;
         event.preventDefault(); onChange(moeglichkeiten[ziel]);
         gruppe.current?.querySelectorAll<HTMLButtonElement>("button")[ziel].focus();
-      }}><span>{text}</span><b aria-hidden="true">{text}</b></button>)}
+      }}><span data-t={text}>{text}</span></button>)}
   </div>;
 }
