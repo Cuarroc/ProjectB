@@ -9,6 +9,22 @@
     "letmewatch@synced": false,
     "workflow-audit@synced": false,
     "cowork-plugin-management@synced": false,
-    "auto-research@synced": false
+    "auto-research@synced": false,
+    "taste-skill@taste-skill": false,
+    "mattpocock-skills@claude-plugins-official": false,
+    "claude-code-setup@claude-plugins-official": false,
+    "claude-code-setup@synced": false,
+    "backend-design@synced": false,
+    "github@synced": false,
+    "product-management@synced": false,
+    "figma@synced": false,
+    "figma-to-code@synced": false,
+    "figma-suite@synced": false,
+    "design-dev-bridge@synced": false,
+    "design@synced": false,
+    "design-skills@synced": false,
+    "engineering@synced": false,
+    "rust-cli-skills@synced": false,
+    "claude-review-loop@synced": false
   }
 }
