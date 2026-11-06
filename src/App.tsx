@@ -1,6 +1,8 @@
 import "./App.css";
+import Vorschau from "./bausteine/Vorschau";
 
 export default function App() {
+  if (new URLSearchParams(window.location.search).get("vorschau") === "bausteine") return <Vorschau />;
   return (
     <div className="app-rahmen">
       <header className="app-kopf"><h1>ProjectB</h1></header>
