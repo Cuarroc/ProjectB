@@ -81,7 +81,8 @@ export const beispiel: Datenstand = {
   todos: [{ id: "export", text: "CSV-Export fertigstellen", fertig: false },
     { id: "speicherort", text: "Speicherort auswählen", fertig: false },
     { id: "pruefen", text: "Gesamtergebnis prüfen", fertig: false }],
-  ausgaben: [], belege: [],
+  ausgaben: [{ id: "export-protokoll", sitzungId: "kern", name: "Testprotokoll", pfad: "Ausgaben/export-tests.txt" }],
+  belege: [{ id: "dauer-pr", agentId: "dauer", titel: "12 von 12 Tests grün · Review ohne Funde", prLink: "https://github.com/Cuarroc/ProjectB/pull/57" }],
   kopf: { projekt: "ProjectB", pfad: "C:\\ProjectB", zweig: "main",
     kontingent: { claude: 42, codex: 51 }, postfach: 3 },
   berechtigungen: {

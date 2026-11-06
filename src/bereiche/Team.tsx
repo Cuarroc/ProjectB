@@ -9,6 +9,7 @@ import { Umschalter } from "../bausteine/Umschalter";
 import { TeamBoard, TeamZeitstrahl, spur, teamAngehalten } from "./TeamAnsichten";
 import type { Datenstand, Agent } from "../daten/typen";
 import "./Team.css";
+import { TeamDetails, mitBeleg } from "./TeamDetails";
 
 const status = { Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fertig", Problem: "problem" } as const;
 const jetzt = orchestratorBeispiel.laufzeitSekunden;
@@ -24,8 +25,9 @@ export function anhalten(daten: Datenstand, id?: string): Datenstand {
 
 type Props = { daten: Datenstand; auswahl: string | null; waehlen: (id: string | null) => void; aendern: (daten: Datenstand) => void; ansicht?: string; umschalten?: (wert: string) => void };
 export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karten", umschalten = () => {} }: Props) {
+  daten = mitBeleg(daten);
   const agenten = daten.agenten.slice(0, 3).sort((a, b) => Number(a.zustand === "Fertig") - Number(b.zustand === "Fertig"));
-  const details = auswahl === "orchestrator" ? { name: "Orchestrator", liveZeile: `Koordiniert ${agenten.length} Agenten`, anbieter: "Claude", modell: daten.chats[0]?.modell, arbeitskopie: null } : agenten.find(a => a.id === auswahl);
+  const details = auswahl === "orchestrator" ? { id: "orchestrator", name: "Orchestrator", liveZeile: `Koordiniert ${agenten.length} Agenten`, anbieter: "Claude", modell: daten.chats[0]?.modell, zustand: teamAngehalten(agenten) ? "Wartet auf dich" : "Arbeitet", tokens: orchestratorBeispiel.tokens, laufzeitSekunden: jetzt, dateien: [], phasen: [], arbeitskopie: "", effort: "Hoch", fortschritt: 0, letzteZeilen: [], tests: null, schaetzung: null } as Agent : agenten.find(a => a.id === auswahl);
   const fertig = daten.plan.schritte.filter(s => s.zustand === "Fertig").length;
   const alleAngehalten = teamAngehalten(agenten);
   const tests = agenten.reduce((summe, a) => ({ gruen: summe.gruen + (a.tests?.gruen ?? 0), gesamt: summe.gesamt + (a.tests?.gesamt ?? 0) }), { gruen: 0, gesamt: 0 });
@@ -63,10 +65,7 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
       </div>)}
     </div>
     </div>
-    {details && <aside id="team-details" className="team-details" aria-label={`Details: ${details.name}`}>
-      <header><h3>{details.name}</h3><Knopf text="Schließen" variante="leise" onClick={() => waehlen(null)} /></header>
-      <p>{details.liveZeile}</p><p>{details.anbieter} · {details.modell}{details.arbeitskopie && ` · Arbeitskopie ${details.arbeitskopie}`}</p>
-    </aside>}
+    {details && <TeamDetails agent={details} daten={daten} schliessen={() => waehlen(null)} />}
   </section>;
 }
 

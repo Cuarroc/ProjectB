@@ -53,4 +53,18 @@ describe("Team", () => {
     const html = renderToStaticMarkup(<Agentenkarte name="Test" modell="Codex" zustand="arbeitet" zeitspur={{ jetzt: 0, phasen: [] }} zeile="Testet" tokens="132k" laufzeit="6:12" aktion="Anhalten" />);
     expect(html).toContain("132k"); expect(html).toContain("6:12");
   });
+  it("zeigt Phasen, Dateien und den Beleg mit dem PR-Link aus den Daten", () => {
+    const html = renderToStaticMarkup(ansicht(beispiel, vi.fn(), "dauer"));
+    expect(html).toContain("Phasen"); expect(html).toContain("Beleg");
+    expect(html).toContain('href="https://github.com/Cuarroc/ProjectB/pull/57"');
+    const kern = renderToStaticMarkup(ansicht(beispiel, vi.fn(), "kern"));
+    expect(kern).toContain("src/export.rs"); expect(kern).toContain("Ansehen");
+  });
+  it.each([[], [{ agentId: "dauer", titel: "Tests grün", prLink: "" }], [{ agentId: "dauer", prLink: "   " }]].map(belege => ({ belege })))("zeigt ohne PR-Link kein Fertig am Agenten", ({ belege }) => {
+    const daten = { ...beispiel, belege };
+    const karte = karten(ansicht(daten)).find(k => k.props.name === beispiel.agenten[0].name);
+    expect(karte.props.zustand).not.toBe("fertig");
+    const html = renderToStaticMarkup(ansicht(daten, vi.fn(), "dauer"));
+    expect(html.match(/<aside[\s\S]*<\/aside>/)?.[0]).not.toContain(">Fertig<");
+  });
 });
