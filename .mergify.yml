@@ -8,6 +8,7 @@ shared:
     - check-success=zizmor
     - check-success=deny
     - check-success=Testzahl-Wächter
+    - check-success=oberflaeche
   # Am ursprünglichen PR geprüft, auch bei „@mergifyio queue“ (queue_conditions).
   freigabe: &freigabe
     - base=main
