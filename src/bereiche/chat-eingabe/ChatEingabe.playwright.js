@@ -14,10 +14,10 @@ async page => {
   pruefe(await modell.evaluate(e => e === document.activeElement), 'Esc gibt Fokus zurück');
   await modell.press('ArrowDown'); await page.keyboard.press('Tab');
   pruefe(await page.getByRole('menu').count() === 0, 'Tab schließt');
-  const kontext = page.getByRole('button', { name: 'Kontext zu 10 % belegt · Fenster 1M', exact: true }); await kontext.focus(); await kontext.press('ArrowDown');
+  const kontext = page.getByRole('button', { name: 'Kontext 10 % · 1M', exact: true }); await kontext.focus(); await kontext.press('ArrowDown');
   pruefe(await page.getByRole('menuitemradio', { name: '1M', exact: true }).evaluate(e => e === document.activeElement), 'Aktuelles Fenster fokussiert');
   await page.keyboard.press('Home'); await page.keyboard.press('Enter');
-  pruefe(await page.getByRole('button', { name: /Kontext zu 39 % belegt · Fenster 256k/ }).count() === 1, 'Füllung folgt der Fenstergröße');
+  pruefe(await page.getByRole('button', { name: 'Kontext 39 % · 256k', exact: true }).count() === 1, 'Füllung folgt der Fenstergröße');
   const feld = page.getByRole('textbox', { name: 'Nachricht an den Orchestrator' }); await feld.fill('Browsernachricht'); await feld.press('Shift+Enter');
   await feld.dispatchEvent('keydown', { key: 'Enter', isComposing: true }); pruefe(await feld.inputValue() === 'Browsernachricht\n', 'Shift+Enter und IME behalten Text'); await feld.press('Enter');
   pruefe(await feld.inputValue() === '', 'Enter sendet');

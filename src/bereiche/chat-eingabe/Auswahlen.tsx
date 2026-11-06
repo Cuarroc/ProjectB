@@ -33,7 +33,7 @@ export function Auswahl({ name, wert, werte, aendern, children, fest = false }: 
   const fokus = (i: number) => ort.current?.querySelectorAll<HTMLButtonElement>("[role=menuitemradio]")[(i + werte.length) % werte.length]?.focus();
   useEffect(() => {
     if (!offen) return;
-    fokus(Math.max(0, werte.findIndex(w => wert === w || wert.endsWith(`Fenster ${w}`))));
+    fokus(Math.max(0, werte.findIndex(w => wert === w || wert.endsWith(`· ${w}`))));
     const daneben = (e: PointerEvent) => { if (!ort.current?.contains(e.target as Node)) zu(); };
     document.addEventListener("pointerdown", daneben); return () => document.removeEventListener("pointerdown", daneben);
   }, [offen]); // Die Auswahl bleibt bis zur Bestätigung unverändert.
@@ -50,13 +50,13 @@ export function Auswahl({ name, wert, werte, aendern, children, fest = false }: 
       const i = [...e.currentTarget.querySelectorAll("button")].indexOf(document.activeElement as HTMLButtonElement);
       const ziel = e.key === "Home" ? 0 : e.key === "End" ? werte.length - 1 : e.key === "ArrowDown" ? i + 1 : e.key === "ArrowUp" ? i - 1 : null;
       if (ziel !== null) { e.preventDefault(); fokus(ziel); }
-    }}>{werte.map(w => <button type="button" role="menuitemradio" tabIndex={-1} aria-checked={wert === w || wert.endsWith(`Fenster ${w}`)} key={w}
+    }}>{werte.map(w => <button type="button" role="menuitemradio" tabIndex={-1} aria-checked={wert === w || wert.endsWith(`· ${w}`)} key={w}
       onClick={() => { aendern(w); zu(true); }}>{w}</button>)}</div>}
   </div>;
 }
 export function Kontext({ chat, aendern }: { chat: Chat; aendern: (werte: Partial<Chat>) => void }) {
   const fenster = chat.kontextfenster === 1000000 ? "1M" : "256k", prozent = Number.isFinite(chat.kontextProzent) ? `${Math.round(chat.kontextProzent)} %` : "–";
-  return <Auswahl name="Kontext" wert={`Kontext zu ${prozent} belegt · Fenster ${fenster}`} werte={["256k", "1M"]} fest={chat.modell !== "Opus 5.5"}
+  return <Auswahl name="Kontext" wert={`Kontext ${prozent} · ${fenster}`} werte={["256k", "1M"]} fest={chat.modell !== "Opus 5.5"}
     aendern={w => aendern({ kontextfenster: w === "1M" ? 1000000 : 256000 })}>
     <span className="wort">Kontext</span><Fortschrittsring wert={chat.kontextProzent} groesse={20} zustand="kontext" />
     <span className="kontext-prozent">{prozent}<span className="wort-punkt"> ·</span></span>{fenster}
