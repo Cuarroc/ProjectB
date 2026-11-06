@@ -47,9 +47,6 @@
 .kopf-voll .kopf-probe > span::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(105deg, transparent 34%, color-mix(in srgb, var(--marke-soll) 50%, transparent) 50%, transparent 66%) no-repeat; background-size: 300% 100%; background-position: 100% 0; mix-blend-mode: overlay; animation: kopf-glanz var(--b-schleife-glanz) linear infinite; }
 .kopf-menue [aria-disabled=true] { cursor: default; }
 .kopf-rollen .kopf-menue, .kopf .postfach-anker > p { left: auto; right: 0; }
-.kopf-dialog { border: 0; border-radius: var(--rund-bereich); background: var(--flaeche-2); color: var(--text-1); padding: var(--abstand-8); box-shadow: var(--schatten-schwebend); }
-.kopf-dialog form { margin-top: var(--abstand-6); }
-.kopf-dialog::backdrop { background: var(--scrim); backdrop-filter: blur(var(--scrim-unschaerfe)); }
 @keyframes kopf-auf { from { opacity: 0; transform: scale(var(--b-skala-menue)); } to { opacity: 1; transform: none; } }
 @keyframes kopf-blende { from { opacity: 0; } to { opacity: 1; } }
 @keyframes kopf-verlauf { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }

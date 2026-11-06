@@ -9,6 +9,7 @@ import type { Planschritt } from "../daten/typen";
 import "./ChatVerlauf.css";
 import "../bausteine/bausteine2.css";
 import Planfenster, { type PlanMarken } from "./Planfenster";
+import Interview, { type InterviewZustand } from "./Interview";
 
 const standardQuelle = new BeispielQuelle();
 const zustaende: Record<Planschritt["zustand"], Zustand> = {
@@ -23,6 +24,7 @@ type Props = {
 
 export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, onAntwort, onAktion }: Props) {
   const [daten, setDaten] = useState(() => quelle.lesen());
+  const [interviews, setInterviews] = useState<Record<string, InterviewZustand>>({});
   const [antworten, setAntworten] = useState<Record<string, string>>({});
   const [meldung, setMeldung] = useState("");
   const [planOffen, setPlanOffen] = useState(false);
@@ -51,6 +53,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
   return <>
     <header className="chat-kopf"><h2 id="chat">Chat</h2></header>
     <div className="chat-verlauf" role="log" aria-label="Chatverlauf" aria-relevant="additions text">
+      {chat?.modus === "Interview" && <Interview key={chat.id} zustand={interviews[chat.id] ?? { antworten: [], auswahl: "", frei: "" }} aendern={wert => setInterviews(v => ({ ...v, [chat.id]: wert }))} />}
       <ol className="chat-nachrichten">
         {chat?.verlauf.map(n => {
           const frage = daten.fragen.find(f => f.id === n.frageId);
