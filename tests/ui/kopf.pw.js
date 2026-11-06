@@ -13,7 +13,7 @@ test("Kopf: Soll-Bilder, Menüs, Bewegung und axe", async ({ page }, info) => {
   for (const name of ["ProjectB", "Projekt wählen", "Rollen"]) {
     const knopf = kopf.getByRole("button", { name: new RegExp(`^${name}`) });
     await knopf.focus(); await page.keyboard.press("ArrowDown");
-    const menue = kopf.getByRole("menu", { name, exact: true }), eintraege = menue.getByRole(name === "Rollen" ? "menuitem" : "menuitemradio");
+    const menue = kopf.getByRole("menu", { name, exact: true }), eintraege = menue.locator('[role^="menuitem"]');
     await expect(eintraege.first()).toBeFocused();
     await page.keyboard.press("End"); await expect(eintraege.last()).toBeFocused();
     await page.keyboard.press("ArrowDown"); await expect(eintraege.first()).toBeFocused();

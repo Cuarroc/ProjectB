@@ -1,0 +1,4 @@
+.anhalte-hinweis { display: flex; align-items: center; flex-wrap: wrap; gap: var(--abstand-2); padding: var(--abstand-3); margin-bottom: var(--abstand-3); border-radius: var(--rund-liste); background: var(--status-wartet-grund); color: var(--status-wartet-text); font: var(--schrift-klein); }
+.anhalte-hinweis > button { margin-left: auto; }
+.kopf > .knopf { flex-shrink: 0; }
+@media (width < 80rem) { .kopf-zweig { display: none; } .kopf-logo strong { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }

@@ -8,6 +8,7 @@ import { tokenMs } from "../bausteine/Tooltip";
 import type { Planschritt } from "../daten/typen";
 import "./ChatVerlauf.css";
 import "../bausteine/bausteine2.css";
+import { AnhalteHinweis, useAnhalten } from "./anhalten";
 
 const standardQuelle = new BeispielQuelle();
 const zustaende: Record<Planschritt["zustand"], Zustand> = {
@@ -21,6 +22,7 @@ type Props = {
 };
 
 export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, onAntwort, onAktion }: Props) {
+  const pause = useAnhalten();
   const [daten, setDaten] = useState(() => quelle.lesen());
   const [antworten, setAntworten] = useState<Record<string, string>>({});
   const [meldung, setMeldung] = useState("");
@@ -46,6 +48,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
   };
   return <>
     <header className="chat-kopf"><h2 id="chat">Chat</h2></header>
+    <AnhalteHinweis pause={pause} />
     <div className="chat-verlauf" role="log" aria-label="Chatverlauf" aria-relevant="additions text">
       <ol className="chat-nachrichten">
         {chat?.verlauf.map(n => {

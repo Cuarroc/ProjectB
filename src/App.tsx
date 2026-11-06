@@ -1,5 +1,6 @@
 import "./App.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { beobachteFragen } from "./bereiche/fragenHinweise";
 import { PanelRightOpen } from "lucide-react";
 import Vorschau from "./bausteine/Vorschau";
 import Vorschau3 from "./bausteine/Vorschau3";
@@ -11,6 +12,7 @@ import Team from "./bereiche/Team";
 
 export default function App() {
   const [linksOffen, setLinksOffen] = useState(false);
+  useEffect(() => beobachteFragen(chatEingabeQuelle), []);
   if (new URLSearchParams(window.location.search).get("vorschau") === "eingabe") return <Vorschau3 />;
   if (new URLSearchParams(window.location.search).get("vorschau") === "bausteine") return <Vorschau />;
   return (
