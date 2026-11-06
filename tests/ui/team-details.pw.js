@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 test("Team-Details: Tastatur, Beleg, Vorschau, Bewegung und bild-und-axe", async ({ page }, testInfo) => {
+  test.skip(process.env.UI_BASELINE === "1", "Die neuen Details werden am Kandidaten geprüft.");
   await page.goto("/");
   await page.evaluate(async () => { await document.fonts.ready; document.documentElement.dataset.bewegung = "voll"; });
   const karte = page.locator('.team-liste [data-agent="kern"] .ak-kopf');
