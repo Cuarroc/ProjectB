@@ -74,7 +74,7 @@ curl_stub() {
         if [[ ${!i} == --data-binary ]]; then i=$((i+1)); body=${!i}; fi
     done
     case " $* " in
-        *' https://api.github.com/repos/Cuarroc/ProjectB/installation '*)
+        *' https://api.github.com/repos/Cuarroc/ProjectB/installation '*|*' https://api.github.com/repos/Cuarroc/ProjectB-Leitstand/installation '*)
             [[ $auth == eyJ* && " $* " == *' -X GET '* ]] || return 1
             if [[ ${scenario:-} == installation_error ]]; then printf '%s' "$auth" >&2; return 1; fi
             if [[ ${scenario:-} == installation_invalid ]]; then printf 'null\n'; return; fi
@@ -93,9 +93,14 @@ curl_stub() {
                 empty) printf '{"total_count":0,"repositories":[]}' ;;
                 wrong_repo) printf '{"total_count":1,"repositories":[{"full_name":"Cuarroc/Fremd"}]}' ;;
                 inconsistent) printf '{"total_count":1,"repositories":[{"full_name":"Cuarroc/ProjectB"},{"full_name":"Cuarroc/ProjectB"}]}' ;;
+                duplicate) printf '{"total_count":2,"repositories":[{"full_name":"Cuarroc/ProjectB"},{"full_name":"Cuarroc/ProjectB"}]}' ;;
+                three) printf '{"total_count":3,"repositories":[{"full_name":"Cuarroc/ProjectB"},{"full_name":"Cuarroc/ProjectB-Leitstand"},{"full_name":"Cuarroc/Fremd"}]}' ;;
+                leitstand_only) printf '{"total_count":1,"repositories":[{"full_name":"Cuarroc/ProjectB-Leitstand"}]}' ;;
+                both) printf '{"total_count":2,"repositories":[{"full_name":"Cuarroc/ProjectB","owner":{"id":7}},{"full_name":"Cuarroc/ProjectB-Leitstand","owner":{"id":7}}]}' ;;
                 *) printf '{"total_count":1,"repositories":[{"id":9,"full_name":"Cuarroc/ProjectB","owner":{"id":7}}]}' ;;
             esac ;;
-        *' https://api.github.com/repos/Cuarroc/ProjectB/check-runs '*)
+        *' https://api.github.com/repos/Cuarroc/ProjectB/check-runs '*|*' https://api.github.com/repos/Cuarroc/ProjectB-Leitstand/check-runs '*)
+            [[ " $* " == *" https://api.github.com/repos/${expected_repo:-Cuarroc/ProjectB}/check-runs "* ]] || return 1
             [[ $auth == ghs_installation_token_test.v2-a.b-c && ${scenario:-} != test_only && " $* " == *' -X POST '* ]] || return 1
             [[ $body == *'"status":"completed"'* && $body == *'"title":"Titel \"Zitat\""'* ]] || return 1
             [[ $body == *"\"name\":\"${expected_name:-review/claude}\""* && $body == *"\"head_sha\":\"$sha\""* ]] || return 1
@@ -135,7 +140,21 @@ unset expected_name expected_conclusion
 output=$(scenario=test_only run --test)
 safe "$output"
 [[ $output == *'Repo-Grenze bestätigt'* ]]
-for scenario in installation_error installation_invalid token_error token_empty scope_error broad paginated empty wrong_repo inconsistent check_error; do
+# Zwei erlaubte Repos (ProjectB und Leitstand) bestehen die Repo-Grenze; Check-Runs auch im Leitstand.
+output=$(scenario=both run --test)
+safe "$output"
+[[ $output == *'Repo-Grenze bestätigt: Cuarroc/ProjectB Cuarroc/ProjectB-Leitstand'* ]]
+output=$(scenario=both expected_repo=Cuarroc/ProjectB-Leitstand run "$sha" success 'Titel "Zitat"' Text review/claude Cuarroc/ProjectB-Leitstand)
+safe "$output"
+[[ $output == *'Check-Run angelegt: review/claude (Cuarroc/ProjectB-Leitstand)'* ]]
+output=$(scenario=both run "$sha" success 'Titel "Zitat"' Text review/claude)
+[[ $output == *'Check-Run angelegt: review/claude (Cuarroc/ProjectB)'* ]]
+# Ziel-Repo muss in der Installation stehen; fremdes Ziel-Repo wird abgelehnt.
+if output=$(scenario=leitstand_only run "$sha" success 'Titel "Zitat"' Text); then exit 1; fi
+safe "$output"
+if output=$(run "$sha" success 'Titel "Zitat"' Text review/claude Cuarroc/Fremd); then exit 1; fi
+safe "$output"
+for scenario in installation_error installation_invalid token_error token_empty scope_error broad paginated empty wrong_repo inconsistent duplicate three check_error; do
     export scenario
     if output=$(run "$sha" success 'Titel "Zitat"' Text); then exit 1; fi
     safe "$output"
