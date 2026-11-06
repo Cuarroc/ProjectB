@@ -78,6 +78,24 @@ fn sichert_neue_und_geaenderte_dateien_und_laesst_sauberes_repo_unberuehrt() {
 }
 
 #[test]
+fn sichert_neue_datei_auch_bei_ausgeblendeten_unverfolgten_dateien() {
+    let temp = Temp::neu();
+    let repo = temp.repo("neue-datei");
+    git(&repo, &["config", "status.showUntrackedFiles", "no"]);
+    fs::write(repo.join("neu.txt"), "neu").unwrap();
+    assert!(git(&repo, &["status", "--porcelain"]).is_empty());
+
+    let bericht = alles_anhalten(vec![], std::slice::from_ref(&repo), STANDARD_FRIST);
+
+    let sha = git(&repo, &["rev-parse", "HEAD"]);
+    assert_eq!(bericht.ordner[0].status, Ordnerstatus::Gesichert { sha });
+    assert_eq!(git(&repo, &["rev-list", "--count", "HEAD"]), "2");
+    assert!(git(&repo, &["log", "-1", "--format=%s"]).starts_with("WIP: angehalten "));
+    assert_eq!(git(&repo, &["show", "HEAD:neu.txt"]), "neu");
+    assert!(git(&repo, &["status", "--porcelain", "--untracked-files=all"]).is_empty());
+}
+
+#[test]
 fn fehler_in_einem_ordner_verhindern_keine_weitere_sicherung() {
     let temp = Temp::neu();
     let kein_repo = temp.0.join("kein-repo");
