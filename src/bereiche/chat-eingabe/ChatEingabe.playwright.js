@@ -14,6 +14,13 @@ async page => {
   pruefe(await modell.evaluate(e => e === document.activeElement), 'Esc gibt Fokus zurück');
   await modell.press('ArrowDown'); await page.keyboard.press('Tab');
   pruefe(await page.getByRole('menu').count() === 0, 'Tab schließt');
+  for (const [name, danach] of [['Modell: Opus 5.5', 'Effort: Sehr hoch'], ['Effort: Sehr hoch', 'Kontext 10 % · 1M'], ['Kontext 10 % · 1M', 'Senden']]) {
+    const ausloeser = page.getByRole('button', { name, exact: true }); await ausloeser.focus(); await ausloeser.press('ArrowDown');
+    await page.keyboard.press('Shift+Tab'); await page.getByRole('menu').waitFor({ state: 'detached' });
+    pruefe(await ausloeser.evaluate(e => e === document.activeElement), `Umschalt+Tab behält Fokus bei ${name}`);
+    await page.keyboard.press('Tab');
+    pruefe(await page.getByRole('button', { name: danach, exact: true }).evaluate(e => e === document.activeElement), 'Tab geht danach weiter');
+  }
   const kontext = page.getByRole('button', { name: 'Kontext 10 % · 1M', exact: true }); await kontext.focus(); await kontext.press('ArrowDown');
   pruefe(await page.getByRole('menuitemradio', { name: '1M', exact: true }).evaluate(e => e === document.activeElement), 'Aktuelles Fenster fokussiert');
   await page.keyboard.press('Home'); await page.keyboard.press('Enter');

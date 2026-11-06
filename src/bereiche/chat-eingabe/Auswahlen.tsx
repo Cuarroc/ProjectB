@@ -46,7 +46,7 @@ export function Auswahl({ name, wert, werte, aendern, children, fest = false }: 
     {offen ? <span className="tt-ausloeser">{ausloeser}</span> : <Tooltip text={name === "Kontext" ? wert : `${name}: ${wert}`}>{ausloeser}</Tooltip>}
     {offen && <div className="ein-menue" role="menu" aria-label={name} onKeyDown={e => {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); zu(true); }
-      if (e.key === "Tab") setTimeout(() => zu(), 0);
+      if (e.key === "Tab") setTimeout(() => zu(document.activeElement === knopf.current), 0);
       const i = [...e.currentTarget.querySelectorAll("button")].indexOf(document.activeElement as HTMLButtonElement);
       const ziel = e.key === "Home" ? 0 : e.key === "End" ? werte.length - 1 : e.key === "ArrowDown" ? i + 1 : e.key === "ArrowUp" ? i - 1 : null;
       if (ziel !== null) { e.preventDefault(); fokus(ziel); }
