@@ -14,8 +14,8 @@ type Marke = { name: Markierung; start: number; ende: number };
 export type PlanMarken = Record<string, Marke>;
 const farbe = (name: Markierung) => `var(--markierung-${farben.find(f => f[0] === name)![1]})`;
 export function MarkierterText({ text, marke }: { text: string; marke?: Marke }) {
-  return marke ? <>{text.slice(0, marke.start)}<mark style={{ "--f": farbe(marke.name) } as CSSProperties}
-    aria-label={`${marke.name}, ${farben.find(f => f[0] === marke.name)![2]}`}>{text.slice(marke.start, marke.ende)}</mark>{text.slice(marke.ende)}</> : <>{text}</>;
+  return marke ? <>{text.slice(0, marke.start)}<mark style={{ "--f": farbe(marke.name) } as CSSProperties}>{text.slice(marke.start, marke.ende)}</mark>
+    <span className="pl-vorlesen"> ({marke.name}, {farben.find(f => f[0] === marke.name)![2]})</span>{text.slice(marke.ende)}</> : <>{text}</>;
 }
 export default function Planfenster({ daten, gespeicherteMarken, onSchliessen, onEntscheiden }: {
   daten: Datenstand; gespeicherteMarken: PlanMarken; onSchliessen: () => void; onEntscheiden: (plan: Plan, marken: PlanMarken) => void;
@@ -32,9 +32,9 @@ export default function Planfenster({ daten, gespeicherteMarken, onSchliessen, o
   const markieren = (id: string, name: Markierung) => {
     const s = plan.schritte.find(s => s.id === id)!;
     schrittAendern(id, { markierungen: s.markierungen.includes(name) ? s.markierungen.filter(m => m !== name) : [...s.markierungen, name] });
-    const a = auswahl.current?.id === id ? auswahl.current : { feld: "titel", start: 0, ende: s.titel.length };
+    const a = auswahl.current?.id === id ? auswahl.current : null;
     setMarken(m => s.markierungen.includes(name) ? Object.fromEntries(Object.entries(m).filter(([k, v]) => !k.startsWith(`${id}:`) || v.name !== name))
-      : { ...m, [`${id}:${a.feld}`]: { name, start: a.start, ende: a.ende } });
+      : a ? { ...m, [`${id}:${a.feld}`]: { name, start: a.start, ende: a.ende } } : m);
   };
   const erfassen = (id: string, element: HTMLElement, feld = "titel") => {
     const selection = window.getSelection();
@@ -42,7 +42,8 @@ export default function Planfenster({ daten, gespeicherteMarken, onSchliessen, o
     const r = selection.getRangeAt(0);
     if (!element.contains(r.commonAncestorContainer)) return;
     const davor = r.cloneRange(); davor.selectNodeContents(element); davor.setEnd(r.startContainer, r.startOffset);
-    auswahl.current = { id, feld, start: davor.toString().length, ende: davor.toString().length + r.toString().length };
+    const laenge = (range: Range) => { const inhalt = range.cloneContents(); inhalt.querySelectorAll(".pl-vorlesen").forEach(e => e.remove()); return inhalt.textContent?.length ?? 0; };
+    auswahl.current = { id, feld, start: laenge(davor), ende: laenge(davor) + laenge(r) };
   };
   const entscheiden = (freigeben: boolean) => {
     if (!freigeben && !plan.schritte.some(s => s.kommentar.trim())) { setHinweis("Schreib einen Kommentar, bevor du den Plan zurückgibst."); return; }
@@ -61,10 +62,11 @@ export default function Planfenster({ daten, gespeicherteMarken, onSchliessen, o
       </header>
       <ol className="pl-liste" tabIndex={0} aria-label="Planschritte">{plan.schritte.map((s, i) => {
         const agent = daten.agenten.find(a => a.id === s.agentId);
+        const titelfarbe = s.markierungen.find(m => m !== "Kommentar");
         return <li className="pl-schritt" key={s.id}>
           <div className="pl-streifen" aria-hidden="true">{s.markierungen.map(m => <span key={m} style={{ background: farbe(m) }} />)}</div>
           <div className="pl-kopfzeile"><span className="pl-nr">{i + 1}</span><div className="pl-kopftext">
-            <div className="pl-titelzeile"><h3 onMouseUp={e => erfassen(s.id, e.currentTarget)}><MarkierterText text={s.titel} marke={marken[`${s.id}:titel`]} /></h3>
+            <div className="pl-titelzeile"><h3 onMouseUp={e => erfassen(s.id, e.currentTarget)}><MarkierterText text={s.titel} marke={marken[`${s.id}:titel`] ?? (titelfarbe ? { name: titelfarbe, start: 0, ende: s.titel.length } : undefined)} /></h3>
               {s.markierungen.map(m => <span className="pl-marke" key={m} style={{ "--f": farbe(m) } as CSSProperties}>{m}</span>)}</div>
             <p className="pl-warum" onMouseUp={e => erfassen(s.id, e.currentTarget, "beschreibung")}><MarkierterText text={s.beschreibung} marke={marken[`${s.id}:beschreibung`]} /></p><div className="pl-chips"><span className="pl-chip"><Users size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{agent ? `${agent.anbieter} · ${agent.modell}` : "Orchestrator"}</span>{agent && <span className="pl-chip"><Zap size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{Math.round(agent.tokens / 1000)}k Tokens</span>}</div>
           </div></div>

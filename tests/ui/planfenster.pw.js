@@ -12,15 +12,28 @@ test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe"
   await dialog.getByRole("button", { name: "Mit Kommentaren zurückgeben", exact: true }).click();
   await expect(dialog.getByRole("status").last()).toContainText("Schreib einen Kommentar"); await expect(dialog).toBeVisible();
   const karte = dialog.locator(".pl-schritt").first();
+  const simpler = karte.getByRole("button", { name: "Simpler, Türkis", exact: true }), kommentarKnopf = karte.getByRole("button", { name: "Kommentar, Silbergrau", exact: true });
+  await simpler.click(); await kommentarKnopf.click();
+  await expect(karte.locator("mark")).toHaveAttribute("style", "--f: var(--markierung-simpler);");
+  await kommentarKnopf.click(); await expect(karte.locator("mark")).toHaveAttribute("style", "--f: var(--markierung-simpler);");
+  const innovativer = karte.getByRole("button", { name: "Innovativer, Pink", exact: true }); await innovativer.click();
+  await expect(karte.locator("mark")).toHaveAttribute("style", "--f: var(--markierung-simpler);");
+  await simpler.click(); await expect(karte.locator("mark")).toHaveAttribute("style", "--f: var(--markierung-innovativer);");
+  await innovativer.click(); await expect(karte.locator("mark")).toHaveCount(0);
   // Eine echte Teiltextauswahl darf beim Klick auf den Farbknopf nicht verloren gehen.
   await karte.locator("h3").evaluate(e => { const r = document.createRange(); r.setStart(e.firstChild, 0); r.setEnd(e.firstChild, 10);
     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); e.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })); });
   for (const [name, farbname] of [["Kommentar", "Silbergrau"], ["Ausarbeiten", "Violett"], ["Simpler", "Türkis"], ["Ausführlicher", "Gelb"], ["Innovativer", "Pink"]]) {
     const knopf = karte.getByRole("button", { name: `${name}, ${farbname}`, exact: true });
     await knopf.click(); await expect(knopf).toHaveAttribute("aria-pressed", "true");
-    await expect(karte.locator("mark")).toHaveAttribute("aria-label", `${name}, ${farbname}`);
+    await expect(karte.locator("h3 .pl-vorlesen")).toHaveText(`(${name}, ${farbname})`);
+    await expect(karte.getByRole("heading", { name: `Paketliste (${name}, ${farbname}) lesen`, exact: true })).toBeVisible();
     await expect(karte.locator("mark")).toHaveText("Paketliste");
   }
+  await karte.locator("h3").evaluate(e => { const r = document.createRange(); r.setStart(e.lastChild, 1); r.setEnd(e.lastChild, 6);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); e.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })); });
+  await karte.getByRole("button", { name: "Innovativer, Pink", exact: true }).click(); await karte.getByRole("button", { name: "Innovativer, Pink", exact: true }).click();
+  await expect(karte.locator("mark")).toHaveText("lesen");
   await expect(karte.getByText("Ausgearbeitet · Beispiel", { exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Schneller", exact: true }).click(); await dialog.getByRole("button", { name: "Neu schreiben lassen", exact: true }).click();
   await expect(dialog.getByRole("status").last()).toContainText("schneller geschrieben");
@@ -64,8 +77,8 @@ test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe"
   await dialog.locator(".pl-liste").evaluate(e => e.scrollTop = 0);
   await page.evaluate(() => document.documentElement.dataset.bewegung = "voll");
   const bild = process.env.PLAN_BILD ? `${process.env.PLAN_BILD}_${testInfo.project.name}.png` : testInfo.outputPath("plan.png");
-  await page.evaluate(() => document.activeElement.blur()); await page.screenshot({ path: bild });
+  await page.evaluate(() => document.activeElement.blur()); await page.mouse.move(0, 0); await page.screenshot({ path: bild });
   await testInfo.attach("Plan mit Markierung und Kommentar", { path: bild, contentType: "image/png" });
-  await dritter.getByRole("textbox").focus();
+  await dritter.getByRole("textbox").focus(); await dritter.evaluate(e => e.parentElement.scrollTop = e.offsetTop - e.parentElement.offsetTop);
   const kommentarBild = testInfo.outputPath("kommentar.png"); await page.screenshot({ path: kommentarBild }); await testInfo.attach("Offener Kommentar", { path: kommentarBild, contentType: "image/png" });
 });

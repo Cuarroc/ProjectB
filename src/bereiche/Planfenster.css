@@ -32,4 +32,5 @@
 .planfenster .statusmarke{color:var(--status-farbe);background:var(--status-grund);box-shadow:inset 0 0 0 1px var(--status-farbe)}
 .planfenster .pl-kopf h2{font:var(--schrift-abschnitt)}
 .pl-chips{display:flex;flex-wrap:wrap;gap:var(--abstand-2)}
+.pl-vorlesen{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @starting-style{.pl-marke{opacity:0}}
