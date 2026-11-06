@@ -60,6 +60,11 @@
   --genutzt: #5D5A82; /* Balken „Genutzt“ im Kontingent. */
   --genutzt-verlauf: linear-gradient(90deg, var(--genutzt), #9A93C8);
   --glas-grund: rgba(24,27,37,0.94); /* Menüs, Einstellungen, Tooltip: blur(24px) saturate(1.5). */
+  --markierung-kommentar: #C9D1DE;
+  --markierung-ausarbeiten: #B08CFF;
+  --markierung-simpler: #2FB5A3;
+  --markierung-ausfuehrlicher: #D8C95A;
+  --markierung-innovativer: #E0559A;
 
   /* Schriften */
   --font-sans: "Geist", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
