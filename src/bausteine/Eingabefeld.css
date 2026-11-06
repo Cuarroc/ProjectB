@@ -1,0 +1,27 @@
+.ein { position: relative; display: flex; flex-direction: column; gap: var(--abstand-3); width: 680px; max-width: 100%; box-sizing: border-box; padding: var(--abstand-5) var(--abstand-5) var(--abstand-4); border-radius: var(--rund-eingabe); background: var(--flaeche-2); box-shadow: var(--schatten-eingabe); }
+.ein:has(textarea:focus) { outline: 2px solid var(--akzent); outline-offset: 2px; }
+.ein textarea { box-sizing: border-box; width: 100%; min-height: 48px; max-height: 180px; field-sizing: content; margin: 0; padding: calc(var(--abstand-1) / 2); border: none; background: transparent; color: var(--text-1); font: var(--schrift-eingabe); resize: none; overflow-y: auto; outline: none; scrollbar-width: thin; scrollbar-color: var(--neutral-3) transparent; }
+.ein textarea::placeholder { color: var(--text-3); }
+.ein-leiste { display: flex; align-items: center; gap: var(--abstand-2); white-space: nowrap; min-width: 0; }
+.ein-leiste .luecke { flex: 1; }
+.ein-meldung { display: flex; align-items: center; gap: var(--abstand-2); margin: 0; font: var(--schrift-klein); color: var(--status-problem); white-space: normal; }
+.ein-meldung svg { flex: none; }
+.ein-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ein .kn { display: inline-flex; align-items: center; justify-content: center; gap: var(--abstand-2); height: var(--steuer-hoehe); padding: 0 var(--abstand-4); border: none; border-radius: var(--rund-knopf); font: var(--schrift-klein); font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color var(--dauer-kurz) var(--kurve-raus), color var(--dauer-kurz) var(--kurve-raus), transform var(--dauer-druck) var(--kurve-raus); }
+.ein .kn svg { flex: none; }
+.ein .kn:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
+.ein .kn-haupt { padding: 0 var(--abstand-6); background: var(--akzent); color: var(--akzent-tinte); font: var(--schrift-ueberschrift); font-weight: 650; box-shadow: var(--schatten-senden); }
+.ein .kn-leise { background: transparent; color: var(--text-2); }
+.ein .kn-symbol { width: var(--steuer-hoehe); padding: 0; }
+.ein .kn:disabled { background: var(--flaeche-3); color: var(--text-aus); box-shadow: none; cursor: not-allowed; transition: none; }
+.ein .kn-leise:disabled { background: transparent; }
+.ein .kn[aria-busy=true] { cursor: progress; transition: none; }
+.ein .kn-stapel { display: inline-grid; }
+.ein .kn-stapel > span { grid-area: 1/1; display: inline-flex; align-items: center; justify-content: center; gap: var(--abstand-2); }
+.ein .kn-stapel > .aus { visibility: hidden; }
+@media (hover: hover) and (pointer: fine) {
+  .ein .kn:active:not(:disabled):not([aria-disabled=true]):not(:focus-visible) { transform: scale(var(--skala-druck)); }
+  .ein .kn-haupt:hover:not(:disabled):not([aria-busy=true]) { background: color-mix(in srgb, var(--akzent) 80%, var(--akzent-text)); }
+  .ein .kn-leise:hover:not(:disabled) { background: var(--flaeche-3); color: var(--text-1); }
+}
+.eingabe-vorschau { display: flex; flex-direction: column; align-items: flex-start; gap: var(--abstand-6); padding: var(--abstand-7); min-height: 100dvh; box-sizing: border-box; background: var(--flaeche-1); }
