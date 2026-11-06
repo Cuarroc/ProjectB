@@ -1,5 +1,18 @@
 import type { Datenstand, Planschritt } from "./typen";
 
+export const modusEinstellungen = {
+  Ausführen: [
+    { name: "Agenten gleichzeitig", empfohlen: "Bis zu 3", werte: ["1", "Bis zu 3", "Bis zu 5"] },
+    { name: "Prüfung durch", empfohlen: "Andere Modellfamilie", werte: ["Andere Modellfamilie", "Gleiche Familie"] },
+    { name: "Prüfrunden höchstens", empfohlen: "3", werte: ["1", "2", "3"] },
+  ],
+  Planen: [
+    { name: "Plan", empfohlen: "Normal", werte: ["Kurz", "Normal", "Ausführlich"] },
+    { name: "Dauer und Tokens schätzen", empfohlen: "An", werte: ["An", "Aus"] },
+    { name: "Bei Unklarem nachfragen", empfohlen: "An", werte: ["An", "Aus"] },
+  ],
+} as const;
+
 export const orchestratorBeispiel = { tokens: 113000, laufzeitSekunden: 432,
   phasen: [{ art: "lesen", name: "Lesen", start: 0, ende: 40 },
     { art: "lesen", name: "Planen", start: 40, ende: 70 },
