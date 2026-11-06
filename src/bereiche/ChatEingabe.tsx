@@ -4,6 +4,7 @@ import type { Chat } from "../daten/typen";
 import { Eingabefeld } from "../bausteine/Eingabefeld";
 import { Modi, Auswahl, Kontext, EffortSymbol, efforts, erklaerungen, modi } from "./chat-eingabe/Auswahlen";
 import "./chat-eingabe/ChatEingabe.css";
+import { Einstellungen } from "./chat-eingabe/Einstellungen";
 
 export const chatEingabeQuelle = new BeispielQuelle();
 export function nachrichtAblegen(quelle: BeispielQuelle, text: string) {
@@ -20,7 +21,7 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, aendern, schre
     <span className="ein-sr" id="modus-hilfe">{erklaerungen[modi.indexOf(chat.modus)]}</span>
     <Eingabefeld id="chat-nachricht" text={text} onTextAendern={schreiben} onSenden={senden} fehler={fehler}
       ohneAnhaengen beschreibungId="modus-hilfe"
-      kopf={<Modi wert={chat.modus} aendern={modus => aendern({ modus: modus as Chat["modus"] })} />}
+      kopf={<div className="ein-moduszeile"><Modi wert={chat.modus} aendern={modus => aendern({ modus: modus as Chat["modus"] })} /><Einstellungen modus={chat.modus} /></div>}
       werkzeuge={<>
         <Auswahl name="Modell" wert={chat.modell} werte={modelle} aendern={modell => aendern({ modell, kontextfenster: modell === "Opus 5.5" ? chat.kontextfenster : 256000 })}>
           <span className="modell-punkt" /><span className="lang">{chat.modell}</span><span className="kurz">{chat.modell.split(/[ .-]/)[0]}</span>
