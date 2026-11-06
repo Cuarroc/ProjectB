@@ -13,7 +13,7 @@ describe("Zeitspur und Kennzahlen", () => {
   });
   it("trennt kurze Kapseln mit 2 px und behält die genaue Zeit als zugänglichen Namen", () => {
     const html = renderToStaticMarkup(<Zeitspur {...spur} />);
-    expect(html).toContain("- 2px"); expect(html).toContain("Bauen · 0:50 min · 14:30:10 bis 14:31:00");
+    expect(html).toContain("- var(--abstand-1) / 2"); expect(html).toContain("Bauen · 0:50 min · 14:30:10 bis 14:31:00");
   });
   it.each(["fertig", "problem", "wartet", "startet"])("zeigt bei %s keine Schätzung", zustand => {
     expect(renderToStaticMarkup(<Zeitspur {...spur} zustand={zustand} schaetzung={100} />)).not.toContain('class="zs-schaetzung"');
