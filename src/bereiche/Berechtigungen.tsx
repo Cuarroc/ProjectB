@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Check, ChevronDown, Circle, CircleX, FileText, Lock, Mail, Shield, X } from "lucide-react";
+import { Check, ChevronDown, Circle, CircleX, FileText, Lock, Mail, OctagonPause, Shield, X } from "lucide-react";
 import { Knopf } from "../bausteine/Knopf";
 import type { BeispielQuelle } from "../daten/quelle";
 import type { Berechtigungen as Rechte, Berechtigungsstufe } from "../daten/typen";
@@ -48,17 +48,17 @@ export default function Berechtigungen({ daten, quelle }: { daten: Rechte; quell
         </button>)}</div>
         <div className="ber-raster"><section className="ber-karte"><div className="ber-kartenkopf"><h3>Was er in der Stufe „{wahl}“ darf</h3><span className="ber-chip">{daten.regeln.length} Handlungen</span></div>
           <div className="ber-vert" aria-label={`Verteilung der ${daten.regeln.length} Handlungen`}>{arten.map(art => anzahl(art) > 0 && <span key={art} data-art={art} style={{ flex: anzahl(art) }} aria-label={`${anzahl(art)} ${art}`}>{anzahl(art)}</span>)}</div>
-          <div className="ber-achse" aria-hidden="true"><span>0</span><span>{daten.regeln.length / 2}</span><span>{daten.regeln.length} Handlungen</span></div>
+          <div className="ber-achse" aria-hidden="true"><span>0</span><span>{Math.floor(daten.regeln.length / 2)}</span><span>{daten.regeln.length} Handlungen</span></div>
           <div className="ber-legende">{arten.map(art => <span key={art} data-art={art}><i aria-hidden="true" />{art} <b>{anzahl(art)}</b></span>)}</div>
           <ul className="ber-liste">{daten.regeln.map(r => { const art = r.stufen[wahl], Symbol = symbole[art]; return <li key={r.text}>
             <span>{r.text}</span><span className="ber-pille" data-art={art}><Symbol {...symbol} fill={art === "Fragt dich" ? "currentColor" : "none"} />{art}</span>
           </li>; })}</ul>
         </section><div className="ber-spalte"><section className="ber-karte"><h3>Gilt immer, in jeder Stufe</h3><ul className="ber-immer">{daten.giltImmer.map(text => <li key={text}><Lock {...symbol} /><span>{text}</span></li>)}</ul>
-          <p className="ber-feld">Diese Grenzen stehen in den Regeln des Projekts und lassen sich hier nicht lockern.</p><p>„Alle anhalten“ wirkt sofort.</p><p><FileText {...symbol} /> Jede Freigabe steht mit Uhrzeit im Protokoll.</p>
+          <p className="ber-feld">Diese Grenzen stehen in den Regeln des Projekts und lassen sich hier nicht lockern.</p><ul className="ber-immer ber-auch"><li><FileText {...symbol} /><span>Jede Freigabe steht mit Uhrzeit im Protokoll.</span></li><li><OctagonPause {...symbol} /><span>„Alle anhalten“ wirkt sofort.</span></li></ul>
         </section><section className="ber-karte"><div className="ber-kartenkopf"><h3>Technisch</h3><span className="ber-chip">{wahl}</span></div><div className="ber-feld ber-technik">{technik[index].split(" · ").map(zeile => <code key={zeile}>{zeile}</code>)}</div></section></div></div>
       </div>
-      <div className="ber-fuss"><label className="ber-probe"><input type="checkbox" checked={probe} onChange={e => setProbe(e.target.checked)} />Nächstes Übernehmen schlägt fehl</label>
-        <p id="ber-meldung" className="ber-meldung" aria-live="polite">{fehler ? <><CircleX {...symbol} />{fehler}</> : !geaendert ? "Wähl zuerst eine andere Stufe." : ""}</p>
+      <div className="ber-fuss">{new URLSearchParams(globalThis.location?.search).has("beispielFehler") && <label className="ber-probe"><input type="checkbox" checked={probe} onChange={e => setProbe(e.target.checked)} />Nächstes Übernehmen schlägt fehl</label>}
+        <p id="ber-meldung" className={`ber-meldung${!fehler && !geaendert ? " ber-feld" : ""}`} aria-live="polite">{fehler ? <><CircleX {...symbol} />{fehler}</> : !geaendert ? "Wähl zuerst eine andere Stufe." : ""}</p>
         <Knopf text="Abbrechen" variante="zweit" className="ber-abbrechen" onClick={zu} /><Knopf text="Übernehmen" variante="haupt" disabled={!geaendert} aria-describedby="ber-meldung" onClick={() => {
           const meldung = stufeUebernehmen(quelle, wahl, probe); setFehler(meldung); setProbe(false); if (!meldung) zu();
         }} />

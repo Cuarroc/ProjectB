@@ -47,6 +47,7 @@
 .ber-pille[data-art="Fragt dich"], .ber-pille[data-art="Legt es dir hin"] { background: var(--status-wartet-grund); color: var(--status-wartet); }
 .ber-immer li { align-items: flex-start; min-height: 0; }
 .ber-immer svg { flex-shrink: 0; color: var(--text-2); }
+.ber-auch { border-top: 1px solid var(--flaeche-3); padding-top: var(--abstand-3); }
 .ber-feld { padding: var(--abstand-2) var(--abstand-3); background: var(--flaeche-2); border-radius: var(--rund-knopf); color: var(--text-2); overflow-wrap: anywhere; }
 .ber-karte code { font: var(--schrift-code); }
 .ber-fuss { display: flex; align-items: center; flex-wrap: wrap; gap: var(--abstand-3); padding: var(--abstand-4) var(--abstand-8) var(--abstand-6); box-shadow: var(--schatten-kante); }
@@ -54,5 +55,6 @@
 .ber-probe input { accent-color: var(--akzent); }
 .ber-meldung { flex: 1; display: flex; align-items: center; gap: var(--abstand-2); font: var(--schrift-klein); color: var(--text-2); }
 .ber-meldung:has(svg) { color: var(--status-problem); }
+.ber-meldung.ber-feld { flex: 0 1 auto; margin-left: auto; }
 .ber-inhalt:focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: calc(var(--abstand-1) / -2); }
 @media (hover: hover) and (pointer: fine) { .ber-stufe[aria-checked=false]:hover { background: var(--flaeche-3); } }

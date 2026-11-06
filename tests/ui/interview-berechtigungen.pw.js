@@ -9,9 +9,15 @@ test("Interview und Berechtigungen: bild-und-axe, Fokus und Beispielzustand", as
   const knopf = page.getByRole("button", { name: /^Berechtigungen:/ }), dialog = page.getByRole("dialog", { name: /Berechtigungen/ });
   const abbrechen = dialog.getByRole("button", { name: "Abbrechen" }), speichern = dialog.getByRole("button", { name: "Übernehmen" });
   await knopf.click(); await expect(abbrechen).toBeFocused(); await expect(speichern).toBeDisabled();
+  await expect.soft(dialog.getByLabel("Nächstes Übernehmen schlägt fehl")).toHaveCount(0);
+  expect.soft(await dialog.locator("#ber-meldung").evaluate(el => { const r = el.getBoundingClientRect(), b = el.nextElementSibling.getBoundingClientRect(); return getComputedStyle(el).backgroundColor !== "rgba(0, 0, 0, 0)" && b.left - r.right <= 16; })).toBe(true);
+  expect.soft(await dialog.locator(".ber-auch").evaluateAll(els => els.length === 1 && els[0].children[0].textContent.includes("Protokoll") && els[0].children[1].querySelector("svg") !== null && getComputedStyle(els[0]).borderTopStyle === "solid")).toBe(true);
   await expect(dialog.getByRole("radio")).toHaveCount(3); await bild("berechtigungen"); await axe();
   const grenzen = await dialog.evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && el.scrollWidth <= el.clientWidth; });
   expect(grenzen).toBe(true);
+  await page.evaluate(async () => { const { chatEingabeQuelle: q } = await import("/src/bereiche/ChatEingabe.tsx"); const d = q.lesen(); d.berechtigungen.regeln.pop(); q.aktualisieren(d); });
+  await expect.soft(dialog.locator(".ber-achse > span").nth(1)).toHaveText("4");
+  await page.goto("/?beispielFehler"); await knopf.click();
   await dialog.getByRole("radio", { name: /Vorsichtig/ }).click();
   const nieFarbe = await dialog.locator('.ber-legende [data-art="Nie"] i').evaluate(el => getComputedStyle(el).backgroundColor);
   await expect(dialog.locator('.ber-vert > [data-art="Nie"]')).toHaveCSS("background-color", nieFarbe);
