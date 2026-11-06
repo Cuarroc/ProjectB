@@ -7,8 +7,6 @@ import "./Kopf.css";
 export type Bewegung = "auto" | "voll" | "reduziert";
 export function bewegungSetzen(wahl: Bewegung, wurzel = document.documentElement) { wurzel.dataset.bewegung = wahl; }
 export function bewegungAktuell(wahl: Bewegung, reduziert: boolean) { return wahl === "auto" ? (reduziert ? "reduziert" : "voll") : wahl; }
-// Die Soll-Marke stammt aus Haupt.dc.html; die Auswahl bleibt in 0.1 eine lokale Vorschau.
-export const kopfBeispiele = { soll: 48, projekte: ["C:\\ProjectB", "C:\\ProjectB-Beispiel"] };
 const symbol = { size: 16, strokeWidth: 1.5, absoluteStrokeWidth: true, "aria-hidden": true } as const;
 
 function KopfMenue({ name, inhalt, children, klasse = "", beschriftung = name }: { name: string; inhalt: ReactNode; children: ReactNode; klasse?: string; beschriftung?: string }) {
@@ -24,7 +22,7 @@ function KopfMenue({ name, inhalt, children, klasse = "", beschriftung = name }:
   return <div className={`kopf-anker ${klasse}`} ref={ort} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) zeige(false); }}>
     <button ref={knopf} type="button" className="kopf-knopf" aria-label={name === "ProjectB" ? undefined : beschriftung} aria-haspopup="menu" aria-expanded={offen}
       onClick={() => zeige(!offen)} onKeyDown={e => { if (["ArrowDown", "ArrowUp"].includes(e.key)) { e.preventDefault(); zeige(true); } }}>{inhalt}</button>
-    {offen && <div className="kopf-menue" role="menu" aria-label={name} onClick={e => { if ((e.target as Element).closest("[role^=menuitem]")) zu(); }} onKeyDown={e => {
+    {offen && <div className="kopf-menue" role="menu" aria-label={name} onClick={e => { if ((e.target as Element).closest('[role^=menuitem]:not([aria-disabled=true])')) zu(); }} onKeyDown={e => {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); zu(); }
       if (e.key === "Tab") setTimeout(() => zeige(false), 0);
       const i = [...e.currentTarget.querySelectorAll("button")].indexOf(document.activeElement as HTMLButtonElement);
@@ -54,11 +52,11 @@ export default function Kopf() {
       </button>)}</div>
     </KopfMenue>
     <KopfMenue name="Projekt wählen" klasse="kopf-projekt" beschriftung={`Projekt wählen: ${projekt} ${daten.kopf.zweig}`} inhalt={<><Folder {...symbol} /><code>{projekt}</code>{" "}<code className="kopf-zweig">{daten.kopf.zweig}</code><ChevronDown {...symbol} /></>}>
-      <h2 role="presentation">Projekt wählen</h2>{kopfBeispiele.projekte.map(p => <button key={p} type="button" role="menuitemradio" tabIndex={-1} aria-checked={projekt === p} onClick={() => waehleProjekt(p)}>{p}</button>)}
+      <h2 role="presentation">Projekt wählen</h2>{daten.kopf.projekte.map(p => <button key={p} type="button" role="menuitemradio" tabIndex={-1} aria-checked={projekt === p} onClick={() => waehleProjekt(p)}>{p}</button>)}
     </KopfMenue>
-    <div className="kopf-kontingent" role="group" aria-label="Kontingent diese Woche · Genutzt · Weiße Marke: Soll 48 %">
-      {(["claude", "codex"] as const).map(a => <span className="kopf-nutzung" key={a} aria-label={`${a === "claude" ? "Claude" : "Codex"}: Genutzt ${daten.kopf.kontingent[a]} %, Soll ${kopfBeispiele.soll} %`}>
-        {a === "claude" ? "Claude" : "Codex"}<span className="kopf-balken" aria-hidden="true"><span style={{ width: `${daten.kopf.kontingent[a]}%` }} /><i className="kopf-soll" style={{ left: `${kopfBeispiele.soll}%` }} /></span><b>{daten.kopf.kontingent[a]} %</b>
+    <div className="kopf-kontingent" role="group" aria-label={`Kontingent diese Woche · Genutzt · Weiße Marke: Soll ${daten.kopf.kontingent.soll} %`}>
+      {(["claude", "codex"] as const).map(a => <span className="kopf-nutzung" key={a} aria-label={`${a === "claude" ? "Claude" : "Codex"}: Genutzt ${daten.kopf.kontingent[a]} %, Soll ${daten.kopf.kontingent.soll} %`}>
+        {a === "claude" ? "Claude" : "Codex"}<span className="kopf-balken" aria-hidden="true"><span style={{ width: `${daten.kopf.kontingent[a]}%` }} /><i className="kopf-soll" style={{ left: `${daten.kopf.kontingent.soll}%` }} /></span><b>{daten.kopf.kontingent[a]} %</b>
       </span>)}
     </div>
     <button type="button" className="kopf-knopf" aria-label={`Berechtigungen: ${daten.berechtigungen.aktuell}`} aria-haspopup="dialog" ref={berechtigungen} onClick={() => dialog.current?.showModal()}>
@@ -66,7 +64,7 @@ export default function Kopf() {
     </button>
     <PostfachKnopf zahl={daten.kopf.postfach} />
     <KopfMenue name="Rollen" klasse="kopf-rollen" inhalt={<><IdCard {...symbol} /><span>Rollen</span></>}>
-      <h2 role="presentation">Rollen</h2>{["Orchestrator", "Arbeiter Codex", "Prüfer Claude"].map(r => <button type="button" role="menuitem" tabIndex={-1} key={r}>{r}</button>)}
+      <h2 role="presentation">Rollen</h2>{["Orchestrator", "Arbeiter Codex", "Prüfer Claude"].map(r => <button type="button" role="menuitem" aria-disabled="true" tabIndex={-1} key={r}>{r}</button>)}
     </KopfMenue>
     <dialog className="kopf-dialog" aria-label="Berechtigungen" ref={dialog} onClose={() => berechtigungen.current?.focus()}><h2>Berechtigungen</h2><form method="dialog"><button className="kopf-knopf">Schließen</button></form></dialog>
   </header>;

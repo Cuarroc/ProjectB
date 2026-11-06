@@ -19,9 +19,11 @@ describe("Kopf", () => {
     expect(html.match(/data-an="true"/g)).toHaveLength(2); expect(html.match(/data-an="false"/g)).toHaveLength(2);
   });
   it("liest geänderte Kontingente aus derselben Quelle wie der Chat", () => {
-    const vorher = chatEingabeQuelle.lesen(), neu = structuredClone(vorher); neu.kopf.kontingent = { claude: 17, codex: 86 };
+    const vorher = chatEingabeQuelle.lesen(), neu = structuredClone(vorher); neu.kopf.kontingent = { claude: 17, codex: 86, soll: 57 };
     try { chatEingabeQuelle.aktualisieren(neu); const html = renderToStaticMarkup(<Kopf />);
-      expect(html).toContain("Genutzt 17 %, Soll 48 %"); expect(html).toContain("Genutzt 86 %, Soll 48 %");
+      expect(html).toContain("Genutzt 17 %, Soll 57 %"); expect(html).toContain("Genutzt 86 %, Soll 57 %");
+      expect(html.match(/class="kopf-soll" style="left:57%"/g)).toHaveLength(2);
+      expect(html).toContain("Weiße Marke: Soll 57 %"); expect(html).not.toContain("Soll 48 %");
     } finally { chatEingabeQuelle.aktualisieren(vorher); }
   });
 });

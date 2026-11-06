@@ -20,6 +20,11 @@ test("Kopf: Soll-Bilder, Menüs, Bewegung und axe", async ({ page }, info) => {
     await page.keyboard.press("ArrowUp"); await expect(eintraege.last()).toBeFocused();
     await page.keyboard.press("Home"); await expect(eintraege.first()).toBeFocused();
     await grenzen(menue); await expect(menue).toHaveCSS("background-color", "rgba(24, 27, 37, 0.94)"); await bild(name === "ProjectB" ? "logo-bewegung" : name);
+    if (name === "ProjectB") {
+      await expect.soft(menue.locator(".kopf-voll")).toHaveCSS("box-shadow", /1px.*inset/);
+      expect.soft(await menue.locator(".kopf-voll .kopf-probe > span").evaluate(el => [getComputedStyle(el).animationName, getComputedStyle(el, "::before").animationName].every(n => n !== "none"))).toBe(true);
+    }
+    if (name === "Rollen") for (const eintrag of await eintraege.all()) await expect.soft(eintrag).toHaveAttribute("aria-disabled", "true");
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.keyboard.press("Escape"); await expect(menue).toHaveCount(0); await expect(knopf).toBeFocused();
     await knopf.click(); await page.keyboard.press("Tab"); await expect(menue).toHaveCount(0);
@@ -32,6 +37,7 @@ test("Kopf: Soll-Bilder, Menüs, Bewegung und axe", async ({ page }, info) => {
   for (const [reducedMotion, text] of [["reduce", "Reduziert"], ["no-preference", "Voll"]]) {
     await page.emulateMedia({ reducedMotion }); await logo.click();
     await expect(kopf.locator(".kopf-gerade")).toHaveText(text);
+    expect(await kopf.locator(".kopf-voll .kopf-probe > span").evaluate(el => [getComputedStyle(el).animationName, getComputedStyle(el, "::before").animationName].every(n => n === "none"))).toBe(reducedMotion === "reduce");
     await expect(kopf.getByRole("menu")).toHaveCSS("animation-name", reducedMotion === "reduce" ? "kopf-blende" : "kopf-auf"); await page.keyboard.press("Escape");
   }
   await kopf.getByRole("button", { name: /^Projekt wählen/ }).click();

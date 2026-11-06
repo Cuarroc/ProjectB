@@ -34,7 +34,7 @@
 .kopf-menue-titel > span, .kopf-wahl > span:last-child { font: var(--schrift-klein); color: var(--text-2); }
 .kopf-bewegung { display: grid; grid-template-columns: 1fr 1fr; gap: var(--abstand-2); }
 .kopf-menue button { border: 0; padding: var(--abstand-3) var(--abstand-4); border-radius: var(--rund-liste); background: var(--flaeche-3); color: var(--text-1); font: var(--schrift-klein); text-align: left; cursor: pointer; }
-.kopf-menue .kopf-wahl { display: flex; flex-direction: column; gap: var(--abstand-2); }
+.kopf-menue .kopf-wahl { display: flex; flex-direction: column; gap: var(--abstand-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--marke-soll) 6%, transparent); }
 .kopf-wahl-titel { display: flex; align-items: center; gap: var(--abstand-2); font: var(--schrift-beschriftung); font-weight: 600; }
 .kopf-menue .kopf-auto { grid-column: 1 / -1; }
 .kopf-gerade { margin-left: auto; background: var(--akzent-grund); color: var(--akzent-text); }
@@ -43,12 +43,19 @@
 .kopf-probe { display: block; height: calc(var(--abstand-1) * 1.5); border-radius: var(--rund-segment); background: var(--flaeche-4); overflow: hidden; }
 .kopf-probe > span { display: block; width: 70%; height: 100%; background: linear-gradient(90deg, var(--akzent), var(--status-arbeitet)); border-radius: inherit; }
 .kopf-reduziert .kopf-probe > span { background: var(--neutral-3); }
+.kopf-voll .kopf-probe > span { position: relative; background-size: 200% 100%; animation: kopf-verlauf var(--b-schleife-verlauf) ease-in-out infinite alternate; }
+.kopf-voll .kopf-probe > span::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(105deg, transparent 34%, color-mix(in srgb, var(--marke-soll) 50%, transparent) 50%, transparent 66%) no-repeat; background-size: 300% 100%; background-position: 100% 0; mix-blend-mode: overlay; animation: kopf-glanz var(--b-schleife-glanz) linear infinite; }
+.kopf-menue [aria-disabled=true] { cursor: default; }
 .kopf-rollen .kopf-menue, .kopf .postfach-anker > p { left: auto; right: 0; }
 .kopf-dialog { border: 0; border-radius: var(--rund-bereich); background: var(--flaeche-2); color: var(--text-1); padding: var(--abstand-8); box-shadow: var(--schatten-schwebend); }
 .kopf-dialog form { margin-top: var(--abstand-6); }
 .kopf-dialog::backdrop { background: var(--scrim); backdrop-filter: blur(var(--scrim-unschaerfe)); }
 @keyframes kopf-auf { from { opacity: 0; transform: scale(var(--b-skala-menue)); } to { opacity: 1; transform: none; } }
 @keyframes kopf-blende { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kopf-verlauf { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@keyframes kopf-glanz { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0% 0; } }
+:root[data-bewegung=reduziert] .kopf-voll .kopf-probe > span, :root[data-bewegung=reduziert] .kopf-voll .kopf-probe > span::before { animation: none; }
+@media (prefers-reduced-motion: reduce) { :root:not([data-bewegung=voll]) .kopf-voll .kopf-probe > span, :root:not([data-bewegung=voll]) .kopf-voll .kopf-probe > span::before { animation: none; } }
 :root[data-bewegung=reduziert] .kopf-menue { animation: kopf-blende var(--dauer-lang) var(--kurve-raus); }
 @media (prefers-reduced-motion: reduce) { :root:not([data-bewegung=voll]) .kopf-menue { animation: kopf-blende var(--dauer-lang) var(--kurve-raus); } }
 @media (hover: hover) and (pointer: fine) { .kopf button:hover { background-color: var(--flaeche-4); } }
