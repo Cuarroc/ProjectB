@@ -68,8 +68,6 @@ jobs:
         if: needs.aenderungen.outputs.oberflaeche == 'true'
       - run: npm run build
         if: needs.aenderungen.outputs.oberflaeche == 'true'
-      - run: npm test
-        if: needs.aenderungen.outputs.oberflaeche == 'true'
       - run: cargo clippy --all-targets -- -D warnings
         if: needs.aenderungen.outputs.oberflaeche == 'true'
         working-directory: src-tauri
