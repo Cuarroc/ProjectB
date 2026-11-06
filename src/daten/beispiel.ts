@@ -1,15 +1,15 @@
 import type { Datenstand, Planschritt } from "./typen";
 
 const schritt = (id: string, titel: string, agentId: string | null,
-  zustand: Planschritt["zustand"]): Planschritt => ({
-  id, titel, agentId, zustand, dauerMinuten: 5, kommentar: "", markierungen: [],
+  zustand: Planschritt["zustand"], beschreibung: string): Planschritt => ({
+  id, titel, agentId, zustand, beschreibung, dauerMinuten: 5, kommentar: "", markierungen: [],
   fertigWenn: [{ text: "Tests grün und Review durch die andere Modellfamilie", erfuellt: zustand === "Fertig" }],
 });
 
 export const beispiel: Datenstand = {
-  chat: {
+  aktiverChatId: "csv-export", chats: [{
     id: "csv-export", titel: "Paketliste als CSV exportieren", modus: "Ausführen",
-    modell: "Opus 5.5", effort: "Hoch", kontextfenster: 1000000, kontextProzent: 10,
+    modell: "Opus 5.5", effort: "Hoch", kontextfenster: 1000000, kontextProzent: 10, gestartetUm: "14:30",
     verlauf: [
       { id: "auftrag", von: "Du", zeit: "14:30", aktionen: [],
         text: "Exportiere die Paketliste als CSV, mit Spalten für Status und Dauer." },
@@ -18,32 +18,42 @@ export const beispiel: Datenstand = {
       { id: "frage", von: "Orchestrator", zeit: "14:36", frageId: "speicherort", aktionen: [],
         text: "Frage von Knopf „Als CSV speichern“" },
     ],
-  },
+  }],
   agenten: [
     { id: "dauer", name: "Spalte „Dauer“ berechnen", anbieter: "Codex", modell: "gpt-6.1-sol",
       effort: "Hoch", zustand: "Fertig", fortschritt: 100, arbeitskopie: "csv-dauer",
-      liveZeile: "Tests grün", tokens: 28000, laufzeitSekunden: 180, phasen: [] },
+      liveZeile: "Tests grün", tokens: 28000, laufzeitSekunden: 180, phasen: [],
+      dateien: [], letzteZeilen: [], tests: { gruenSeit: "14:34", gruen: 2, gesamt: 2, verlauf: [] }, schaetzung: null },
     { id: "kern", name: "CSV-Export im Kern", anbieter: "Codex", modell: "gpt-6.1-sol",
       effort: "Hoch", zustand: "Arbeitet", fortschritt: 67, arbeitskopie: "csv-export",
       liveZeile: "cargo test export · 14 von 21 grün", tokens: 132000, laufzeitSekunden: 372,
+      dateien: [{ pfad: "src/export.rs", hinzugefuegt: 84, entfernt: 3 },
+        { pfad: "tests/export.rs", hinzugefuegt: 41, entfernt: 0 }, { pfad: "Cargo.toml", hinzugefuegt: 1, entfernt: 0 }],
+      letzteZeilen: ["test export::csv_kopfzeile … ok", "test export::csv_leer … ok", "test export::csv_umlaute … ok"],
+      tests: { gruenSeit: "14:34", gruen: 14, gesamt: 21,
+        verlauf: [{ zeit: "14:34", rot: 0 }, { zeit: "14:35", rot: 3 }, { zeit: "14:37", rot: 0 }] },
+      schaetzung: { fertigUm: "14:39", restMinuten: 2 },
       phasen: [{ name: "Lesen", start: "14:31:00", ende: "14:31:30" },
         { name: "Bauen", start: "14:31:30", ende: "14:34:00" },
         { name: "Testen", start: "14:34:00", ende: null }] },
     { id: "knopf", name: "Knopf „Als CSV speichern“", anbieter: "Claude", modell: "Opus 5.5",
       effort: "Hoch", zustand: "Wartet auf dich", fortschritt: 40, arbeitskopie: "csv-knopf",
-      liveZeile: "Wartet auf den Speicherort", tokens: 42000, laufzeitSekunden: 300, phasen: [] },
+      liveZeile: "Wartet auf den Speicherort", tokens: 42000, laufzeitSekunden: 300, phasen: [],
+      dateien: [], letzteZeilen: [], tests: null, schaetzung: null },
   ],
-  plan: { id: "csv-plan", titel: "CSV-Export", schritte: [
-    schritt("lesen", "Paketliste lesen", null, "Fertig"),
-    schritt("dauer", "Spalte „Dauer“ berechnen", "dauer", "Fertig"),
-    schritt("kern", "CSV-Export im Kern, mit Tests", "kern", "Arbeitet"),
-    schritt("knopf", "Knopf „Als CSV speichern“", "knopf", "Wartet auf dich"),
-    schritt("review", "Gesamtergebnis prüfen", null, "Offen"),
+  plan: { id: "csv-plan", titel: "CSV-Export", freigabe: "Freigegeben", schritte: [
+    schritt("lesen", "Paketliste lesen", null, "Fertig", "Die vorhandenen Paketdaten und Zustände erfassen."),
+    schritt("dauer", "Spalte „Dauer“ berechnen", "dauer", "Fertig", "Laufende Pakete brauchen eine Dauer bis jetzt."),
+    schritt("kern", "CSV-Export im Kern, mit Tests", "kern", "Arbeitet", "Der Kern liefert die Daten, alles andere baut darauf auf."),
+    schritt("knopf", "Knopf „Als CSV speichern“", "knopf", "Wartet auf dich", "Der Speicherort ist noch unklar."),
+    schritt("review", "Gesamtergebnis prüfen", null, "Offen", "Export und Knopf gemeinsam prüfen."),
   ] },
   fragen: [{ id: "speicherort", agentId: "knopf",
     text: "Wo soll die CSV-Datei standardmäßig gespeichert werden?",
     antwortknoepfe: [{ id: "downloads", text: "In Downloads" }, { id: "projekt", text: "Im Projektordner" }] }],
-  todos: [{ id: "export", text: "CSV-Export fertigstellen", fertig: false }],
+  todos: [{ id: "export", text: "CSV-Export fertigstellen", fertig: false },
+    { id: "speicherort", text: "Speicherort auswählen", fertig: false },
+    { id: "pruefen", text: "Gesamtergebnis prüfen", fertig: false }],
   ausgaben: [], belege: [],
   kopf: { projekt: "ProjectB", pfad: "C:\\ProjectB", zweig: "main",
     kontingent: { claude: 42, codex: 51 }, postfach: 3 },

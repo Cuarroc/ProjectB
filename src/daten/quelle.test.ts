@@ -3,10 +3,47 @@ import { beispiel } from "./beispiel";
 import { BeispielQuelle, type Datenquelle } from "./quelle";
 
 describe("BeispielQuelle", () => {
+  it("liefert Dateien, letzte Zeilen, Testverlauf und Schätzung für die Team-Details", () => {
+    const agent = new BeispielQuelle().lesen().agenten.find(a => a.id === "kern")!;
+    expect(agent.dateien).toEqual([{ pfad: "src/export.rs", hinzugefuegt: 84, entfernt: 3 },
+      { pfad: "tests/export.rs", hinzugefuegt: 41, entfernt: 0 }, { pfad: "Cargo.toml", hinzugefuegt: 1, entfernt: 0 }]);
+    expect(agent.letzteZeilen).toEqual(["test export::csv_kopfzeile … ok",
+      "test export::csv_leer … ok", "test export::csv_umlaute … ok"]);
+    expect(agent.tests).toMatchObject({ gruenSeit: "14:34", gruen: 14, gesamt: 21 });
+    expect(agent.tests!.verlauf).toContainEqual({ zeit: "14:35", rot: 3 });
+    expect(agent.schaetzung).toEqual({ fertigUm: "14:39", restMinuten: 2 });
+  });
+
+  it("liefert eine Chat-Liste mit aktivem Chat und Startzeit und kann den Chat wechseln", () => {
+    const quelle = new BeispielQuelle();
+    const daten = quelle.lesen();
+    expect(daten.chats?.find(c => c.id === daten.aktiverChatId)?.gestartetUm).toBe("14:30");
+    daten.chats.push({ ...daten.chats[0], id: "zweiter", titel: "Zweiter Auftrag", verlauf: [] });
+    daten.aktiverChatId = "zweiter";
+    quelle.aktualisieren(daten);
+    expect(quelle.lesen().chats.find(c => c.id === quelle.lesen().aktiverChatId)?.titel).toBe("Zweiter Auftrag");
+  });
+
+  it("liefert Schrittbeschreibungen und den Freigabestand des Plans", () => {
+    const quelle = new BeispielQuelle();
+    expect(quelle.lesePlan().schritte.find(s => s.id === "kern")?.beschreibung)
+      .toBe("Der Kern liefert die Daten, alles andere baut darauf auf.");
+    expect(quelle.lesePlan().freigabe).toBe("Freigegeben");
+    const daten = quelle.lesen();
+    daten.plan.freigabe = "Wartet auf dich";
+    quelle.aktualisieren(daten);
+    expect(quelle.lesePlan().freigabe).toBe("Wartet auf dich");
+  });
+
+  it("liefert drei Aufgaben für den Todo-Zähler", () => {
+    expect(new BeispielQuelle().lesen().todos).toHaveLength(3);
+  });
+
   it("liefert den CSV-Auftrag und drei Agenten in drei verschiedenen Zuständen", () => {
     const quelle: Datenquelle = new BeispielQuelle();
     const daten = quelle.lesen();
-    expect(daten.chat.verlauf[0].text).toBe("Exportiere die Paketliste als CSV, mit Spalten für Status und Dauer.");
+    expect(daten.chats.find(c => c.id === daten.aktiverChatId)?.verlauf[0].text)
+      .toBe("Exportiere die Paketliste als CSV, mit Spalten für Status und Dauer.");
     expect(daten.agenten).toHaveLength(3);
     expect(new Set(daten.agenten.map(a => a.zustand))).toEqual(new Set(["Arbeitet", "Wartet auf dich", "Fertig"]));
     expect(daten.fragen).toHaveLength(1);

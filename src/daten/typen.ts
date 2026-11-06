@@ -7,6 +7,11 @@ export type Agent = {
   zustand: Zustand; fortschritt: number; arbeitskopie: string;
   liveZeile: string; tokens: number; laufzeitSekunden: number;
   phasen: { name: string; start: string; ende: string | null }[];
+  dateien: { pfad: string; hinzugefuegt: number; entfernt: number }[];
+  letzteZeilen: string[];
+  tests: { gruenSeit: string | null; gruen: number; gesamt: number;
+    verlauf: { zeit: string; rot: number }[] } | null;
+  schaetzung: { fertigUm: string; restMinuten: number } | null;
 };
 export type Nachricht = {
   id: string; von: "Du" | "Orchestrator"; zeit: string; text: string;
@@ -16,9 +21,12 @@ export type Markierung = "Kommentar" | "Ausarbeiten" | "Simpler" | "Ausführlich
 export type Planschritt = {
   id: string; titel: string; agentId: string | null; zustand: Zustand | "Offen";
   dauerMinuten: number; fertigWenn: { text: string; erfuellt: boolean }[];
+  beschreibung: string;
   kommentar: string; markierungen: Markierung[];
 };
-export type Plan = { id: string; titel: string; schritte: Planschritt[] };
+export type Plan = {
+  id: string; titel: string; schritte: Planschritt[]; freigabe: "Wartet auf dich" | "Freigegeben";
+};
 export type Frage = {
   id: string; agentId: string | null; text: string; antwortknoepfe: Aktion[];
 };
@@ -27,7 +35,7 @@ export type Ausgabe = { id: string; sitzungId: string; name: string; pfad: strin
 export type Beleg = { id: string; agentId: string; titel: string; prLink: string };
 export type Kontingent = { claude: number; codex: number };
 export type Chat = {
-  id: string; titel: string; verlauf: Nachricht[];
+  id: string; titel: string; verlauf: Nachricht[]; gestartetUm: string | null;
   modus: "Ausführen" | "Planen" | "Interview";
   modell: string; effort: Effort; kontextfenster: number; kontextProzent: number;
 };
@@ -43,6 +51,7 @@ export type Berechtigungen = {
   giltImmer: string[];
 };
 export type Datenstand = {
-  chat: Chat; agenten: Agent[]; plan: Plan; fragen: Frage[]; todos: Todo[];
+  chats: Chat[]; aktiverChatId: string | null;
+  agenten: Agent[]; plan: Plan; fragen: Frage[]; todos: Todo[];
   ausgaben: Ausgabe[]; belege: Beleg[]; kopf: Kopf; berechtigungen: Berechtigungen;
 };
