@@ -13,6 +13,7 @@ pub mod pruefung;
 pub mod zustand;
 
 use serde_json::Value;
+pub mod arbeitskopie;
 use std::fmt;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
