@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Aufruf: bash werkzeuge/pruefer-check.sh SHA success|failure TITEL KURZTEXT [review/claude|review/codex]
+# Aufruf: bash werkzeuge/pruefer-check.sh SHA success|failure TITEL KURZTEXT [review/claude|review/codex] [REPO]
+# REPO: Cuarroc/ProjectB (Standard) oder Cuarroc/ProjectB-Leitstand. Die App darf keine weiteren Repos sehen.
 # --test prüft nur die Repo-Grenze, legt keinen Check an. Benötigt PRUEFER_APP_ID und PRUEFER_APP_KEY (PEM).
 set +x +v
 set -Eeuo pipefail
@@ -49,6 +50,18 @@ field() {
     [[ -n $value && $value != *$'\n'* ]] || return 1
     printf '%s' "$value"
 }
+# Repo-Grenze der Prüfer-App (Elias 05.11.2026: gleiche Regeln für den Leitstand).
+allowed_repos=(Cuarroc/ProjectB Cuarroc/ProjectB-Leitstand)
+repo_names() {
+    # Alle full_name-Werte einer installation/repositories-Antwort, eine Zeile je Repo.
+    local text
+    export -n text
+    text=$(cat); text=${text//$'\n'/}; text=${text//$'\r'/}
+    [[ $text =~ ^[[:space:]]*\{.*\}[[:space:]]*$ ]] || return 1
+    printf '%s' "$text" | grep -oE '"full_name"[[:space:]]*:[[:space:]]*"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+"' |
+        sed -E 's/^[^:]+:[[:space:]]*"//; s/"$//'
+}
+in_allowed() { local r; for r in "${allowed_repos[@]}"; do [[ $1 == "$r" ]] && return 0; done; return 1; }
 quote_json() {
     # Reines ASCII ausgeben: Windows-curl verfälscht Nicht-ASCII-Zeichen in argv (GitHub: „Problems parsing JSON“).
     # UTF-8 byteweise selbst dekodieren: MSYS-bash zählt Zeichen außerhalb der BMP als UTF-16-Paar.
@@ -88,13 +101,15 @@ api() {
         -H 'X-GitHub-Api-Version: 2022-11-28' -X "$1" "${args[@]}" "https://api.github.com/$2" 2>/dev/null
 }
 main() {
-    local mode=${1:-} sha conclusion title summary name jwt credential installation scope body
+    local mode=${1:-} sha conclusion title summary name repo=Cuarroc/ProjectB jwt credential installation scope body
+    local count names found n
     export -n jwt credential
     if [[ $mode != --test ]]; then
-        [[ $# -ge 4 && $# -le 5 ]] || return 1
-        sha=$1 conclusion=$2 title=$3 summary=$4 name=${5:-review/claude}
+        [[ $# -ge 4 && $# -le 6 ]] || return 1
+        sha=$1 conclusion=$2 title=$3 summary=$4 name=${5:-review/claude} repo=${6:-Cuarroc/ProjectB}
         [[ $sha =~ ^[[:xdigit:]]{40}$ && $conclusion =~ ^(success|failure)$ && -n $title && -n $summary ]] || return 1
         [[ $name == review/claude || $name == review/codex ]] || return 1
+        in_allowed "$repo" || return 1
     else
         [[ $# == 1 ]] || return 1
     fi
@@ -102,7 +117,7 @@ main() {
     build_jwt
     credential=$jwt
     # Die eindeutige Token-URL liefert die ID; die Antwort enthält zusätzlich z. B. account.id.
-    installation=$(api GET repos/Cuarroc/ProjectB/installation |
+    installation=$(api GET "repos/$repo/installation" |
         field access_tokens_url '"https://api[.]github[.]com/app/installations/[0-9]+/access_tokens"')
     installation=${installation#https://api.github.com/app/installations/}; installation=${installation%/access_tokens}
     [[ $installation =~ ^[0-9]+$ ]] || return 1
@@ -110,15 +125,21 @@ main() {
     [[ -n $credential && $credential != null && $credential != *$'\n'* ]] || return 1
     # Absichtlich unbeschränkten Installationstoken prüfen: eine zu breite Installation ist ein Fehler.
     scope=$(api GET 'installation/repositories?per_page=100')
-    [[ $(printf '%s' "$scope" | field total_count '[0-9]+') == 1 ]] || return 1
-    [[ $(printf '%s' "$scope" | field full_name '"Cuarroc/ProjectB"') == Cuarroc/ProjectB ]] || return 1
+    count=$(printf '%s' "$scope" | field total_count '[0-9]+')
+    names=$(printf '%s' "$scope" | repo_names)
+    mapfile -t found <<< "$names"
+    (( count >= 1 && count <= ${#allowed_repos[@]} && ${#found[@]} == count )) || return 1
+    # Jedes Repo höchstens einmal und nur aus der erlaubten Liste (ohne sort: Windows-sort kennt kein -u).
+    local -A seen=()
+    for n in "${found[@]}"; do in_allowed "$n" && [[ -z ${seen[$n]:-} ]] || return 1; seen[$n]=1; done
+    [[ " ${found[*]} " == *" $repo "* ]] || return 1
     if [[ $mode == --test ]]; then
-        printf 'Repo-Grenze bestätigt: Cuarroc/ProjectB\n'
+        printf 'Repo-Grenze bestätigt: %s\n' "${found[*]}"
         return
     fi
     body=$(printf '{"name":"%s","head_sha":"%s","status":"completed","conclusion":"%s","output":{"title":%s,"summary":%s}}' \
         "$name" "$sha" "$conclusion" "$(quote_json "$title")" "$(quote_json "$summary")")
-    api POST repos/Cuarroc/ProjectB/check-runs "$body" >/dev/null
-    printf 'Check-Run angelegt: %s\n' "$name"
+    api POST "repos/$repo/check-runs" "$body" >/dev/null
+    printf 'Check-Run angelegt: %s (%s)\n' "$name" "$repo"
 }
 if [[ ${BASH_SOURCE[0]} == "$0" ]]; then main "$@"; fi
