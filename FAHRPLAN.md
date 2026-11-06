@@ -1,6 +1,6 @@
 # ProjectB – Fahrplan
 
-Stand: 05.11.2026 · Aktueller Schritt: **4b** · Version 0.1 eingefroren (Elias, 30.10.2026) · Ziel: siehe `README.md`
+Stand: 06.11.2026 · Aktueller Schritt: **4b** · Version 0.1 eingefroren (Elias, 30.10.2026) · Ziel: siehe `README.md`
 
 ## Schritte
 
@@ -36,6 +36,20 @@ Die Bereiche links und rechts lassen sich einklappen. 0.1 ist fertig, wenn Elias
 Anfang bis Ende erledigt hat, ohne in den Code einzugreifen, und jede Funktion mindestens einmal lief. Was hakt,
 wird vor 0.2 behoben.
 
+## Version 0.2 (im Leerlauf, 0.1 hat Vorrang · Elias, 06.11.2026)
+
+1. **Ziel und Nachtmodus:** Ziel mit „Fertig, wenn …“, Frist und Grenzen. Der Nachtmodus arbeitet ohne Zwischenfragen
+   bis zur gewählten Zeit, morgens kommt ein Bericht. Zeitlimit („4 Stunden“, „Bis morgen 8 Uhr“).
+2. **Prompt bauen:** Aus einer groben Idee wird mit Rückfragen ein fertiger Auftrag. Du änderst ihn, bevor er losgeht.
+3. **Subagenten und direkter Chat:** Der Orchestrator mit seinen Subagenten ist sichtbar. Mit einem einzelnen Agenten
+   kannst du direkt schreiben, der Orchestrator liest mit.
+4. **Planfenster:** Aufwand und Risiko je Schritt, zwei Fassungen zum Vergleich.
+5. **Berechtigung „Maximal“:** mit vollem Browser und allen Werkzeugen. AGENTS.md Regeln 5–7 gelten weiter.
+6. **Chat-Werkzeuge:** Befehle /kompakt, /neu, /planen, /interview, /anhalten. Mit @ verweist du auf Dateien im Projekt
+   und auf Agenten. Anhänge (Bilder und Dateien) gehen per Plus-Knopf oder Hineinziehen.
+
+0.2 ist fertig, wenn Elias jede Funktion in einem echten Auftrag benutzt hat.
+
 ## Spielregeln
 
 - **Eingefroren:** geändert nur zwischen zwei Schritten und nur von Elias. Neue Ideen auf die Später-Liste.
@@ -46,9 +60,5 @@ wird vor 0.2 behoben.
 
 - Denkraum (Kandidat für 0.2); Server als zweiter Ort; Statistik je Modell; Updater
 - Weitere Anbieter mit Abo: OpenCode, Kimi, Ollama; Anpassung über Dateien (Teams, Rollen, Prüfstufen)
-- Chat-Werkzeuge: Befehle mit /, Verweise mit @, Anhänge, /kompakt
-- Ziel 0.2: Modus „Prompt bauen“, Ziel setzen, Nachtmodus, Ansicht der Subagenten, direkter Chat mit einem Agenten
-- Ziel 0.2: im Plan Aufwand und Risiko je Schritt, zwei Fassungen zum Vergleich
-- Ziel 0.2: Berechtigung „Maximal“ und Zeitlimit („4 Stunden“, „Bis morgen 8 Uhr“)
 - Vorschau und Kommentare an die Vorschau: über AgentsRoom gelöst (05.11.2026)
 - Leitstand-Prüfer-Benchmark: die zwei P3 aus Leitstand-PR #7 (Blindheit nur per Anweisung, Zusatzfunde in Fehler-Fällen)
