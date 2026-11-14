@@ -28,6 +28,12 @@ test("bild-und-axe: Alles anhalten und Weitermachen", async ({ page }, info) => 
   if (info.project.use.viewport.width < 1280) await expect(page.locator('.kopf-projekt > button > code').first()).toHaveCSS('display', 'none');
   expect(await page.locator('.team-liste .zs[aria-label="Zeitspur: Angehalten"] .zs-hinweis').evaluateAll(texte => texte.every(el => { const r = el.getBoundingClientRect(), spur = el.parentElement, linie = spur.querySelector('.zs-jetzt').getBoundingClientRect(); return r.left > linie.right && r.right <= spur.getBoundingClientRect().right; }))).toBe(true);
   await grenzen(); await bild("angehalten");
+  for (const id of ['kern', 'orchestrator']) {
+    await page.locator(`.team-liste [data-agent="${id}"] .ak-kopf`).click(); const details = page.locator('#team-details');
+    await expect(details.locator('.pause-marke')).toHaveText('Angehalten'); await expect(details).not.toContainText(/Wartet auf dich|Wartet 0:00|~/);
+    await details.locator('.zs').scrollIntoViewIfNeeded(); await grenzen(); await bild(`angehalten-details-${id}`);
+    await details.getByRole('button', { name: 'Schließen', exact: true }).click();
+  }
   await page.locator(".chat-spalte").getByRole("button", { name: /Weitermachen/ }).click();
   await expect(page.locator(".anhalte-hinweis")).toHaveCount(0);
   await page.locator(".team-kopf").getByRole("button", { name: "Alles anhalten", exact: true }).click();

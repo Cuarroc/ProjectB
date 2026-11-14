@@ -72,7 +72,7 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
       </div>)}
     </div>
     </div>
-    {details && <TeamDetails agent={details} daten={daten} schliessen={() => waehlen(null)} />}
+    {details && <TeamDetails agent={details} daten={daten} angehalten={pause && details.zustand !== "Fertig"} schliessen={() => waehlen(null)} />}
   </section>;
 }
 

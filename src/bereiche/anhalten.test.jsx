@@ -9,6 +9,14 @@ import { beobachteFragen, frageTon, leiserTon } from "./fragenHinweise";
 
 afterEach(() => { allesAnhalten.setzen(false); frageTon.setzen(true); });
 describe("Alles anhalten", () => {
+  it.each(["kern", "orchestrator"])("zeigt auch die Details von %s neutral und ohne laufende Schätzung", auswahl => {
+    const props = { daten: new BeispielQuelle().lesen(), auswahl, waehlen: vi.fn(), aendern: vi.fn() };
+    const details = pause => renderToStaticMarkup(<TeamAnsicht {...props} pause={pause} />).split("<aside")[1];
+    const html = details(true);
+    expect(html).toContain('class="mk pause-marke"'); expect(html).toContain('--detail-glanz:var(--status-offen-grund)');
+    expect(html).not.toMatch(/Wartet auf dich|Wartet 0:00|· Offen|~/);
+    if (auswahl === "kern") expect(details(false)).toContain("~14:39");
+  });
   it("zeigt neutrale Pausenmarken, keine Wartezeit und keine Einzel-Fortsetzung", () => {
     const daten = new BeispielQuelle().lesen(), props = { daten, auswahl: null, waehlen: vi.fn(), aendern: vi.fn() };
     const html = renderToStaticMarkup(<TeamAnsicht {...props} pause />);

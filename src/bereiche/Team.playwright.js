@@ -33,11 +33,11 @@ async page => {
   pruefe(await page.locator('[data-agent=kern] .mk').innerText() === 'Wartet auf dich', 'Anhalten ändert Zustand nicht');
   await page.locator('[data-agent=kern]').getByRole('button', { name:'Fortsetzen', exact:true }).click();
   pruefe(await page.locator('[data-agent=kern] .mk').innerText() === 'Arbeitet', 'Fortsetzen fehlt');
-  await page.getByRole('button', { name:'Alle anhalten', exact:true }).click();
-  pruefe(await page.locator('[data-agent=kern] .ak-fuss').innerText().then(t => t.includes('Angehalten.')), 'Alle anhalten wirkt nicht');
+  await page.locator('.team-kopf').getByRole('button', { name:'Alles anhalten', exact:true }).click();
+  pruefe(await page.locator('[data-agent=kern] .ak-fuss').innerText().then(t => t.includes('Angehalten.')), 'Alles anhalten wirkt nicht');
   pruefe(await page.locator('[data-agent=dauer] .mk').innerText() === 'Fertig', 'Fertiger Agent verändert');
-  await page.locator('[data-agent=knopf]').getByRole('button', { name:'Fortsetzen', exact:true }).click();
+  await page.locator('.kopf').getByRole('button', { name:'Weitermachen', exact:true }).click();
   pruefe(await page.locator('[data-agent=knopf] .mk').innerText() === 'Wartet auf dich', 'Offene Frage verloren');
   pruefe(await page.locator('[data-agent=knopf] .ak-fuss').innerText().then(t => t.includes('Wartet auf den Speicherort')), 'Vorzustand fehlt');
-  return 'Grün: 2 Fenstergrößen, Voll/Reduziert, Karten sichtbar, 12 px, kein Überlauf, Anhalten/Fortsetzen/Alle anhalten';
+  return 'Grün: 2 Fenstergrößen, Voll/Reduziert, Karten sichtbar, 12 px, kein Überlauf, Anhalten/Fortsetzen/Alles anhalten';
 }

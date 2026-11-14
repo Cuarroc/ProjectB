@@ -9,6 +9,7 @@ import { orchestratorBeispiel } from "../daten/quelle";
 import { agentenTestverlauf } from "../daten/beispiel";
 import { spur } from "./TeamAnsichten";
 import "./TeamDetails.css";
+import { AnhalteMarke } from "./anhalten";
 
 const status = { Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fertig", Problem: "problem" } as const;
 const dauer = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -16,10 +17,11 @@ export const belegFuer = (daten: Datenstand, id: string) => daten.belege.find(b 
 export const mitBeleg = (daten: Datenstand): Datenstand => ({ ...daten, agenten: daten.agenten.map(a => a.zustand === "Fertig" && !belegFuer(daten, a.id)
   ? { ...a, zustand: "Problem", liveZeile: "Beleg mit PR-Link fehlt" } : a) });
 
-export function TeamDetails({ agent, daten, schliessen }: { agent: Agent; daten: Datenstand; schliessen: () => void }) {
+export function TeamDetails({ agent, daten, schliessen, angehalten = false }: { agent: Agent; daten: Datenstand; schliessen: () => void; angehalten?: boolean }) {
+  if (angehalten) agent = { ...agent, schaetzung: null };
   const bereich = useRef<HTMLElement>(null), [vorschau, zeige] = useState<string | null>(null);
   const vorschauBereich = useRef<HTMLElement>(null), vorschauKnopf = useRef<HTMLButtonElement>(null);
-  const zustand = status[agent.zustand], beleg = belegFuer(daten, agent.id);
+  const zustand = angehalten ? "offen" : status[agent.zustand], beleg = belegFuer(daten, agent.id);
   const zeitspur = agent.id === "orchestrator" ? { jetzt: orchestratorBeispiel.laufzeitSekunden, phasen: [...orchestratorBeispiel.phasen] } : spur(agent);
   const ausgaben = daten.ausgaben.filter(a => a.sitzungId === agent.id);
   const phase = agent.id === "orchestrator" ? "koordiniert" : zeitspur.phasen.find(p => "laufend" in p && p.laufend)?.art;
@@ -49,17 +51,17 @@ export function TeamDetails({ agent, daten, schliessen }: { agent: Agent; daten:
   return <aside id="team-details" ref={bereich} tabIndex={-1} className="team-details" aria-label={`Details: ${agent.name}`} style={{ "--detail-glanz": `var(--status-${zustand}-grund)` } as CSSProperties}
     onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); zu(); } }}>
     <div className="tm-det">
-      <header className="tm-det-kopf"><Fortschrittsring wert={agent.zustand === "Problem" || agent.id === "orchestrator" ? undefined : agent.fortschritt} zustand={zustand} />
+      <header className="tm-det-kopf"><Fortschrittsring wert={agent.zustand === "Problem" || agent.id === "orchestrator" ? undefined : agent.fortschritt} zustand={zustand} beschriftung={angehalten ? "Angehalten" : undefined} />
         <div className="tm-det-titel"><h3>{agent.name}</h3><p>{agent.anbieter} · {agent.modell}{agent.arbeitskopie && <> · Arbeitskopie <span className="tm-arbeitskopie">{agent.arbeitskopie}</span></>}</p></div>
         <Knopf text="Schließen" symbol={X} nurSymbol variante="leise" onClick={zu} /></header>
-      <div className="tm-det-leiste"><span className="tm-status"><Statusmarke zustand={zustand} />{agent.zustand === "Arbeitet" && taetigkeit && ` · ${taetigkeit}`}</span>
+      <div className="tm-det-leiste"><span className="tm-status">{angehalten ? <AnhalteMarke /> : <Statusmarke zustand={zustand} />}{!angehalten && agent.zustand === "Arbeitet" && taetigkeit && ` · ${taetigkeit}`}</span>
         <div className="tm-det-knoepfe"><Knopf text="Protokoll öffnen" symbol={FileText} onClick={e => oeffnen(e, "Protokoll")} /><Knopf text="Agent fragen" symbol={MessageCircle} onClick={e => oeffnen(e, "Agent fragen")} /></div></div>
       <section className="tm-dkarte"><h4>Kennzahlen</h4><dl className="tm-zellen">{[
         ["Fortschritt", agent.id === "orchestrator" ? "–" : `${agent.fortschritt} %`], ["Laufzeit", `${dauer(agent.laufzeitSekunden)} min`],
         ["Tokens", `${(agent.tokens / 1000).toLocaleString("de-DE")}k`], ["Fertig um", agent.schaetzung ? `~${agent.schaetzung.fertigUm}` : "–"],
       ].map(([titel, wert]) => <div key={titel}><dt>{titel}</dt><dd>{wert}{titel === "Fortschritt" && agent.id !== "orchestrator" && <progress value={agent.fortschritt} max={100} aria-label="Fortschritt" />}</dd></div>)}</dl></section>
       <div className="tm-det-raster">
-        <section className="tm-dkarte"><h4>Phasen <small>Dauer in min</small></h4><Zeitspur {...zeitspur} zustand={zustand} />
+        <section className="tm-dkarte"><h4>Phasen <small>Dauer in min</small></h4><Zeitspur {...zeitspur} zustand={status[agent.zustand]} angehalten={angehalten} />
           <div className="team-diagramm-zeiten"><span>{agent.phasen[0]?.start.slice(0, 5) ?? "14:30"}</span><span className="tm-jetzt">Jetzt</span><span>{agent.schaetzung ? `~${agent.schaetzung.fertigUm}` : agent.phasen.at(-1)?.ende?.slice(0, 5)}</span></div>
           <div className="tm-phasenlegende">{zeitspur.phasen.map((p, i) => <span key={i}><i style={{ background: `var(--phase-${p.art}-verlauf)` }} />{p.name} <b>{dauer(p.ende - p.start)} min</b></span>)}{agent.schaetzung && <span>Noch <b>~{agent.schaetzung.restMinuten} min</b></span>}</div></section>
         <section className="tm-dkarte"><h4>Tests{agent.tests?.gruenSeit && ` grün seit ${agent.tests.gruenSeit}`}<small>Anzahl Tests</small></h4>
