@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 test("bild-und-axe: Alles anhalten und Weitermachen", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Globales Anhalten fehlt im Basisstand.");
   await page.goto("/"); await page.evaluate(() => document.fonts.ready);
   const bild = async name => { const path = info.outputPath(`${name}.png`); await page.screenshot({ path, animations: "disabled" }); await info.attach(name, { path, contentType: "image/png" }); };
   const grenzen = async () => {
