@@ -18,12 +18,14 @@ test("bild-und-axe: Alles anhalten und Weitermachen", async ({ page }, info) => 
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   };
   await grenzen(); await bild("normal");
+  for (const bereich of ['.kopf', '.team-kopf']) { const stopp = page.locator(bereich).getByRole('button', { name: 'Alles anhalten', exact: true }); await expect(stopp).toHaveAttribute('data-variante', 'zweit'); await expect(stopp.locator('svg.lucide-octagon-pause')).toHaveCount(1); }
   await page.locator(".kopf").getByRole("button", { name: "Alles anhalten", exact: true }).click();
   await expect(page.locator(".kopf")).toContainText("Angehalten");
   await expect(page.locator(".chat-spalte .anhalte-hinweis")).toContainText("Angehalten");
   await expect(page.locator(".team-spalte .anhalte-hinweis")).toContainText("Angehalten");
   await expect(page.locator(".team-kopf").getByRole("button", { name: "Alles anhalten" })).toHaveCount(0);
   await expect(page.locator(".team-liste .pause-marke")).toHaveCount(3);
+  if (info.project.use.viewport.width < 1280) await expect(page.locator('.kopf-projekt > button > code').first()).toHaveCSS('display', 'none');
   expect(await page.locator('.team-liste .zs[aria-label="Zeitspur: Angehalten"] .zs-hinweis').evaluateAll(texte => texte.every(el => { const r = el.getBoundingClientRect(), spur = el.parentElement, linie = spur.querySelector('.zs-jetzt').getBoundingClientRect(); return r.left > linie.right && r.right <= spur.getBoundingClientRect().right; }))).toBe(true);
   await grenzen(); await bild("angehalten");
   await page.locator(".chat-spalte").getByRole("button", { name: /Weitermachen/ }).click();

@@ -41,7 +41,7 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
   return <section className="team-bereich" aria-labelledby="team">
     <header className="team-kopf"><h2 id="team">Team</h2><span className="team-chip">{agenten.length} Agenten</span>
       <Umschalter className="team-ansichten" moeglichkeiten={["Karten", "Board", "Zeitstrahl"]} wert={ansicht} beschriftung="Team-Ansicht" onChange={umschalten} symbole={[LayoutGrid, Kanban, ChartGantt].map((Symbol, i) => <Symbol key={i} size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />)} />
-      {!pause && <Knopf text="Alles anhalten" vorsatz={<OctagonPause size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="gefaehrlich" onClick={() => allesStoppen ? allesStoppen() : aendern(anhalten(original))} />}</header>
+      {!pause && <Knopf text="Alles anhalten" symbol={OctagonPause} onClick={() => allesStoppen ? allesStoppen() : aendern(anhalten(original))} />}</header>
     <AnhalteHinweis pause={pause} />
     {ansicht !== "Karten" && <div className="team-wechsel" key={ansicht}>
       <div className="team-summe"><span>Aufgaben <b>{fertig} / {daten.plan.schritte.length}</b></span><span>Tests grün <b>{tests.gruen} / {tests.gesamt}</b></span><span>Tokens <b>{tokens(gesamtTokens)}</b></span><span>Laufzeit <b>{dauer(jetzt)} min</b></span></div>
