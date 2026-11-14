@@ -2,13 +2,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { allesAnhalten, AnhalteKnopf } from "./anhalten";
 import Kopf from "./Kopf";
-import Team from "./Team";
+import Team, { TeamAnsicht, anhalten } from "./Team";
 import ChatVerlauf from "./ChatVerlauf";
 import { BeispielQuelle } from "../daten/quelle";
 import { beobachteFragen, frageTon, leiserTon } from "./fragenHinweise";
 
 afterEach(() => { allesAnhalten.setzen(false); frageTon.setzen(true); });
 describe("Alles anhalten", () => {
+  it("zeigt neutrale Pausenmarken, keine Wartezeit und keine Einzel-Fortsetzung", () => {
+    const daten = new BeispielQuelle().lesen(), props = { daten, auswahl: null, waehlen: vi.fn(), aendern: vi.fn() };
+    const html = renderToStaticMarkup(<TeamAnsicht {...props} pause />);
+    expect(html.match(/class="ak offen[^]*?class="mk pause-marke"/g)).toHaveLength(3);
+    expect(html).not.toContain("Wartet 0:00");
+    expect(html).not.toMatch(/>Fortsetzen<\/button>/);
+    expect(renderToStaticMarkup(<TeamAnsicht {...props} daten={anhalten(daten, "kern")} />)).toMatch(/>Fortsetzen<\/button>/);
+    expect(renderToStaticMarkup(AnhalteKnopf({ pause: true }))).not.toContain("Angehalten ·");
+    expect(html).not.toMatch(/>Alle anhalten<|>Alles anhalten</);
+  });
   it("hält Kopf, Team und Chat gemeinsam an und setzt sie mit einem Klick fort", () => {
     const abo = vi.fn(), abmelden = allesAnhalten.abonnieren(abo);
     const anzeigen = () => [Kopf, Team, ChatVerlauf].map(Komponente => renderToStaticMarkup(<Komponente />));
@@ -16,7 +26,7 @@ describe("Alles anhalten", () => {
     AnhalteKnopf({ pause: false }).props.onClick();
     expect(allesAnhalten.lesen()).toBe(true);
     for (const html of anzeigen()) { expect(html).toContain("Angehalten"); expect(html).toContain("Weitermachen"); }
-    expect(anzeigen()[1]).toContain("Angehalten. Weiter mit Weitermachen.");
+    expect(anzeigen()[1]).toContain("Angehalten.");
     AnhalteKnopf({ pause: true }).props.onClick();
     expect(allesAnhalten.lesen()).toBe(false); expect(anzeigen()).toEqual(vorher);
     expect(abo).toHaveBeenCalledTimes(2); abmelden();
