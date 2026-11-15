@@ -58,3 +58,13 @@
 @media (hover: hover) and (pointer: fine) { .kopf button:hover { background-color: var(--flaeche-4); } }
 @media (width < 90rem) { .kopf-rollen > button > span { display: none; } }
 @media (width < 80rem) { .kopf-balken { width: calc(var(--abstand-8) + var(--abstand-4)); } .kopf-kontingent, .kopf-nutzung { gap: var(--abstand-2); } }
+
+.kopf-projekt .kopf-menue { width: calc(6 * var(--leiste-breite) + var(--abstand-2)); max-height: calc(100dvh - var(--kopf-hoehe) - 2 * var(--abstand-4)); }
+.kopf-projekte { display: flex; flex-direction: column; gap: var(--abstand-3); overflow-y: auto; min-height: 0; padding: var(--abstand-2); margin: calc(-1 * var(--abstand-2)); }
+.kopf-projekte button { flex: none; overflow-wrap: anywhere; }
+.kopf-pfad label { font: var(--schrift-beschriftung); }
+.kopf-pfad input { box-sizing: border-box; width: 100%; min-width: 0; height: var(--steuer-hoehe); padding: calc(var(--abstand-1) / 2); border: 0; background: transparent; color: var(--text-1); font: var(--schrift-code); outline: none; }
+.kopf-pfad:has(input:focus) { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: calc(var(--abstand-1) / 2); }
+.kopf-pfad input::placeholder { color: var(--text-3); }
+.kopf-pfad .ein-meldung { overflow-wrap: anywhere; }
+.kopf-projekt > button > span, .kopf-zweig { max-width: calc(3 * var(--leiste-breite)); overflow: hidden; text-overflow: ellipsis; }
