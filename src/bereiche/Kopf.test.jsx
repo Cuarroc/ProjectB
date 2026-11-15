@@ -74,13 +74,20 @@ it.each(["Liste", "Formular"])("sperrt Projektwechsel über %s bis alle Chats fe
   const ausloesen = () => { const { inhalt } = weg === "Liste" || auswahl().menue.props.formular ? auswahl() : formular(projekt.pfad);
     if (weg === "Liste") inhalt.props.children[0].props.children[1].props.onClick();
     else inhalt.props.onSubmit({ preventDefault: vi.fn() }); };
-  const d = chatEingabeQuelle.lesen(); d.chats.push({ ...d.chats[0], id: "laufend", gestartetUm: "12:00" }); chatEingabeQuelle.aktualisieren(d);
+  const d = chatEingabeQuelle.lesen(); d.kopf = { ...d.kopf, geoeffnet: true }; d.chats.push({ ...d.chats[0], id: "laufend", gestartetUm: "12:00" }); chatEingabeQuelle.aktualisieren(d);
   ausloesen(); await fertig();
   expect(projektOeffnen).not.toHaveBeenCalled(); expect(projekteZuletzt).not.toHaveBeenCalled();
   expect(chatEingabeQuelle.lesen().kopf).toEqual(d.kopf);
   expect(renderToStaticMarkup(auswahl().inhalt)).toContain("Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist.");
   d.chats[1].gestartetUm = null; chatEingabeQuelle.aktualisieren(d); ausloesen(); await fertig();
   expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad); expect(chatEingabeQuelle.lesen().kopf.pfad).toBe(projekt.pfad);
+});
+
+it("sperrt das erste Öffnen nicht wegen eines Beispiel-Laufs", async () => {
+  const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" }; vi.mocked(projektOeffnen).mockResolvedValue(projekt);
+  const d = chatEingabeQuelle.lesen(); d.kopf = { ...d.kopf, geoeffnet: false }; d.chats[0].gestartetUm = "14:30"; chatEingabeQuelle.aktualisieren(d);
+  auswahl().inhalt.props.children[0].props.children[1].props.onClick(); await fertig();
+  expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad);
 });
 
 it("öffnet per Formular und setzt Projektname, Pfad, Zweig und die letzte Liste im Kopf", async () => {
