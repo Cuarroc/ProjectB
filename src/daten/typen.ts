@@ -36,11 +36,13 @@ export type Beleg = { id: string; agentId: string; titel: string; prLink: string
 export type Wert = { genutzt: number; soll: number };
 export type Kontingent = { claude: Wert | null; codex: Wert | null };
 export type Chat = {
+  sitzung?: { id: string; anbieter: Anbieter; pfad: string } | null;
   id: string; titel: string; verlauf: Nachricht[]; gestartetUm: string | null;
   modus: "Ausführen" | "Planen" | "Interview";
   modell: string; effort: Effort; kontextfenster: number; kontextProzent: number;
 };
 export type Kopf = {
+  geoeffnet?: boolean;
   projekt: string; pfad: string; zweig: string; projekte: string[];
   kontingent: Kontingent; postfach: number;
 };

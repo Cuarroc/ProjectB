@@ -1,6 +1,16 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { beispiel, modusEinstellungen } from "./beispiel";
-import type { Kontingent, Kopf } from "./typen";
+import type { Anbieter, Kontingent, Kopf } from "./typen";
+
+export async function auftragSenden(auftrag: { chat: string; pfad: string; anbieter: Anbieter; sitzung: string | null; text: string }): Promise<{ sitzung: string | null; erfolg: boolean }> {
+  if (!isTauri()) throw new Error("Echte Aufträge gehen nur in der Desktop-App.");
+  return invoke("auftrag_senden", auftrag);
+}
+
+export async function chatNachrichtenHoeren(cb: (chat: string, text: string) => void): Promise<() => void> {
+  return isTauri() ? listen<{ chat: string; text: string }>("chat-nachricht", ({ payload }) => cb(payload.chat, payload.text)) : () => {};
+}
 
 export type Projekt = Pick<Kopf, "projekt" | "pfad" | "zweig">;
 
