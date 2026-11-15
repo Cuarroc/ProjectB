@@ -58,6 +58,11 @@ export function ProjektWahl({ kopf }: { kopf: KopfDaten }) {
   }, []);
   const oeffnen = async (pfad: string, zu: () => void) => {
     if (laedt.current) return;
+    const aktuell = chatEingabeQuelle.lesen();
+    // Nur echte Läufe eines geöffneten Projekts sperren, nicht die Beispieldaten vor dem ersten Öffnen.
+    if (aktuell.kopf.geoeffnet && pfad.trim() !== aktuell.kopf.pfad && aktuell.chats.some(chat => chat.gestartetUm != null)) {
+      setFehler("Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist."); return;
+    }
     laedt.current = true; setOeffnet(true); setFehler("");
     try {
       const projekt = await projektOeffnen(pfad.trim()), daten = chatEingabeQuelle.lesen();

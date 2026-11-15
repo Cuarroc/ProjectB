@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sitzung fort", async ({ page }, testInfo) => {
   test.skip(process.env.UI_BASELINE === "1", "Die Chatbrücke wird am Kandidaten geprüft.");
   await page.addInitScript(() => {
-    window.isTauri = true; window.auftraege = []; window.callbacks = {}; window.listener = new Set();
+    window.isTauri = true; window.auftraege = []; window.projektwechsel = []; window.callbacks = {}; window.listener = new Set();
     let id = 0;
     window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: (_event, id) => window.listener.delete(id) };
     window.__TAURI_INTERNALS__ = {
@@ -11,10 +11,16 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
       invoke: async (cmd, args) => {
         if (cmd === "plugin:event|listen") { window.listener.add(args.handler); return args.handler; }
         if (cmd === "plugin:event|unlisten") { window.listener.delete(args.eventId); return; }
-        if (cmd === "projekte_zuletzt") return ["C:\\ProjectB"];
+        if (cmd === "projekte_zuletzt") return ["C:\\ProjectB", "C:\\Anderes"];
+        if (cmd === "projekt_oeffnen") { window.projektwechsel.push(args.pfad); return { projekt: "Anderes", pfad: args.pfad, zweig: "main" }; }
         if (cmd === "projekt_pruefen") return { projekt: "ProjectB", pfad: args.pfad, zweig: "main" };
         if (cmd === "kontingent") return { claude: null, codex: null };
         if (cmd === "einstellungen_laden") return {};
+        if (cmd === "chats_laden") {
+          const { chats, aktiverChatId } = (await import("/src/daten/beispiel.ts")).beispiel;
+          return { chats, aktiverChatId };
+        }
+        if (cmd === "chats_speichern") return;
         if (cmd === "auftrag_senden") {
           window.auftraege.push(args);
           return new Promise(resolve => { window.beenden = () => resolve({ sitzung: { id: "s-1", anbieter: "Claude", pfad: args.pfad }, erfolg: true }); });
@@ -32,6 +38,12 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
   await expect(page.getByRole("log").getByText("Prüfe den CSV-Export im geöffneten Projekt.")).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "Orchestrator arbeitet …" })).toBeVisible();
   await expect(feld).toHaveAccessibleDescription(/Bitte warte vor dem nächsten Senden/);
+  const projekt = page.getByRole("button", { name: /^Projekt wählen/ });
+  await projekt.click(); await page.getByRole("menuitemradio", { name: "C:\\Anderes", exact: true }).click();
+  await expect(page.getByText("Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist.")).toBeVisible();
+  expect(await page.evaluate(() => window.projektwechsel)).toEqual([]); await expect(projekt).toContainText("C:\\ProjectB");
+  if (process.env.BILD_ORDNER) await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p52i_projektsperre_${testInfo.project.name}.png`, animations: "disabled" });
+  await page.keyboard.press("Escape");
   const abstand = await page.locator(".ein-arbeitet").evaluate(hinweis => {
     const form = document.querySelector(".chat-eingabe .ein"), h = hinweis.getBoundingClientRect(), f = form.getBoundingClientRect();
     return { einzug: h.left - f.left, innen: parseFloat(getComputedStyle(form).paddingLeft), unten: f.top - h.bottom,
@@ -58,4 +70,7 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(2);
   expect(await page.evaluate(() => window.auftraege[1])).toMatchObject({ chat: "csv-export", modell: "Opus 5.5", effort: "Hoch", sitzung: { id: "s-1", anbieter: "Claude", pfad: "C:\\ProjectB" }, text: "Prüfe auch leere Listen." });
   await page.evaluate(() => window.beenden());
+  await expect(page.getByRole("status").filter({ hasText: "Orchestrator arbeitet …" })).toHaveCount(0);
+  await projekt.click(); await page.getByRole("menuitemradio", { name: "C:\\Anderes", exact: true }).click();
+  await expect(projekt).toContainText("C:\\Anderes"); expect(await page.evaluate(() => window.projektwechsel)).toEqual(["C:\\Anderes"]);
 });
