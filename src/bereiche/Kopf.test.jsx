@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import Kopf, { ProjektWahl, bewegungSetzen, bewegungAktuell } from "./Kopf";
 import { Children } from "react";
-import { projektOeffnen, projekteZuletzt } from "../daten/tauri";
+import { isTauri } from "@tauri-apps/api/core";
+import { projektOeffnen, projektPruefen, projekteZuletzt } from "../daten/tauri";
 import { chatEingabeQuelle } from "./ChatEingabe";
 
 describe("Kopf", () => {
@@ -31,7 +32,9 @@ describe("Kopf", () => {
 });
 
 const hooks = vi.hoisted(() => ({ aktiv: false, werte: [], index: 0, effekte: [] }));
-vi.mock("../daten/tauri", () => ({ projektOeffnen: vi.fn(), projekteZuletzt: vi.fn() }));
+// Desktop-Start und Browser-Verhalten brauchen getrennte Antworten.
+vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn(() => false) }));
+vi.mock("../daten/tauri", () => ({ projektOeffnen: vi.fn(), projektPruefen: vi.fn(), projekteZuletzt: vi.fn() }));
 vi.mock("react", async original => {
   const react = await original();
   return { ...react, useEffect: (...args) => { if (!hooks.aktiv) return react.useEffect(...args); hooks.effekte.push(args[0]); },
@@ -43,7 +46,8 @@ vi.mock("react", async original => {
     } };
 });
 const vorher = chatEingabeQuelle.lesen();
-afterEach(() => { hooks.aktiv = false; hooks.werte = []; hooks.effekte = []; vi.clearAllMocks(); chatEingabeQuelle.aktualisieren(vorher); });
+// Desktop-Mocks dürfen die folgenden Browser-Tests nicht beeinflussen.
+afterEach(() => { hooks.aktiv = false; hooks.werte = []; hooks.effekte = []; vi.resetAllMocks(); vi.mocked(isTauri).mockReturnValue(false); chatEingabeQuelle.aktualisieren(vorher); });
 const auswahl = () => {
   hooks.aktiv = true; hooks.index = 0;
   const menue = ProjektWahl({ kopf: chatEingabeQuelle.lesen().kopf });
@@ -119,4 +123,51 @@ it.each([[], ["D:\\Arbeit\\Garten"]])("übernimmt projekteZuletzt: %j", async pr
   vi.mocked(projekteZuletzt).mockResolvedValue(projekte); auswahl();
   const aufraeumen = hooks.effekte[0](); await fertig(); aufraeumen();
   expect(chatEingabeQuelle.lesen().kopf.projekte).toEqual(projekte);
+});
+
+it("zeigt beim Desktop-Start das erste gemerkte Projekt mit Pfad und Zweig", async () => {
+  const projekt = { projekt: "ProjectB-Handbuch", pfad: "C:\\ProjectB-Handbuch", zweig: "handbuch" };
+  vi.mocked(isTauri).mockReturnValue(true);
+  vi.mocked(projekteZuletzt).mockResolvedValue([projekt.pfad, vorher.kopf.pfad]);
+  vi.mocked(projektPruefen).mockResolvedValue(projekt);
+  auswahl(); const aufraeumen = hooks.effekte[0](); await fertig(); aufraeumen();
+  expect(projektPruefen).toHaveBeenCalledExactlyOnceWith(projekt.pfad);
+  expect(projektOeffnen).not.toHaveBeenCalled();
+  expect(chatEingabeQuelle.lesen().kopf.projekte).toEqual([projekt.pfad, vorher.kopf.pfad]);
+  const html = renderToStaticMarkup(<Kopf />);
+  expect(html).toContain(`aria-label="Projekt wählen: ${projekt.projekt} ${projekt.pfad} ${projekt.zweig}"`);
+});
+
+it.each(["leere Liste", "Prüffehler", "Listenfehler"])("behält beim Desktop-Start ohne Fehlermeldung den Startzustand: %s", async fall => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  if (fall === "Listenfehler") vi.mocked(projekteZuletzt).mockRejectedValue(new Error("Nicht erreichbar"));
+  else vi.mocked(projekteZuletzt).mockResolvedValue(fall === "leere Liste" ? [] : ["C:\\Fehlt"]);
+  vi.mocked(projektPruefen).mockRejectedValue(new Error("Ordner gelöscht"));
+  auswahl(); const aufraeumen = hooks.effekte[0](); await fertig(); await fertig(); aufraeumen();
+  const { projekt, pfad, zweig } = vorher.kopf;
+  expect(chatEingabeQuelle.lesen().kopf).toMatchObject({ projekt, pfad, zweig });
+  expect(projektPruefen).toHaveBeenCalledTimes(fall === "Prüffehler" ? 1 : 0);
+  expect(renderToStaticMarkup(auswahl().inhalt)).not.toMatch(/ein-meldung|Ordner gelöscht|Nicht erreichbar/);
+});
+
+it("prüft im Browser beim Start kein Projekt und behält die Beispieldaten", async () => {
+  vi.mocked(projekteZuletzt).mockResolvedValue(vorher.kopf.projekte);
+  auswahl(); const aufraeumen = hooks.effekte[0](); await fertig(); aufraeumen();
+  expect(projektPruefen).not.toHaveBeenCalled(); expect(chatEingabeQuelle.lesen().kopf).toEqual(vorher.kopf);
+});
+
+it.each(["geschlossen", "manuell geöffnet"])("verwirft eine späte Startprüfung: %s", async fall => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  vi.mocked(projekteZuletzt).mockResolvedValue(["C:\\Alt"]);
+  let antwort; vi.mocked(projektPruefen).mockReturnValue(new Promise(resolve => { antwort = resolve; }));
+  auswahl(); const aufraeumen = hooks.effekte[0](); await fertig();
+  expect(projektPruefen).toHaveBeenCalledExactlyOnceWith("C:\\Alt");
+  const projekt = { projekt: "Neu", pfad: "C:\\Neu", zweig: "neu" };
+  if (fall === "geschlossen") aufraeumen();
+  else {
+    vi.mocked(projektOeffnen).mockResolvedValue(projekt); vi.mocked(projekteZuletzt).mockResolvedValue([projekt.pfad]);
+    const { inhalt } = formular(projekt.pfad); inhalt.props.onSubmit({ preventDefault: vi.fn() }); await fertig();
+  }
+  antwort({ projekt: "Alt", pfad: "C:\\Alt", zweig: "alt" }); await fertig(); aufraeumen();
+  expect(chatEingabeQuelle.lesen().kopf.pfad).toBe(fall === "geschlossen" ? vorher.kopf.pfad : projekt.pfad);
 });
