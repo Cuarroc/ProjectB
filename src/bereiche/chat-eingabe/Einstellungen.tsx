@@ -11,42 +11,48 @@ import "./Einstellungen.css";
 export function Einstellungen({ modus }: { modus: string }) {
   const [werte, setWerte] = useState<Record<string, string[]>>({}), [offen, setOffen] = useState(false);
   const [fehler, setFehler] = useState("");
-  const speicher = useRef<{ aktiv: boolean; gespeichert: Record<string, string[]>; auftrag: number; kette: Promise<unknown> } | null>(null);
+  type Werte = Record<string, string[]>;
+  const speicher = useRef<{ aktiv: boolean; gespeichert: Werte; offen: ((w: Werte) => Werte)[]; fehler: Map<string, string>; kette: Promise<unknown> } | null>(null);
   useEffect(() => {
     if (!isTauri()) return;
     let pfad: string | undefined;
+    const projekte = new Map<string, NonNullable<typeof speicher.current>>();
     const laden = () => {
       const neu = chatEingabeQuelle.lesen().kopf.pfad;
       if (neu === pfad) return;
       pfad = neu;
       if (speicher.current) speicher.current.aktiv = false;
-      const stand = { aktiv: true, gespeichert: {}, auftrag: 0, kette: Promise.resolve() as Promise<unknown> };
+      const stand: NonNullable<typeof speicher.current> = { aktiv: true, gespeichert: {}, offen: [], fehler: new Map(), kette: Promise.resolve() };
       speicher.current = stand; setWerte({}); setFehler("");
-      stand.kette = einstellungenLaden(neu).then(werte => {
-        if (stand.aktiv) { stand.gespeichert = werte; if (!stand.auftrag) setWerte(werte); }
+      stand.kette = (projekte.get(neu)?.kette ?? Promise.resolve()).then(() => einstellungenLaden(neu)).then(werte => {
+        stand.gespeichert = werte; if (stand.aktiv && !stand.offen.length) setWerte(werte);
       }).catch(e => { if (stand.aktiv) setFehler(`Nicht geladen: ${String(e)}`); });
+      projekte.set(neu, stand);
     };
     const ab = chatEingabeQuelle.abonnieren(laden); laden();
     return () => { ab(); if (speicher.current) speicher.current.aktiv = false; };
   }, []);
   useEffect(() => {
-    if (!fehler) return;
+    if (!fehler || speicher.current?.fehler.size) return;
     const timer = setTimeout(() => setFehler(""), tokenMs("standzeit-toast-info"));
     return () => clearTimeout(timer);
   }, [fehler]);
   const aendern = (neu: string[], index?: number) => {
     setWerte(vorher => ({ ...vorher, [modus]: neu }));
     if (!isTauri() || !speicher.current) return;
-    const stand = speicher.current, nr = ++stand.auftrag, pfad = chatEingabeQuelle.lesen().kopf.pfad;
+    const stand = speicher.current, pfad = chatEingabeQuelle.lesen().kopf.pfad;
     const delta = einstellungenAenderung(modus, neu, index);
+    const felder = neu.flatMap((_, i) => index === undefined || index === i ? [`${modus}:${i}`] : []);
+    stand.offen.push(w => ({ ...w, [modus]: (w[modus] ?? neu).map((alt, i) => index === undefined || index === i ? neu[i] : alt) }));
     stand.kette = stand.kette.then(async () => {
-      if (!stand.aktiv) return;
       try {
-        const gespeichert = await einstellungenAendern(pfad, delta);
-        if (stand.aktiv) { stand.gespeichert = gespeichert; if (nr === stand.auftrag) { setWerte(gespeichert); setFehler(""); } }
+        stand.gespeichert = await einstellungenAendern(pfad, delta);
+        felder.forEach(feld => stand.fehler.delete(feld));
       } catch (e) {
-        if (stand.aktiv && nr === stand.auftrag) { setWerte(stand.gespeichert); setFehler(`Nicht gespeichert: ${String(e)}`); }
+        felder.forEach(feld => stand.fehler.set(feld, `Nicht gespeichert: ${String(e)}`));
       }
+      stand.offen.shift();
+      if (stand.aktiv) { setWerte(stand.offen.reduce((w, anwenden) => anwenden(w), stand.gespeichert)); setFehler([...new Set(stand.fehler.values())].join(" ")); }
     });
   };
   const ort = useRef<HTMLSpanElement>(null), knopf = useRef<HTMLButtonElement>(null), rueckgabe = useRef(false), id = useId();

@@ -59,7 +59,8 @@ it.each(["resolve", "reject"])("verwirft alte Antworten (%s) auch nach Abbau und
   abbau[ergebnis]({ ausfuehren: { agentenGleichzeitig: "einer" } }); await leeren(); expect(h.werte).toEqual(stand);
 });
 
-it("setzt nur den aktiven Modus auf seine Empfehlungen zurück und blendet Fehler kurz ein", async () => {
+// Runde 2: Speicherfehler bleiben bis zum erfolgreichen Nachspeichern sichtbar, daher auch der neue Testname.
+it("setzt nur den aktiven Modus zurück und behält unbehobene Speicherfehler", async () => {
   vi.useFakeTimers();
   try {
     vi.mocked(invoke).mockResolvedValue({ ausfuehren: { agentenGleichzeitig: "einer" }, planen: { plan: "kurz" } });
@@ -68,6 +69,33 @@ it("setzt nur den aktiven Modus auf seine Empfehlungen zurück und blendet Fehle
     expect(invoke).toHaveBeenLastCalledWith("einstellungen_speichern", { projekt: "A", werte: { ausfuehren: { agentenGleichzeitig: "bisZu3", pruefungDurch: "andereModellfamilie", pruefrundenHoechstens: "drei" } } });
     vi.mocked(invoke).mockRejectedValueOnce("Kein Zugriff"); feld().props.onChange("Bis zu 5"); await leeren(); render();
     expect(finde(render(), e => e.props.role === "status")).toBeDefined();
-    vi.advanceTimersByTime(6000); expect(finde(render(), e => e.props.role === "status")).toBeUndefined();
+    // Runde 2: Der Toast-Zeitablauf darf eine weiterhin ungespeicherte Änderung nicht verschweigen.
+    vi.advanceTimersByTime(6000); expect(finde(render(), e => e.props.role === "status")).toBeDefined();
   } finally { vi.useRealTimers(); }
+});
+it.each(["Laden", "Speichern"])("speichert vorgemerkte Änderungen trotz Projektwechsel während %s", async phase => {
+  const block = warten(); let daten = {}, erstesLaden = true;
+  vi.mocked(invoke).mockImplementation(async (cmd, { projekt, werte }) => {
+    if (cmd === "einstellungen_laden") { if (projekt === "A" && erstesLaden) { erstesLaden = false; if (phase === "Laden") await block.promise; } return projekt === "A" ? daten : {}; }
+    if (phase === "Speichern") await block.promise;
+    daten = { ausfuehren: { ...daten.ausfuehren, ...werte.ausfuehren } }; return daten;
+  });
+  render(); if (phase === "Speichern") await leeren(); knopf(render()).props.onClick();
+  feld().props.onChange("Bis zu 5"); feld().props.onChange("1"); await leeren(); pfad("B"); await leeren();
+  block.resolve(); await leeren(); expect(feld().props.wert).toBe("Bis zu 3");
+  expect(invoke.mock.calls.filter(c => c[0] === "einstellungen_speichern").map(c => c[1].projekt)).toEqual(["A", "A"]);
+  pfad("A"); await leeren(); expect(feld().props.wert).toBe("1");
+});
+it("behält frühe Speicherfehler und gespeicherte Feldwerte bis genau dieses Feld erfolgreich gespeichert wird", async () => {
+  const erster = warten(), zweiter = warten(), status = () => finde(render(), e => e.props.role === "status");
+  const pruefung = () => finde(render(), e => e.type === Umschalter && e.props.beschriftung === "Prüfung durch");
+  vi.mocked(invoke).mockResolvedValue({}); render(); await leeren(); knopf(render()).props.onClick();
+  vi.mocked(invoke).mockReturnValueOnce(erster.promise).mockReturnValueOnce(zweiter.promise);
+  feld().props.onChange("Bis zu 5"); pruefung().props.onChange("Gleiche Familie"); await leeren();
+  erster.reject("Kein Zugriff"); await leeren();
+  expect(status()?.props.children.join(" ")).toContain("Nicht gespeichert: Kein Zugriff");
+  expect(feld().props.wert).toBe("Bis zu 3"); expect(pruefung().props.wert).toBe("Gleiche Familie");
+  zweiter.resolve({ ausfuehren: { pruefungDurch: "gleicheFamilie" } }); await leeren();
+  expect(feld().props.wert).toBe("Bis zu 3"); expect(status()).toBeDefined();
+  feld().props.onChange("1"); await leeren(); expect(status()).toBeUndefined();
 });
