@@ -4,7 +4,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { Einstellungen } from "./Einstellungen";
 import { chatEingabeQuelle as quelle } from "../ChatEingabe";
 import { Umschalter } from "../../bausteine/Umschalter";
-
 const h = vi.hoisted(() => ({ werte: [], refs: [], effekte: [], jetzt: [], i: 0, r: 0, e: 0 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => true }));
 vi.mock("../ChatEingabe", async () => ({ chatEingabeQuelle: new (await import("../../daten/quelle")).BeispielQuelle() }));
@@ -24,7 +23,6 @@ const leeren = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(
 const warten = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 beforeEach(() => { vi.stubGlobal("getComputedStyle", () => ({ getPropertyValue: () => "6000ms" })); vi.stubGlobal("document", { addEventListener: vi.fn(), removeEventListener: vi.fn() }); h.werte = []; h.refs = []; h.effekte = []; vi.mocked(invoke).mockReset(); pfad("A"); });
 afterEach(() => { h.effekte.forEach(e => e.ab?.()); vi.unstubAllGlobals(); });
-
 it("lädt je Projekt, sendet ein Feld, zeigt die Kernantwort und springt bei Fehler zurück", async () => {
   vi.mocked(invoke).mockResolvedValue({ ausfuehren: { agentenGleichzeitig: "einer" } });
   render(); await leeren(); knopf(render()).props.onClick();
@@ -58,8 +56,6 @@ it.each(["resolve", "reject"])("verwirft alte Antworten (%s) auch nach Abbau und
   feld().props.onChange("1"); await leeren(); h.effekte.forEach(e => e.ab?.()); const stand = [...h.werte];
   abbau[ergebnis]({ ausfuehren: { agentenGleichzeitig: "einer" } }); await leeren(); expect(h.werte).toEqual(stand);
 });
-
-// Runde 2: Speicherfehler bleiben bis zum erfolgreichen Nachspeichern sichtbar, daher auch der neue Testname.
 it("setzt nur den aktiven Modus zurück und behält unbehobene Speicherfehler", async () => {
   vi.useFakeTimers();
   try {
@@ -69,7 +65,6 @@ it("setzt nur den aktiven Modus zurück und behält unbehobene Speicherfehler", 
     expect(invoke).toHaveBeenLastCalledWith("einstellungen_speichern", { projekt: "A", werte: { ausfuehren: { agentenGleichzeitig: "bisZu3", pruefungDurch: "andereModellfamilie", pruefrundenHoechstens: "drei" } } });
     vi.mocked(invoke).mockRejectedValueOnce("Kein Zugriff"); feld().props.onChange("Bis zu 5"); await leeren(); render();
     expect(finde(render(), e => e.props.role === "status")).toBeDefined();
-    // Runde 2: Der Toast-Zeitablauf darf eine weiterhin ungespeicherte Änderung nicht verschweigen.
     vi.advanceTimersByTime(6000); expect(finde(render(), e => e.props.role === "status")).toBeDefined();
   } finally { vi.useRealTimers(); }
 });
@@ -86,7 +81,7 @@ it.each(["Laden", "Speichern"])("speichert vorgemerkte Änderungen trotz Projekt
   expect(invoke.mock.calls.filter(c => c[0] === "einstellungen_speichern").map(c => c[1].projekt)).toEqual(["A", "A"]);
   pfad("A"); await leeren(); expect(feld().props.wert).toBe("1");
 });
-it("behält frühe Speicherfehler und gespeicherte Feldwerte bis genau dieses Feld erfolgreich gespeichert wird", async () => {
+it("behält Speicherfehler auch nach Projektwechsel bis genau dieses Feld erfolgreich gespeichert wird", async () => {
   const erster = warten(), zweiter = warten(), status = () => finde(render(), e => e.props.role === "status");
   const pruefung = () => finde(render(), e => e.type === Umschalter && e.props.beschriftung === "Prüfung durch");
   vi.mocked(invoke).mockResolvedValue({}); render(); await leeren(); knopf(render()).props.onClick();
@@ -98,4 +93,9 @@ it("behält frühe Speicherfehler und gespeicherte Feldwerte bis genau dieses Fe
   zweiter.resolve({ ausfuehren: { pruefungDurch: "gleicheFamilie" } }); await leeren();
   expect(feld().props.wert).toBe("Bis zu 3"); expect(status()).toBeDefined();
   feld().props.onChange("1"); await leeren(); expect(status()).toBeUndefined();
+  const spaet = warten(); vi.mocked(invoke).mockResolvedValue({ ausfuehren: { agentenGleichzeitig: "einer" } }).mockReturnValueOnce(spaet.promise);
+  feld().props.onChange("Bis zu 5"); await leeren(); pfad("B"); await leeren();
+  spaet.reject("Projekt A gesperrt"); await leeren(); expect(status()).toBeUndefined();
+  pfad("A"); await leeren(); expect(feld().props.wert).toBe("1");
+  expect(status()?.props.children.join(" ")).toContain("Nicht gespeichert: Projekt A gesperrt");
 });

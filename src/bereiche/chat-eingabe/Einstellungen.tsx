@@ -22,10 +22,10 @@ export function Einstellungen({ modus }: { modus: string }) {
       if (neu === pfad) return;
       pfad = neu;
       if (speicher.current) speicher.current.aktiv = false;
-      const stand: NonNullable<typeof speicher.current> = { aktiv: true, gespeichert: {}, offen: [], fehler: new Map(), kette: Promise.resolve() };
+      const stand: NonNullable<typeof speicher.current> = { aktiv: true, gespeichert: {}, offen: [], fehler: projekte.get(neu)?.fehler ?? new Map(), kette: Promise.resolve() };
       speicher.current = stand; setWerte({}); setFehler("");
       stand.kette = (projekte.get(neu)?.kette ?? Promise.resolve()).then(() => einstellungenLaden(neu)).then(werte => {
-        stand.gespeichert = werte; if (stand.aktiv && !stand.offen.length) setWerte(werte);
+        stand.gespeichert = werte; if (stand.aktiv) { if (!stand.offen.length) setWerte(werte); setFehler([...new Set(stand.fehler.values())].join(" ")); }
       }).catch(e => { if (stand.aktiv) setFehler(`Nicht geladen: ${String(e)}`); });
       projekte.set(neu, stand);
     };
