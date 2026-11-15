@@ -15,6 +15,11 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
         if (cmd === "projekt_pruefen") return { projekt: "ProjectB", pfad: args.pfad, zweig: "main" };
         if (cmd === "kontingent") return { claude: null, codex: null };
         if (cmd === "einstellungen_laden") return {};
+        if (cmd === "chats_laden") {
+          const { chats, aktiverChatId } = (await import("/src/daten/beispiel.ts")).beispiel;
+          return { chats, aktiverChatId };
+        }
+        if (cmd === "chats_speichern") return;
         if (cmd === "auftrag_senden") {
           window.auftraege.push(args);
           return new Promise(resolve => { window.beenden = () => resolve({ sitzung: { id: "s-1", anbieter: "Claude", pfad: args.pfad }, erfolg: true }); });

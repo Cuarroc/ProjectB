@@ -10,6 +10,7 @@
 .rand-karte ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--abstand-2); }
 .rand-chat, .rand-postfach { border: 0; width: 100%; text-align: left; color: var(--text-1); font: inherit; padding: var(--abstand-2); background: var(--flaeche-3); border-radius: var(--rund-knopf); display: flex; align-items: center; gap: var(--abstand-2); cursor: pointer; }
 .rand-chat[aria-current] { background: var(--akzent-grund); color: var(--akzent-text); }
+.rand-karte > .knopf { margin-bottom: var(--abstand-3); }
 .rand-chat span, .rand-todo span { overflow-wrap: anywhere; min-width: 0; }
 .rand-chat svg { flex-shrink: 0; }
 .rand-todo { display: flex; align-items: start; gap: var(--abstand-2); padding-block: var(--abstand-1); cursor: pointer; }
