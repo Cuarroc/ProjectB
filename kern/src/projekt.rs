@@ -15,6 +15,13 @@ pub struct Projekt {
     pub zweig: String,
 }
 
+/// Prüft das Projekt und merkt ausschließlich seine ermittelte Repo-Wurzel.
+pub fn oeffnen(pfad: impl AsRef<Path>, datei: impl AsRef<Path>) -> Result<Projekt, Fehler> {
+    let projekt = pruefen(pfad)?;
+    zuletzt_merken(datei, &projekt.pfad)?;
+    Ok(projekt)
+}
+
 /// Ermittelt die Arbeitsbaumwurzel, auch aus Unterordnern und bei leerem Repo.
 pub fn pruefen(pfad: impl AsRef<Path>) -> Result<Projekt, Fehler> {
     let pfad = pfad.as_ref();
