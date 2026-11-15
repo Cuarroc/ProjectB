@@ -1,9 +1,10 @@
 //! Projekteinstellungen: stabile deutsche JSON-Schlüssel, Rückfall je einzelnem Feld.
-use serde_json::{json, Value};
+use serde_json::json;
+pub use serde_json::Value;
 use std::{
     fs::{self, OpenOptions},
     io::{self, Write},
-    path::Path,
+    path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -65,6 +66,11 @@ pub struct Einstellungen {
 /// Fehlende, unbekannte oder falsch typisierte Werte fallen einzeln zurück.
 pub fn laden(pfad: impl AsRef<Path>) -> Einstellungen {
     let v: Value = fs::read(pfad).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    aus_json(&v)
+}
+
+/// Liest dieselben Schlüssel und Rückfallwerte wie die Einstellungsdatei.
+pub fn aus_json(v: &Value) -> Einstellungen {
     let a = &v["ausfuehren"];
     let p = &v["planen"];
     Einstellungen {
@@ -81,14 +87,11 @@ pub fn laden(pfad: impl AsRef<Path>) -> Einstellungen {
     }
 }
 
-/// Schreibt und synchronisiert eine neue Nachbardatei und ersetzt dann das Ziel.
-/// Bei Fehlern bleibt das bisherige Ziel erhalten; sein Ordner muss existieren.
-pub fn speichern(pfad: impl AsRef<Path>, e: &Einstellungen) -> io::Result<()> {
-    let pfad = pfad.as_ref();
-    let name = pfad.file_name().ok_or_else(|| io::Error::other("Dateiname fehlt"))?;
+/// Gibt die stabilen deutschen Schlüssel und Werte für Datei und Tauri zurück.
+pub fn als_json(e: &Einstellungen) -> Value {
     let a = &e.ausfuehren;
     let p = &e.planen;
-    let daten = serde_json::to_vec_pretty(&json!({
+    json!({
         "ausfuehren": {
             "agentenGleichzeitig": a.agenten_gleichzeitig.text(),
             "pruefungDurch": a.pruefung_durch.text(),
@@ -99,7 +102,32 @@ pub fn speichern(pfad: impl AsRef<Path>, e: &Einstellungen) -> io::Result<()> {
             "dauerUndTokensSchaetzen": p.dauer_und_tokens_schaetzen.text(),
             "beiUnklaremNachfragen": p.bei_unklarem_nachfragen.text()
         }
-    }))?;
+    })
+}
+
+/// Stabiler FNV-1a-64-Dateiname im App-Datenordner, ohne Zugriff aufs Projekt.
+pub fn datei_fuer(ordner: &Path, projektpfad: &str) -> PathBuf {
+    // Dieselbe Windows-Normalisierung wie in projekt::schluessel.
+    let pfad = if cfg!(windows)
+        || projektpfad.as_bytes().get(1) == Some(&b':')
+        || projektpfad.starts_with(r"\\")
+        || projektpfad.starts_with("//")
+    {
+        projektpfad.replace('\\', "/").to_lowercase()
+    } else {
+        projektpfad.to_owned()
+    };
+    let hash =
+        pfad.bytes().fold(0xcbf29ce484222325u64, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3));
+    ordner.join("einstellungen").join(format!("{hash:016x}.json"))
+}
+
+/// Schreibt und synchronisiert eine neue Nachbardatei und ersetzt dann das Ziel.
+/// Bei Fehlern bleibt das bisherige Ziel erhalten; sein Ordner muss existieren.
+pub fn speichern(pfad: impl AsRef<Path>, e: &Einstellungen) -> io::Result<()> {
+    let pfad = pfad.as_ref();
+    let name = pfad.file_name().ok_or_else(|| io::Error::other("Dateiname fehlt"))?;
+    let daten = serde_json::to_vec_pretty(&als_json(e))?;
     static NR: AtomicUsize = AtomicUsize::new(0);
     let (temp, mut datei) = loop {
         let mut temp_name = name.to_os_string();
