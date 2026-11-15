@@ -36,6 +36,7 @@ impl AgentZustand {
 
     pub fn anwenden(&mut self, ereignis: &Ereignis) {
         match ereignis {
+            Ereignis::Sitzung(_) => {}
             Ereignis::Gestartet { modell } => {
                 if let Some(modell) = modell {
                     self.stammdaten.modell.clone_from(modell);
