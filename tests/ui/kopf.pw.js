@@ -51,6 +51,7 @@ test("Kopf: Soll-Bilder, Menüs, Bewegung und axe", async ({ page }, info) => {
 });
 
 test("Projekt wählen: Liste, Pfad, Fehler, Tastatur und axe", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Das Pfad-Feld fehlt im Basisstand.");
   await page.goto("/"); await page.waitForLoadState("networkidle"); await page.evaluate(() => document.fonts.ready);
   const kopf = page.getByRole("banner"), knopf = kopf.getByRole("button", { name: /^Projekt wählen/ });
   const bild = async szene => {
