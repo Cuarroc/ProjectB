@@ -17,7 +17,7 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
         if (cmd === "einstellungen_laden") return {};
         if (cmd === "auftrag_senden") {
           window.auftraege.push(args);
-          return new Promise(resolve => { window.beenden = () => resolve({ sitzung: "s-1", erfolg: true }); });
+          return new Promise(resolve => { window.beenden = () => resolve({ sitzung: { id: "s-1", anbieter: "Claude", pfad: args.pfad }, erfolg: true }); });
         }
         throw new Error(`Unerwarteter Command: ${cmd}`);
       },
@@ -28,6 +28,7 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
   const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" });
   await feld.fill("Prüfe den CSV-Export im geöffneten Projekt."); await feld.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(1);
+  expect(await page.evaluate(() => window.auftraege[0])).toEqual({ chat: "csv-export", pfad: "C:\\ProjectB", modell: "Opus 5.5", effort: "Hoch", sitzung: null, text: "Prüfe den CSV-Export im geöffneten Projekt." });
   await expect(page.getByRole("log").getByText("Prüfe den CSV-Export im geöffneten Projekt.")).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "Orchestrator arbeitet …" })).toBeVisible();
   await expect(feld).toHaveAccessibleDescription(/Bitte warte vor dem nächsten Senden/);
@@ -44,13 +45,17 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
   await page.evaluate(() => window.antwort("Die ersten Tests sind grün. Ich prüfe jetzt die Randfälle."));
   const letzte = page.getByRole("log").getByText("Die ersten Tests sind grün. Ich prüfe jetzt die Randfälle.");
   await expect(letzte).toBeVisible(); await letzte.scrollIntoViewIfNeeded(); await feld.fill("");
-  const path = testInfo.project.name === "1440x900" && process.env.BILD_ORDNER ? `${process.env.BILD_ORDNER}/PR-p52e_chat_1440x900.png` : testInfo.outputPath("chat.png");
-  await page.screenshot({ path }); await testInfo.attach("Chat während des Laufs", { path, contentType: "image/png" });
+  await page.getByRole("button", { name: "Modell: Opus 5.5", exact: true }).click();
+  const modelle = page.getByRole("menu", { name: "Modell", exact: true }).getByRole("menuitemradio");
+  await expect(modelle).toHaveText(["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"]);
+  const path = testInfo.project.name === "1440x900" && process.env.BILD_ORDNER ? `${process.env.BILD_ORDNER}/PR-p52g_modell_1440x900.png` : testInfo.outputPath("chat.png");
+  await page.screenshot({ path }); await testInfo.attach("Offene Modellauswahl", { path, contentType: "image/png" });
+  await page.getByRole("menu", { name: "Modell", exact: true }).press("Escape");
   expect(await page.evaluate(() => window.listener.size)).toBe(1);
   await page.evaluate(() => window.beenden());
   await expect(page.getByRole("status").filter({ hasText: "Orchestrator arbeitet …" })).toHaveCount(0);
   await feld.fill("Prüfe auch leere Listen."); await feld.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(2);
-  expect(await page.evaluate(() => window.auftraege[1])).toMatchObject({ chat: "csv-export", anbieter: "Claude", sitzung: "s-1", text: "Prüfe auch leere Listen." });
+  expect(await page.evaluate(() => window.auftraege[1])).toMatchObject({ chat: "csv-export", modell: "Opus 5.5", effort: "Hoch", sitzung: { id: "s-1", anbieter: "Claude", pfad: "C:\\ProjectB" }, text: "Prüfe auch leere Listen." });
   await page.evaluate(() => window.beenden());
 });
