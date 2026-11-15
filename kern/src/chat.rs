@@ -1,6 +1,31 @@
 use crate::{start, verbrauch, Anbieter, Ereignis};
 use std::{io, path::Path};
 
+pub fn startwunsch(
+    modell: &str,
+    effort: &str,
+    sitzung: Option<(&str, &str, &str)>,
+    pfad: &str,
+    text: String,
+) -> Result<(&'static Anbieter, start::Startwunsch), String> {
+    let (name, cli_modell) = start::modell(modell).ok_or_else(|| format!("Unbekanntes Modell: {modell}"))?;
+    let anbieter = crate::anbieter(name).ok_or_else(|| format!("Unbekannter Anbieter: {name}"))?;
+    let effort = start::Effort::aus_text(effort).ok_or_else(|| format!("Unbekannter Effort: {effort}"))?;
+    let fortsetzen = sitzung
+        .filter(|(_, alt, ort)| alt.eq_ignore_ascii_case(anbieter.name) && *ort == pfad)
+        .map(|(id, _, _)| id.to_owned());
+    Ok((
+        anbieter,
+        start::Startwunsch {
+            rolle: None,
+            modell: Some(cli_modell.into()),
+            effort: Some(effort),
+            fortsetzen,
+            auftrag: text,
+        },
+    ))
+}
+
 pub struct Antwort {
     pub sitzung: Option<String>,
     pub erfolg: bool,
