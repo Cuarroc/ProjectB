@@ -32,7 +32,12 @@ fn main() {
     std::io::stdin().read_to_string(&mut auftrag).expect("stdin");
     let antwort = serde_json::json!({"type":"assistant","message":{"content":[
         {"type":"text","text":format!("Auftrag: {}", auftrag.trim())},{"type":"tool_use","name":"Read"}]}});
-    writeln!(aus, r#"{{"type":"system","subtype":"init","model":"test-modell"}}"#).unwrap();
+    if hat("--codex") {
+        writeln!(aus, r#"{{"type":"thread.started","thread_id":"test-sitzung"}}"#).unwrap();
+    } else {
+        writeln!(aus, r#"{{"type":"system","subtype":"init","model":"test-modell","session_id":"test-sitzung"}}"#)
+            .unwrap();
+    }
     if hat("--kaputtes-utf8") {
         aus.write_all(b"kaputt \xff\n").unwrap();
     }

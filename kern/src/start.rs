@@ -18,6 +18,7 @@ pub struct Startwunsch {
     pub rolle: Option<String>,
     pub modell: Option<String>,
     pub effort: Option<Effort>,
+    pub fortsetzen: Option<String>,
     pub auftrag: String,
 }
 
@@ -32,6 +33,8 @@ impl Startwunsch {
 }
 
 /// CLI-Hilfe geprüft: Claude --model/--effort; Codex --model/-c.
+/// CLI-Hilfe geprüft: claude -p --output-format stream-json --verbose --resume <id> (Prompt über stdin);
+/// codex exec resume <id> --json - (laut `claude --help` / `codex exec resume --help`).
 /// Codex-Konfiguration: model_reasoning_effort (offizielle Config Reference).
 pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String>> {
     if let Some(modell) = &wunsch.modell {
@@ -45,10 +48,21 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
             ));
         }
     }
-    if !matches!(anbieter.name, "claude" | "codex") && (wunsch.modell.is_some() || wunsch.effort.is_some()) {
+    if let Some(id) = &wunsch.fortsetzen {
+        if id.is_empty() || id.starts_with('-') || !id.bytes().all(|c| c.is_ascii_alphanumeric() || b"-_".contains(&c))
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Sitzungs-ID: nur A-Z, a-z, 0-9, -_; nicht leer oder mit - beginnen",
+            ));
+        }
+    }
+    if !matches!(anbieter.name, "claude" | "codex")
+        && (wunsch.modell.is_some() || wunsch.effort.is_some() || wunsch.fortsetzen.is_some())
+    {
         return Err(Error::new(
             ErrorKind::Unsupported,
-            format!("Für Anbieter {} sind keine Modell-/Effort-Schalter bekannt", anbieter.name),
+            format!("Für Anbieter {} sind keine Modell-/Effort-/Fortsetzen-Schalter bekannt", anbieter.name),
         ));
     }
     let mut args: Vec<String> = anbieter.argumente.iter().map(|s| (*s).into()).collect();
@@ -56,6 +70,15 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
     let stdin_marker = anbieter.name == "codex" && args.last().is_some_and(|s| s == "-");
     if stdin_marker {
         args.pop();
+    }
+    if let Some(id) = &wunsch.fortsetzen {
+        match anbieter.name {
+            "claude" => args.extend(["--resume".into(), id.clone()]),
+            "codex" => {
+                args.splice(1..1, ["resume".into(), id.clone()]);
+            }
+            _ => unreachable!("unbekannte Schalter zuvor abgelehnt"),
+        }
     }
     if let Some(modell) = &wunsch.modell {
         args.extend(["--model".into(), modell.clone()]);
@@ -111,6 +134,7 @@ mod tests {
             rolle: None,
             modell: Some("modell-test".into()),
             effort: Some(Effort::Hoch),
+            fortsetzen: None,
             auftrag: "Test".into(),
         };
         for a in [&CLAUDE, &CODEX] {
@@ -121,5 +145,58 @@ mod tests {
             assert_eq!(erster.programm, a.programm);
             assert_eq!(erster.name, a.name);
         }
+    }
+
+    fn fortsetzung() -> Startwunsch {
+        Startwunsch {
+            rolle: None,
+            modell: None,
+            effort: None,
+            fortsetzen: Some("AZaz09_-".into()),
+            auftrag: "Weiter".into(),
+        }
+    }
+
+    #[test]
+    fn fortsetzen_beider_anbieter_mit_prompt_von_stdin() {
+        let w = fortsetzung();
+        assert_eq!(
+            argumente(&CLAUDE, &w).unwrap(),
+            ["-p", "--output-format", "stream-json", "--verbose", "--resume", "AZaz09_-"]
+        );
+        assert_eq!(argumente(&CODEX, &w).unwrap(), ["exec", "resume", "AZaz09_-", "--json", "-"]);
+        assert_eq!(w.prompt(), "Weiter");
+        let w = Startwunsch { modell: Some("modell".into()), effort: Some(Effort::Hoch), ..w };
+        assert_eq!(
+            argumente(&CODEX, &w).unwrap(),
+            ["exec", "resume", "AZaz09_-", "--json", "--model", "modell", "-c", "model_reasoning_effort=\"high\"", "-"]
+        );
+        assert_eq!(
+            argumente(&CLAUDE, &w).unwrap(),
+            [
+                "-p",
+                "--output-format",
+                "stream-json",
+                "--verbose",
+                "--resume",
+                "AZaz09_-",
+                "--model",
+                "modell",
+                "--effort",
+                "high"
+            ]
+        );
+    }
+
+    #[test]
+    fn ungueltige_sitzungs_ids_werden_abgelehnt() {
+        for id in ["", "-id", "--help", "id x", "id;x", "sitzüng", "id\nx", "id/x", "id\"x", "id.x", "id:x"] {
+            for a in [&CLAUDE, &CODEX] {
+                let w = Startwunsch { fortsetzen: Some(id.into()), ..fortsetzung() };
+                assert_eq!(argumente(a, &w).unwrap_err().kind(), ErrorKind::InvalidInput, "{id:?}");
+            }
+        }
+        let unbekannt = Anbieter { name: "unbekannt", ..CLAUDE };
+        assert_eq!(argumente(&unbekannt, &fortsetzung()).unwrap_err().kind(), ErrorKind::Unsupported);
     }
 }

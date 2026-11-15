@@ -1,6 +1,7 @@
 //! Kern von ProjectB: startet Coding-Agenten ohne Terminal, liest ihre
 //! JSON-Ereignisse live und kann sie anhalten (Technik-Probe, Schritt 3).
 pub mod anhalten;
+pub mod chat;
 
 pub mod einstellungen;
 pub mod projekt;
@@ -32,6 +33,7 @@ pub enum Ereignis {
     Gestartet {
         modell: Option<String>,
     },
+    Sitzung(String),
     Text(String),
     Werkzeug(String),
     Fertig {
@@ -81,7 +83,11 @@ fn text(v: &Value, zeiger: &str) -> Option<String> {
 pub fn lies_claude(v: &Value) -> Vec<Ereignis> {
     match v.get("type").and_then(Value::as_str) {
         Some("system") if text(v, "/subtype").as_deref() == Some("init") => {
-            vec![Ereignis::Gestartet { modell: text(v, "/model") }]
+            let mut ereignisse = vec![Ereignis::Gestartet { modell: text(v, "/model") }];
+            if let Some(id) = text(v, "/session_id") {
+                ereignisse.push(Ereignis::Sitzung(id));
+            }
+            ereignisse
         }
         Some("system") | Some("user") => vec![],
         Some("rate_limit_event") => vec![verbrauch::aus_claude(v)
@@ -114,7 +120,13 @@ pub fn lies_claude(v: &Value) -> Vec<Ereignis> {
 pub fn lies_codex(v: &Value) -> Vec<Ereignis> {
     let art = text(v, "/item/type");
     match v.get("type").and_then(Value::as_str) {
-        Some("thread.started") => vec![Ereignis::Gestartet { modell: None }],
+        Some("thread.started") => {
+            let mut ereignisse = vec![Ereignis::Gestartet { modell: None }];
+            if let Some(id) = text(v, "/thread_id") {
+                ereignisse.push(Ereignis::Sitzung(id));
+            }
+            ereignisse
+        }
         Some("turn.started") | Some("item.updated") => vec![],
         Some("item.started") if art.as_deref() == Some("command_execution") => {
             vec![Ereignis::Werkzeug(text(v, "/item/command").unwrap_or_default())]
@@ -425,6 +437,7 @@ impl fmt::Display for Ereignis {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let kurz = |s: &str| s.chars().take(160).collect::<String>().replace('\n', " ");
         match self {
+            Ereignis::Sitzung(_) => Ok(()),
             Ereignis::Gestartet { modell } => {
                 write!(f, "bereit (Modell: {})", modell.as_deref().unwrap_or("unbekannt"))
             }
@@ -451,6 +464,29 @@ impl fmt::Display for Ereignis {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn sitzung_folgt_auf_gestartet_nur_mit_string_id() {
+        for (lesen, mut init, feld, modell) in [
+            (
+                lies_claude as fn(&Value) -> Vec<Ereignis>,
+                json!({"type":"system","subtype":"init","model":"m"}),
+                "session_id",
+                Some("m".into()),
+            ),
+            (lies_codex, json!({"type":"thread.started"}), "thread_id", None),
+        ] {
+            let gestartet = Ereignis::Gestartet { modell };
+            assert_eq!(lesen(&init), vec![gestartet.clone()]);
+            init[feld] = json!("test-sitzung");
+            assert_eq!(lesen(&init), vec![gestartet.clone(), Ereignis::Sitzung("test-sitzung".into())]);
+            for wert in [Value::Null, json!(42)] {
+                init[feld] = wert;
+                assert_eq!(lesen(&init), vec![gestartet.clone()]);
+            }
+        }
+        assert_eq!(Ereignis::Sitzung("test-sitzung".into()).to_string(), "");
+    }
 
     #[test]
     fn claude_zeilen() {

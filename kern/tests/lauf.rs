@@ -11,6 +11,18 @@ static HAENGT: Anbieter = Anbieter {
 };
 
 #[test]
+fn lauf_liefert_sitzung_fuer_beide_anbieter() {
+    let codex = Anbieter { argumente: &["--codex"], lesen: lies_codex, ..TEST_AGENT };
+    for a in [&TEST_AGENT, &codex] {
+        let mut lauf = Lauf::starten(a, "Hallo", &std::env::temp_dir()).unwrap();
+        let alle: Vec<_> = lauf.ereignisse.iter().collect();
+        assert!(lauf.warten().unwrap().success());
+        let ids: Vec<_> = alle.iter().filter(|e| matches!(e, Ereignis::Sitzung(_))).collect();
+        assert_eq!(ids, [&Ereignis::Sitzung("test-sitzung".into())]);
+    }
+}
+
+#[test]
 fn liest_alle_ereignisse_live() {
     let mut lauf = Lauf::starten(&TEST_AGENT, "Hallo", &std::env::temp_dir()).unwrap();
     let alle: Vec<Ereignis> = lauf.ereignisse.iter().collect();
