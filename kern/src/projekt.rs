@@ -125,6 +125,10 @@ pub fn zuletzt_merken(datei: impl AsRef<Path>, pfad: &str) -> io::Result<()> {
     liste.retain(|p| bekannt.insert(schluessel(p)));
     liste.truncate(10);
     let daten = serde_json::to_vec_pretty(&liste)?;
+    atomar_schreiben(ziel, &daten)
+}
+
+pub(crate) fn atomar_schreiben(ziel: &Path, daten: &[u8]) -> io::Result<()> {
     let name = ziel.file_name().ok_or_else(|| Fehler::other("Dateiname fehlt"))?;
     static NR: AtomicUsize = AtomicUsize::new(0);
     let (temp, mut datei) = loop {
@@ -138,7 +142,7 @@ pub fn zuletzt_merken(datei: impl AsRef<Path>, pfad: &str) -> io::Result<()> {
         }
     };
     let ergebnis = (|| {
-        datei.write_all(&daten)?;
+        datei.write_all(daten)?;
         datei.sync_all()?;
         drop(datei);
         fs::rename(&temp, ziel)
