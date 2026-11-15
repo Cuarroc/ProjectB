@@ -48,7 +48,8 @@ describe("BeispielQuelle", () => {
     expect(new Set(daten.agenten.map(a => a.zustand))).toEqual(new Set(["Arbeitet", "Wartet auf dich", "Fertig"]));
     expect(daten.fragen).toHaveLength(1);
     expect(daten.fragen[0].antwortknoepfe.map(a => a.text)).toEqual(["In Downloads", "Im Projektordner"]);
-    expect(daten.kopf.kontingent).toEqual({ claude: 42, codex: 51, soll: 48 });
+    // Jedes Anbieterfenster braucht sein eigenes Soll, die Beispielansicht bleibt gleich.
+    expect(daten.kopf.kontingent).toEqual({ claude: { genutzt: 42, soll: 48 }, codex: { genutzt: 51, soll: 48 } });
     expect(daten.kopf.projekte).toEqual(["C:\\ProjectB", "C:\\ProjectB-Beispiel"]);
     expect(daten.kopf.postfach).toBe(3);
   });
@@ -91,4 +92,20 @@ describe("BeispielQuelle", () => {
     expect(quelle.lesen().agenten[0].name).toBe("Verändert");
     expect(new BeispielQuelle().lesen()).toEqual(beispiel);
   });
+});
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: vi.fn(() => false) }));
+it("liest Kontingente im Browser aus Beispielen und in Tauri unverändert aus dem Command", async () => {
+  const { invoke, isTauri } = await import("@tauri-apps/api/core");
+  const { kontingentLesen } = await import("./tauri");
+  expect(await kontingentLesen()).toEqual(beispiel.kopf.kontingent);
+  expect(invoke).not.toHaveBeenCalled();
+  vi.mocked(isTauri).mockReturnValue(true);
+  const werte = { claude: null, codex: { genutzt: 17, soll: 63 } };
+  vi.mocked(invoke).mockResolvedValueOnce(werte);
+  expect(await kontingentLesen()).toEqual(werte);
+  expect(invoke).toHaveBeenCalledExactlyOnceWith("kontingent");
+  vi.mocked(invoke).mockRejectedValueOnce(new Error("Nicht erreichbar"));
+  await expect(kontingentLesen()).rejects.toThrow("Nicht erreichbar");
+  vi.resetAllMocks();
 });

@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Circle, CircleDot, CircleX, Folder, IdCard } from "lucide-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { chatEingabeQuelle } from "./ChatEingabe";
-import { projektOeffnen, projektPruefen, projekteZuletzt } from "../daten/tauri";
-import type { Kopf as KopfDaten } from "../daten/typen";
+import { kontingentLesen, projektOeffnen, projektPruefen, projekteZuletzt } from "../daten/tauri";
+import type { Kontingent, Kopf as KopfDaten } from "../daten/typen";
 import "../bausteine/Eingabefeld.css";
 import { PostfachKnopf } from "./PostfachKnopf";
 import "./Kopf.css";
@@ -94,8 +94,17 @@ export function ProjektWahl({ kopf }: { kopf: KopfDaten }) {
 export default function Kopf() {
   const pause = useAnhalten(), [ton, setTon] = useState(frageTon.lesen);
   const [daten, setDaten] = useState(() => chatEingabeQuelle.lesen());
+  const [kontingent, setKontingent] = useState<Kontingent>(() => isTauri() ? { claude: null, codex: null } : daten.kopf.kontingent);
   const [bewegung, waehleBewegung] = useState<Bewegung>("auto"), [ruhig, setRuhig] = useState(false);
   useEffect(() => chatEingabeQuelle.abonnieren(() => setDaten(chatEingabeQuelle.lesen())), []);
+  useEffect(() => {
+    let aktiv = true;
+    const lesen = () => kontingentLesen().then(wert => { if (aktiv) setKontingent(wert); })
+      .catch(() => { /* Bei Lesefehlern bleibt der letzte Stand sichtbar. */ });
+    void lesen();
+    const intervall = setInterval(() => { void lesen(); }, 5 * 60 * 1000);
+    return () => { aktiv = false; clearInterval(intervall); };
+  }, []);
   useEffect(() => { bewegungSetzen(bewegung); }, [bewegung]);
   useEffect(() => { const m = matchMedia("(prefers-reduced-motion: reduce)"), lesen = () => setRuhig(m.matches); lesen();
     m.addEventListener("change", lesen); return () => m.removeEventListener("change", lesen); }, []);
@@ -112,10 +121,13 @@ export default function Kopf() {
       <button type="button" role="menuitemcheckbox" tabIndex={-1} aria-checked={ton} onClick={() => { frageTon.setzen(!ton); setTon(!ton); }}>Ton bei Fragen: {ton ? "An" : "Aus"}</button>
     </KopfMenue>
     <ProjektWahl kopf={daten.kopf} />
-    <div className="kopf-kontingent" role="group" aria-label={`Kontingent diese Woche · Genutzt · Weiße Marke: Soll ${daten.kopf.kontingent.soll} %`}>
-      {(["claude", "codex"] as const).map(a => <span className="kopf-nutzung" key={a} aria-label={`${a === "claude" ? "Claude" : "Codex"}: Genutzt ${daten.kopf.kontingent[a]} %, Soll ${daten.kopf.kontingent.soll} %`}>
-        {a === "claude" ? "Claude" : "Codex"}<span className="kopf-balken" aria-hidden="true"><span style={{ width: `${daten.kopf.kontingent[a]}%` }} /><i className="kopf-soll" style={{ left: `${daten.kopf.kontingent.soll}%` }} /></span><b>{daten.kopf.kontingent[a]} %</b>
-      </span>)}
+    <div className="kopf-kontingent" role="group" aria-label="Kontingent diese Woche · Genutzt · Weiße Marke: Soll">
+      {(["claude", "codex"] as const).map(a => {
+        const wert = kontingent[a], name = a === "claude" ? "Claude" : "Codex";
+        return <span className="kopf-nutzung" key={a} aria-label={`${name}: ${wert ? `Genutzt ${wert.genutzt} %, Soll ${wert.soll} %` : "unbekannt"}`}>
+          {name}{wert ? <><span className="kopf-balken" aria-hidden="true"><span style={{ width: `${wert.genutzt}%` }} /><i className="kopf-soll" style={{ left: `${wert.soll}%` }} /></span><b>{wert.genutzt} %</b></> : <b>unbekannt</b>}
+        </span>;
+      })}
     </div>
     <Berechtigungen daten={daten.berechtigungen} quelle={chatEingabeQuelle} />
     <PostfachKnopf zahl={daten.kopf.postfach} />
