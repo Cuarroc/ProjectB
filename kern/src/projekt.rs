@@ -30,7 +30,7 @@ pub fn pruefen(pfad: impl AsRef<Path>) -> Result<Projekt, Fehler> {
     }
     let wurzel = git(pfad, &["rev-parse", "--show-toplevel"])?;
     if !wurzel.status.success() {
-        return Err(Fehler::other(format!("Ordner ist kein Git-Repo: {}", git_fehler(&wurzel))));
+        return Err(Fehler::other(git_fehler(&wurzel, "Ordner ist kein Git-Repo")));
     }
     let wurzel = text(wurzel)?;
     let projekt = Path::new(&wurzel)
@@ -74,13 +74,19 @@ fn git(pfad: &Path, args: &[&str]) -> io::Result<Output> {
     })
 }
 
-fn git_fehler(ausgabe: &Output) -> String {
-    format!("{}: {}", ausgabe.status, String::from_utf8_lossy(&ausgabe.stderr).trim())
+fn git_fehler(ausgabe: &Output, hinweis: &str) -> String {
+    let stderr = String::from_utf8_lossy(&ausgabe.stderr);
+    let hinweis = if stderr.contains("dubious ownership") {
+        "Git vertraut diesem Ordner nicht (anderer Besitzer)"
+    } else {
+        hinweis
+    };
+    format!("{hinweis}: {}: {}", ausgabe.status, stderr.trim())
 }
 
 fn text(ausgabe: Output) -> io::Result<String> {
     if !ausgabe.status.success() {
-        return Err(Fehler::other(format!("Git fehlgeschlagen: {}", git_fehler(&ausgabe))));
+        return Err(Fehler::other(git_fehler(&ausgabe, "Git fehlgeschlagen")));
     }
     String::from_utf8(ausgabe.stdout)
         .map(|s| {
@@ -109,7 +115,11 @@ fn schluessel(pfad: &str) -> String {
 /// Ersetzt die Datei atomar wie einstellungen::speichern; der Elternordner muss existieren.
 pub fn zuletzt_merken(datei: impl AsRef<Path>, pfad: &str) -> io::Result<()> {
     let ziel = datei.as_ref();
-    let mut liste = zuletzt_laden(ziel);
+    let mut liste: Vec<String> = match fs::read(ziel) {
+        Ok(daten) => serde_json::from_slice(&daten).unwrap_or_default(),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => return Err(Fehler::new(e.kind(), format!("Verlauf konnte nicht gelesen werden: {e}"))),
+    };
     liste.insert(0, pfad.to_owned());
     let mut bekannt = HashSet::new();
     liste.retain(|p| bekannt.insert(schluessel(p)));
@@ -137,4 +147,20 @@ pub fn zuletzt_merken(datei: impl AsRef<Path>, pfad: &str) -> io::Result<()> {
         let _ = fs::remove_file(&temp);
     }
     ergebnis
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fremder_besitzer_wird_verstaendlich_gemeldet() {
+        let mut ausgabe = Command::new("git").arg("--version").output().unwrap();
+        let stderr = "fatal: detected dubious ownership in repository at 'Projekt'\n";
+        ausgabe.stderr = stderr.as_bytes().to_vec();
+        let fehler = git_fehler(&ausgabe, "Ordner ist kein Git-Repo");
+        assert!(fehler.contains("Git vertraut diesem Ordner nicht (anderer Besitzer)"), "{fehler}");
+        assert!(fehler.contains(stderr.trim()), "{fehler}");
+        assert!(!fehler.contains("kein Git-Repo"), "{fehler}");
+    }
 }
