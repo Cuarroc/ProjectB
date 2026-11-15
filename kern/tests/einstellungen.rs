@@ -212,3 +212,26 @@ fn projektdateien_sind_stabil_getrennt_und_windows_unabhaengig() {
     assert_eq!(laden(&erster), e);
     assert_eq!(laden(&zweiter), Einstellungen::default());
 }
+
+#[test]
+fn aendern_bewahrt_lesefehler_und_andere_felder() {
+    let datei = Datei::neu();
+    let delta = json!({"ausfuehren": {"pruefrundenHoechstens": "zwei"}});
+    fs::create_dir(&datei.0).unwrap();
+    fs::write(datei.0.join("behalten"), "unveraendert").unwrap();
+    assert!(aendern(&datei.0, &delta).is_err());
+    assert_eq!(fs::read_to_string(datei.0.join("behalten")).unwrap(), "unveraendert");
+    fs::remove_dir_all(&datei.0).unwrap();
+    for basis in [None, Some("{"), Some(r#"{"planen":{"plan":"kurz"},"ausfuehren":{"agentenGleichzeitig":"einer"}}"#)] {
+        if let Some(text) = basis {
+            fs::write(&datei.0, text).unwrap();
+        }
+        let mut erwartet = als_json(&laden(&datei.0));
+        erwartet["ausfuehren"]["pruefrundenHoechstens"] = json!("zwei");
+        assert_eq!(als_json(&aendern(&datei.0, &delta).unwrap()), erwartet);
+        assert_eq!(als_json(&laden(&datei.0)), erwartet);
+    }
+    let e = aendern(&datei.0, &json!({"planen": {"plan": 42}})).unwrap();
+    assert_eq!(e.planen.plan, Plan::Normal);
+    assert_eq!(e.ausfuehren.pruefrunden_hoechstens, Pruefrunden::Zwei);
+}

@@ -20,3 +20,6 @@
 :root[data-bewegung=reduziert] .ein-einst { animation: none; }
 @media (prefers-reduced-motion: reduce) { :root:not([data-bewegung=voll]) .ein-einst { animation: none; } }
 @container chat-eingabe (width < calc(30 * 1rem)) { .einst-wort, .einst-pfeil { display: none; } .einst-gruppe { margin-left: auto; } }
+
+.einst-fehler { display: flex; align-items: center; gap: var(--abstand-2); color: var(--status-problem); font: var(--schrift-klein); }
+.einst-fehler svg { width: var(--abstand-6); height: var(--abstand-6); flex-shrink: 0; }
