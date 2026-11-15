@@ -2,6 +2,8 @@ use std::{collections::BTreeMap, fs, path::Path};
 use tauri::{Emitter, Manager};
 
 #[tauri::command]
+// Benannte IPC-Felder aus invoke("auftrag_senden", …); ein Struct würde die Aufrufform ändern.
+#[allow(clippy::too_many_arguments)]
 pub async fn auftrag_senden(
     app: tauri::AppHandle,
     chat: String,
