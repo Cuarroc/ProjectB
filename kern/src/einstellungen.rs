@@ -130,10 +130,14 @@ pub fn als_json(e: &Einstellungen) -> Value {
 
 /// Stabiler FNV-1a-64-Dateiname im App-Datenordner, ohne Zugriff aufs Projekt.
 pub fn datei_fuer(ordner: &Path, projektpfad: &str) -> PathBuf {
+    ordner.join("einstellungen").join(dateiname(projektpfad))
+}
+
+pub(crate) fn dateiname(projektpfad: &str) -> String {
     let pfad = crate::projekt::schluessel(projektpfad);
     let hash =
         pfad.bytes().fold(0xcbf29ce484222325u64, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3));
-    ordner.join("einstellungen").join(format!("{hash:016x}.json"))
+    format!("{hash:016x}.json")
 }
 
 /// Schreibt und synchronisiert eine neue Nachbardatei und ersetzt dann das Ziel.
