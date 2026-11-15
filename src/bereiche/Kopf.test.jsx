@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import Kopf, { ProjektWahl, bewegungSetzen, bewegungAktuell } from "./Kopf";
 import { Children } from "react";
@@ -51,7 +51,6 @@ vi.mock("react", async original => {
     } };
 });
 const vorher = chatEingabeQuelle.lesen();
-beforeEach(() => { const d = chatEingabeQuelle.lesen(); d.chats.forEach(c => { c.gestartetUm = null; }); chatEingabeQuelle.aktualisieren(d); });
 // Desktop-Mocks und Kontingent-Timer dürfen spätere Tests nicht beeinflussen.
 afterEach(() => { vi.useRealTimers(); hooks.aktiv = false; hooks.werte = []; hooks.effekte = []; vi.resetAllMocks(); vi.mocked(isTauri).mockReturnValue(false); chatEingabeQuelle.aktualisieren(vorher); });
 const auswahl = () => {
@@ -74,7 +73,7 @@ it.each(["Liste", "Formular"])("sperrt Projektwechsel über %s bis alle Chats fe
   const ausloesen = () => { const { inhalt } = weg === "Liste" || auswahl().menue.props.formular ? auswahl() : formular(projekt.pfad);
     if (weg === "Liste") inhalt.props.children[0].props.children[1].props.onClick();
     else inhalt.props.onSubmit({ preventDefault: vi.fn() }); };
-  const d = chatEingabeQuelle.lesen(); d.kopf = { ...d.kopf, geoeffnet: true }; d.chats.push({ ...d.chats[0], id: "laufend", gestartetUm: "12:00" }); chatEingabeQuelle.aktualisieren(d);
+  const d = chatEingabeQuelle.lesen(); d.kopf = { ...d.kopf, geoeffnet: true }; d.chats.forEach(c => { c.gestartetUm = null; }); d.chats.push({ ...d.chats[0], id: "laufend", gestartetUm: "12:00" }); chatEingabeQuelle.aktualisieren(d);
   ausloesen(); await fertig();
   expect(projektOeffnen).not.toHaveBeenCalled(); expect(projekteZuletzt).not.toHaveBeenCalled();
   expect(chatEingabeQuelle.lesen().kopf).toEqual(d.kopf);
