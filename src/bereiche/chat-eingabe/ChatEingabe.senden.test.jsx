@@ -25,23 +25,25 @@ beforeEach(() => {
 });
 afterEach(async () => { aufraeumen.forEach(fn => fn?.()); await Promise.resolve(); vi.resetAllMocks(); });
 
-it.each(["Opus 5.5", "gPt-6", "mein cOdEx"])("sendet %s, sperrt Doppelsenden und setzt die Sitzung fort", async modell => {
-  const daten = quelle.lesen(); daten.chats[0].modell = modell; quelle.aktualisieren(daten);
+it.each([["Opus 5.5", "Niedrig"], ["gpt-6.1-sol", "Sehr hoch"]])("sendet %s mit %s, sperrt Doppelsenden und reicht die Sitzung weiter", async (modell, effort) => {
+  const daten = quelle.lesen(); daten.chats[0].modell = modell; daten.chats[0].effort = effort; quelle.aktualisieren(daten);
   let beenden; vi.mocked(auftragSenden).mockReturnValueOnce(new Promise(resolve => { beenden = resolve; }));
   const vorher = chat().verlauf.length, erste = ansicht().props.senden("Baue den Export");
   await Promise.resolve(); await Promise.resolve();
   expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Baue den Export" });
   expect(auftragSenden).toHaveBeenCalledExactlyOnceWith({ chat: chat().id, pfad: daten.kopf.pfad,
-    anbieter: modell === "Opus 5.5" ? "Claude" : "Codex", sitzung: null, text: "Baue den Export" });
+    modell, effort, sitzung: null, text: "Baue den Export" });
   expect(chat().gestartetUm).toMatch(/^\d\d:\d\d$/);
   await ansicht().props.senden("Noch einmal");
   expect(auftragSenden).toHaveBeenCalledOnce(); expect(chat().verlauf).toHaveLength(vorher + 1);
   expect(ansicht().props.fehler).toContain("läuft bereits");
-  beenden({ sitzung: "sitzung-1", erfolg: true }); await erste;
-  expect(chat()).toMatchObject({ sitzung: { id: "sitzung-1", anbieter: modell === "Opus 5.5" ? "Claude" : "Codex", pfad: daten.kopf.pfad }, gestartetUm: null });
-  vi.mocked(auftragSenden).mockResolvedValueOnce({ sitzung: "sitzung-1", erfolg: false });
+  const sitzung = { id: "sitzung-1", anbieter: modell === "Opus 5.5" ? "Claude" : "Codex", pfad: daten.kopf.pfad };
+  beenden({ sitzung, erfolg: true }); await erste;
+  expect(chat()).toMatchObject({ sitzung, gestartetUm: null });
+  vi.mocked(auftragSenden).mockResolvedValueOnce({ sitzung: null, erfolg: false });
   await ansicht().props.senden("Weiter");
-  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ sitzung: "sitzung-1", text: "Weiter" }));
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ sitzung, text: "Weiter" }));
+  expect(chat().sitzung).toBeNull();
 });
 it("startet ohne bestätigtes Projekt nichts und behält Text und Verlauf", async () => {
   const daten = quelle.lesen(); delete daten.kopf.geoeffnet; quelle.aktualisieren(daten);
@@ -51,18 +53,19 @@ it("startet ohne bestätigtes Projekt nichts und behält Text und Verlauf", asyn
   expect(ansicht().props.fehler).toBe("Bitte zuerst oben ein Projekt öffnen.");
   expect(ansicht().props.text).toBe("Baue den Export");
 });
-it.each(["Modell", "Projekt"])("setzt nach einem Wechsel von %s die Sitzung nicht fort", async wechsel => {
+it.each(["Modell", "Projekt"])("reicht nach einem Wechsel von %s die Sitzung unverändert an den Kern weiter", async wechsel => {
   let beenden; vi.mocked(auftragSenden).mockReturnValueOnce(new Promise(resolve => { beenden = resolve; }));
   const erster = ansicht().props.senden("Baue"); await Promise.resolve();
   const daten = quelle.lesen(), pfad = daten.kopf.pfad;
-  if (wechsel === "Modell") daten.chats[0].modell = "GPT-6";
+  if (wechsel === "Modell") daten.chats[0].modell = "gpt-6.1-sol";
   else daten.kopf.pfad = "D:\\AnderesProjekt";
-  quelle.aktualisieren(daten); beenden({ sitzung: "alte-sitzung", erfolg: true }); await erster;
+  const sitzung = { id: "alte-sitzung", anbieter: "Claude", pfad };
+  quelle.aktualisieren(daten); beenden({ sitzung, erfolg: true }); await erster;
   expect(chat().sitzung).toEqual({ id: "alte-sitzung", anbieter: "Claude", pfad });
-  vi.mocked(auftragSenden).mockResolvedValueOnce({ sitzung: "neue-sitzung", erfolg: true });
+  vi.mocked(auftragSenden).mockResolvedValueOnce({ sitzung: null, erfolg: true });
   await ansicht().props.senden("Weiter");
   expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({
-    anbieter: wechsel === "Modell" ? "Codex" : "Claude", pfad: daten.kopf.pfad, sitzung: null,
+    modell: daten.chats[0].modell, effort: daten.chats[0].effort, pfad: daten.kopf.pfad, sitzung,
   }));
 });
 it("ordnet Events auch einem inaktiven Chat zu und ignoriert unbekannte Chats", () => {
@@ -93,10 +96,10 @@ it("lässt einen anderen Chat senden und ordnet späte Ergebnisse dem ursprüngl
   const erster = ansicht().props.senden("Erster Chat"); await Promise.resolve();
   const daten = quelle.lesen(); daten.chats.push({ ...chat(), id: "zweiter", verlauf: [], gestartetUm: null });
   daten.aktiverChatId = "zweiter"; quelle.aktualisieren(daten);
-  vi.mocked(auftragSenden).mockResolvedValueOnce({ sitzung: "s-2", erfolg: true });
+  vi.mocked(auftragSenden).mockResolvedValueOnce({ sitzung: { id: "s-2", anbieter: "Claude", pfad: daten.kopf.pfad }, erfolg: true });
   await ansicht().props.senden("Zweiter Chat");
   expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ chat: "zweiter", sitzung: null }));
-  empfangen(chat().id, "Späte Antwort"); beenden({ sitzung: "s-1", erfolg: true }); await erster;
+  empfangen(chat().id, "Späte Antwort"); beenden({ sitzung: { id: "s-1", anbieter: "Claude", pfad: daten.kopf.pfad }, erfolg: true }); await erster;
   expect(chat()).toMatchObject({ sitzung: { id: "s-1" }, gestartetUm: null });
   expect(chat().verlauf.at(-1).text).toBe("Späte Antwort");
   expect(quelle.lesen().chats[1]).toMatchObject({ sitzung: { id: "s-2" }, gestartetUm: null });

@@ -40,11 +40,11 @@ describe("Projektbrücke", () => {
   });
 });
 
-const auftrag = { chat: "chat-1", pfad: "D:\\Mein Projekt", anbieter: "Codex" as const, sitzung: null, text: "Baue CSV" };
+const auftrag = { chat: "chat-1", pfad: "D:\\Mein Projekt", modell: "gpt-6.1-sol", effort: "Sehr hoch" as const, sitzung: { id: "s-0", anbieter: "Codex" as const, pfad: "D:\\Mein Projekt" }, text: "Baue CSV" };
 it("sendet genau die Auftragsfelder an den Desktop-Command", async () => {
   vi.mocked(isTauri).mockReturnValue(true);
-  vi.mocked(invoke).mockResolvedValue({ sitzung: "s-1", erfolg: true });
-  await expect(auftragSenden(auftrag)).resolves.toEqual({ sitzung: "s-1", erfolg: true });
+  vi.mocked(invoke).mockResolvedValue({ sitzung: { id: "s-1", anbieter: "Codex", pfad: auftrag.pfad }, erfolg: true });
+  await expect(auftragSenden(auftrag)).resolves.toEqual({ sitzung: { id: "s-1", anbieter: "Codex", pfad: auftrag.pfad }, erfolg: true });
   expect(invoke).toHaveBeenCalledExactlyOnceWith("auftrag_senden", auftrag);
 });
 it("abonniert chat-nachricht und reicht die Nutzdaten und das Abmelden weiter", async () => {

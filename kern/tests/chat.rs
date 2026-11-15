@@ -1,10 +1,65 @@
 use projectb_kern::{
-    chat::ausfuehren,
-    start::Startwunsch,
+    chat::{ausfuehren, startwunsch},
+    start::{argumente, Effort, Startwunsch},
     verbrauch::{laden, Stand},
     Anbieter, Ereignis, CLAUDE, CODEX,
 };
 use std::{fs, path::Path};
+
+#[test]
+fn chat_auswahl_erreicht_die_argumente_beider_anbieter() {
+    for (modell, name, cli) in [
+        ("Opus 5.5", "claude", "claude-opus-5-5"),
+        ("Sonnet 5.5", "claude", "claude-sonnet-5-5"),
+        ("Haiku 5.5", "claude", "claude-haiku-5-5"),
+        ("gpt-6.1-sol", "codex", "gpt-6.1-sol"),
+    ] {
+        for (text, effort, wert) in [
+            ("Niedrig", Effort::Niedrig, "low"),
+            ("Mittel", Effort::Mittel, "medium"),
+            ("Hoch", Effort::Hoch, "high"),
+            ("Sehr hoch", Effort::SehrHoch, "xhigh"),
+        ] {
+            let (a, w) = startwunsch(modell, text, None, "projekt", "Hallo".into()).unwrap();
+            assert_eq!(a.name, name);
+            assert_eq!(w.modell.as_deref(), Some(cli));
+            assert_eq!(w.effort, Some(effort));
+            assert_eq!(w.prompt(), "Hallo");
+            assert!(w.fortsetzen.is_none());
+            let mut erwartet: Vec<String> = a.argumente.iter().map(|s| s.to_string()).collect();
+            if name == "codex" {
+                erwartet.pop();
+            }
+            erwartet.extend(["--model".into(), cli.into()]);
+            if name == "claude" {
+                erwartet.extend(["--effort".into(), wert.into()]);
+            } else {
+                erwartet.extend(["-c".into(), format!("model_reasoning_effort=\"{wert}\""), "-".into()]);
+            }
+            assert_eq!(argumente(a, &w).unwrap(), erwartet);
+        }
+    }
+}
+
+#[test]
+fn nur_sitzungen_desselben_anbieters_und_pfads_werden_fortgesetzt() {
+    for (modell, anbieter) in [("Opus 5.5", "Claude"), ("gpt-6.1-sol", "Codex")] {
+        for (alt, pfad, erwartet) in
+            [(anbieter, "projekt", Some("id")), (anbieter, "anders", None), ("fremd", "projekt", None)]
+        {
+            let (_, w) = startwunsch(modell, "Hoch", Some(("id", alt, pfad)), "projekt", "Weiter".into()).unwrap();
+            assert_eq!(w.fortsetzen.as_deref(), erwartet);
+        }
+    }
+}
+
+#[test]
+fn unbekannte_chat_auswahl_liefert_deutschen_fehler() {
+    for (modell, effort, fehler) in [("X", "Hoch", "Unbekanntes Modell: X"), ("Opus 5.5", "X", "Unbekannter Effort: X")]
+    {
+        assert_eq!(startwunsch(modell, effort, None, ".", "Hallo".into()).err().unwrap(), fehler);
+    }
+}
 
 fn agent(codex: bool, argumente: &'static [&'static str]) -> Anbieter {
     let basis = if codex { &CODEX } else { &CLAUDE };

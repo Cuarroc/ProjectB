@@ -62,7 +62,7 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
     if (werte.kontextfenster && !Object.hasOwn(werte, "kontextProzent")) werte.kontextProzent = ziel.kontextProzent * ziel.kontextfenster / werte.kontextfenster;
     Object.assign(ziel, werte); quelle.aktualisieren(neu);
   };
-  return <ChatEingabeAnsicht chat={chat} modelle={[...new Set([...daten.chats, ...daten.agenten].map(a => a.modell))]}
+  return <ChatEingabeAnsicht chat={chat} modelle={["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"]}
     text={text} fehler={fehler} laeuft={laufende.current.has(chat.id)} aendern={aendern} schreiben={schreiben} senden={async inhalt => {
       if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
       if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
@@ -72,13 +72,11 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
       laufende.current.add(chat.id);
       aendern({ gestartetUm: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) });
       const aktuell = quelle.lesen(), ziel = aktuell.chats.find(c => c.id === chat.id)!;
-      // shortcut: Modell und Effort gehen in P-5-2f mit
-      const anbieter = /^GPT|Codex/i.test(ziel.modell) ? "Codex" : "Claude";
-      const pfad = aktuell.kopf.pfad, sitzung = ziel.sitzung?.anbieter === anbieter && ziel.sitzung.pfad === pfad ? ziel.sitzung.id : null;
+      const pfad = aktuell.kopf.pfad, sitzung = ziel.sitzung ?? null;
       try {
         await empfang.current;
-        const antwort = await auftragSenden({ chat: ziel.id, pfad, anbieter, sitzung, text: inhalt });
-        aendern({ sitzung: antwort.sitzung ? { id: antwort.sitzung, anbieter, pfad } : null });
+        const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, sitzung, text: inhalt });
+        aendern({ sitzung: antwort.sitzung });
       } catch (e) { orchestratorNachricht(quelle, chat.id, `Problem: ${e instanceof Error ? e.message : String(e)}`); }
       finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
     }} />;
