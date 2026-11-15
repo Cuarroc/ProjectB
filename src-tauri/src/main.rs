@@ -1,10 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod kontingent;
 mod projekt;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            kontingent::kontingent,
             projekt::projekt_pruefen,
             projekt::projekt_oeffnen,
             projekt::projekte_zuletzt,

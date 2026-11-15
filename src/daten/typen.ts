@@ -33,7 +33,8 @@ export type Frage = {
 export type Todo = { id: string; text: string; fertig: boolean };
 export type Ausgabe = { id: string; sitzungId: string; name: string; pfad: string };
 export type Beleg = { id: string; agentId: string; titel: string; prLink: string };
-export type Kontingent = { claude: number; codex: number; soll: number };
+export type Wert = { genutzt: number; soll: number };
+export type Kontingent = { claude: Wert | null; codex: Wert | null };
 export type Chat = {
   id: string; titel: string; verlauf: Nachricht[]; gestartetUm: string | null;
   modus: "Ausführen" | "Planen" | "Interview";

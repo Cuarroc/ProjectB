@@ -88,7 +88,7 @@ export const beispiel: Datenstand = {
   ausgaben: [{ id: "export-protokoll", sitzungId: "kern", name: "Testprotokoll", pfad: "Ausgaben/export-tests.txt" }],
   belege: [{ id: "dauer-pr", agentId: "dauer", titel: "12 von 12 Tests grün · Review ohne Funde", prLink: "https://github.com/Cuarroc/ProjectB/pull/57" }],
   kopf: { projekt: "ProjectB", pfad: "C:\\ProjectB", zweig: "main", projekte: ["C:\\ProjectB", "C:\\ProjectB-Beispiel"],
-    kontingent: { claude: 42, codex: 51, soll: 48 }, postfach: 3 },
+    kontingent: { claude: { genutzt: 42, soll: 48 }, codex: { genutzt: 51, soll: 48 } }, postfach: 3 },
   berechtigungen: {
     aktuell: "Nur bei Wichtigem",
     stufen: [

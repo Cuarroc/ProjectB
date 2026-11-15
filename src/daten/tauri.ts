@@ -1,6 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { beispiel } from "./beispiel";
-import type { Kopf } from "./typen";
+import type { Kontingent, Kopf } from "./typen";
 
 export type Projekt = Pick<Kopf, "projekt" | "pfad" | "zweig">;
 
@@ -22,4 +22,8 @@ export async function projektOeffnen(pfad: string): Promise<Projekt> {
 
 export async function projekteZuletzt(): Promise<string[]> {
   return isTauri() ? invoke<string[]>("projekte_zuletzt") : [...beispiel.kopf.projekte];
+}
+
+export async function kontingentLesen(): Promise<Kontingent> {
+  return isTauri() ? invoke<Kontingent>("kontingent") : beispiel.kopf.kontingent;
 }
