@@ -151,15 +151,34 @@ fn zuletzt_neu_oben_ohne_doppelte_und_hoechstens_zehn() {
 }
 
 #[test]
+fn lesefehler_brechen_das_merken_ab_und_erhalten_den_inhalt() {
+    let ordner = Ordner::neu();
+    let datei = ordner.0.join("zuletzt.json");
+    fs::create_dir(&datei).unwrap();
+    fs::write(datei.join("behalten"), "Arbeit").unwrap();
+    let lesefehler = fs::read(&datei).unwrap_err();
+
+    assert!(zuletzt_laden(&datei).is_empty());
+    let fehler = zuletzt_merken(&datei, "Projekt").unwrap_err();
+    assert!(datei.is_dir());
+    assert_eq!(fs::read_to_string(datei.join("behalten")).unwrap(), "Arbeit");
+    assert_eq!(fs::read_dir(&datei).unwrap().count(), 1);
+    assert_eq!(fs::read_dir(&ordner.0).unwrap().count(), 1);
+    assert_eq!(fehler.kind(), lesefehler.kind());
+    assert!(fehler.to_string().contains("Verlauf konnte nicht gelesen werden"), "{fehler}");
+    assert!(fehler.to_string().contains(&lesefehler.to_string()), "{fehler}");
+}
+
+#[test]
 fn kaputte_dateien_und_schreibfehler() {
     let ordner = Ordner::neu();
     let datei = ordner.0.join("zuletzt.json");
     for inhalt in ["{", "null", "{}", "42", r#"["gut", 3]"#] {
         fs::write(&datei, inhalt).unwrap();
         assert!(zuletzt_laden(&datei).is_empty());
+        zuletzt_merken(&datei, "Projekt").unwrap();
+        assert_eq!(zuletzt_laden(&datei), ["Projekt"]);
     }
-    zuletzt_merken(&datei, "Projekt").unwrap();
-    assert_eq!(zuletzt_laden(&datei), ["Projekt"]);
     assert!(zuletzt_merken(datei.join("fehlt.json"), "Projekt").is_err());
     assert_eq!(zuletzt_laden(&datei), ["Projekt"]);
     fs::remove_file(&datei).unwrap();
