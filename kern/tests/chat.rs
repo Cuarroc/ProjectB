@@ -205,7 +205,7 @@ fn planen_und_interview_sind_auch_beim_fortsetzen_nur_lesend() {
                 let mut erwartet = if name == "claude" {
                     vec!["-p", "--output-format", "stream-json", "--verbose"]
                 } else {
-                    vec!["exec", "-s", "read-only"]
+                    vec!["exec"]
                 };
                 if sitzung.is_some() {
                     erwartet.extend([if name == "claude" { "--resume" } else { "resume" }, "id"]);
@@ -215,9 +215,17 @@ fn planen_und_interview_sind_auch_beim_fortsetzen_nur_lesend() {
                 }
                 erwartet.extend(["--model", cli]);
                 if name == "claude" {
-                    erwartet.extend(["--effort", "high", "--permission-mode", "plan"]);
+                    erwartet.extend([
+                        "--effort",
+                        "high",
+                        "--permission-mode",
+                        "plan",
+                        "--settings",
+                        r#"{"useAutoModeDuringPlan":false}"#,
+                        "--disallowedTools=ExitPlanMode",
+                    ]);
                 } else {
-                    erwartet.extend(["-c", "model_reasoning_effort=\"high\"", "-"]);
+                    erwartet.extend(["-c", "model_reasoning_effort=\"high\"", "-c", "sandbox_mode=\"read-only\"", "-"]);
                 }
                 assert_eq!(argumente(a, &w).unwrap(), erwartet);
                 let rolle = w.rolle.as_deref().unwrap();

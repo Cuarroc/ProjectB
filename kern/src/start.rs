@@ -127,11 +127,14 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
     }
     if wunsch.nur_lesen {
         match anbieter.name {
-            "claude" => args.extend(["--permission-mode".into(), "plan".into()]),
-            "codex" => {
-                // `exec resume --help` kennt -s nicht: vor das Unterkommando setzen.
-                args.splice(1..1, ["-s".into(), "read-only".into()]);
-            }
+            "claude" => args.extend([
+                "--permission-mode".into(),
+                "plan".into(),
+                "--settings".into(),
+                r#"{"useAutoModeDuringPlan":false}"#.into(),
+                "--disallowedTools=ExitPlanMode".into(),
+            ]),
+            "codex" => args.extend(["-c".into(), "sandbox_mode=\"read-only\"".into()]),
             _ => unreachable!("unbekannte Schalter zuvor abgelehnt"),
         }
     }
