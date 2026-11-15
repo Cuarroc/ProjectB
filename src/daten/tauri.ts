@@ -11,7 +11,7 @@ export async function chatsSpeichern(projekt: string, daten: Chats): Promise<voi
   if (isTauri()) await invoke("chats_speichern", { projekt, daten });
 }
 
-export async function auftragSenden(auftrag: { chat: string; pfad: string; modell: string; effort: Chat["effort"]; sitzung: NonNullable<Chat["sitzung"]> | null; text: string }): Promise<{ sitzung: NonNullable<Chat["sitzung"]> | null; erfolg: boolean }> {
+export async function auftragSenden(auftrag: { chat: string; pfad: string; modell: string; effort: Chat["effort"]; modus: Chat["modus"]; sitzung: NonNullable<Chat["sitzung"]> | null; text: string }): Promise<{ sitzung: NonNullable<Chat["sitzung"]> | null; erfolg: boolean }> {
   if (!isTauri()) throw new Error("Echte Aufträge gehen nur in der Desktop-App.");
   return invoke("auftrag_senden", auftrag);
 }

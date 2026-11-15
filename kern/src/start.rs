@@ -45,6 +45,7 @@ pub struct Startwunsch {
     pub modell: Option<String>,
     pub effort: Option<Effort>,
     pub fortsetzen: Option<String>,
+    pub nur_lesen: bool,
     pub auftrag: String,
 }
 
@@ -84,11 +85,11 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
         }
     }
     if !matches!(anbieter.name, "claude" | "codex")
-        && (wunsch.modell.is_some() || wunsch.effort.is_some() || wunsch.fortsetzen.is_some())
+        && (wunsch.modell.is_some() || wunsch.effort.is_some() || wunsch.fortsetzen.is_some() || wunsch.nur_lesen)
     {
         return Err(Error::new(
             ErrorKind::Unsupported,
-            format!("Für Anbieter {} sind keine Modell-/Effort-/Fortsetzen-Schalter bekannt", anbieter.name),
+            format!("Für Anbieter {} sind keine Modell-/Effort-/Fortsetzen-/Nur-Lesen-Schalter bekannt", anbieter.name),
         ));
     }
     let mut args: Vec<String> = anbieter.argumente.iter().map(|s| (*s).into()).collect();
@@ -121,6 +122,19 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
         match anbieter.name {
             "claude" => args.extend(["--effort".into(), wert.into()]),
             "codex" => args.extend(["-c".into(), format!("model_reasoning_effort=\"{wert}\"")]),
+            _ => unreachable!("unbekannte Schalter zuvor abgelehnt"),
+        }
+    }
+    if wunsch.nur_lesen {
+        match anbieter.name {
+            "claude" => args.extend([
+                "--permission-mode".into(),
+                "plan".into(),
+                "--settings".into(),
+                r#"{"useAutoModeDuringPlan":false}"#.into(),
+                "--disallowedTools=ExitPlanMode".into(),
+            ]),
+            "codex" => args.extend(["-c".into(), "sandbox_mode=\"read-only\"".into()]),
             _ => unreachable!("unbekannte Schalter zuvor abgelehnt"),
         }
     }
@@ -164,6 +178,7 @@ mod tests {
             modell: Some("modell-test".into()),
             effort: Some(Effort::Hoch),
             fortsetzen: None,
+            nur_lesen: false,
             auftrag: "Test".into(),
         };
         for a in [&CLAUDE, &CODEX] {
@@ -182,6 +197,7 @@ mod tests {
             modell: None,
             effort: None,
             fortsetzen: Some("AZaz09_-".into()),
+            nur_lesen: false,
             auftrag: "Weiter".into(),
         }
     }

@@ -32,7 +32,7 @@ it.each([["Opus 5.5", "Niedrig"], ["gpt-6.1-sol", "Sehr hoch"]])("sendet %s mit 
   await Promise.resolve(); await Promise.resolve();
   expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Baue den Export" });
   expect(auftragSenden).toHaveBeenCalledExactlyOnceWith({ chat: chat().id, pfad: daten.kopf.pfad,
-    modell, effort, sitzung: null, text: "Baue den Export" });
+    modell, effort, modus: "Ausführen", sitzung: null, text: "Baue den Export" });
   expect(chat().gestartetUm).toMatch(/^\d\d:\d\d$/);
   await ansicht().props.senden("Noch einmal");
   expect(auftragSenden).toHaveBeenCalledOnce(); expect(chat().verlauf).toHaveLength(vorher + 1);
@@ -110,4 +110,14 @@ it("lässt einen anderen Chat senden und ordnet späte Ergebnisse dem ursprüngl
   expect(chat()).toMatchObject({ sitzung: { id: "s-1" }, gestartetUm: null });
   expect(chat().verlauf.at(-1).text).toBe("Späte Antwort");
   expect(quelle.lesen().chats[1]).toMatchObject({ sitzung: { id: "s-2" }, gestartetUm: null });
+});
+
+it.each(["Ausführen", "Planen", "Interview"])("sendet den aktuellen Modus %s auch beim Fortsetzen", async modus => {
+  const daten = quelle.lesen(); daten.chats[0].modus = modus; quelle.aktualisieren(daten);
+  const sitzung = { id: "s-modus", anbieter: "Claude", pfad: daten.kopf.pfad };
+  vi.mocked(auftragSenden).mockResolvedValue({ sitzung, erfolg: true });
+  await ansicht().props.senden("Auftrag");
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus, sitzung: null }));
+  await ansicht().props.senden("Weiter");
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus, sitzung }));
 });

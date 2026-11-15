@@ -76,7 +76,7 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
       const pfad = aktuell.kopf.pfad, sitzung = ziel.sitzung ?? null;
       try {
         await empfang.current;
-        const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, sitzung, text: inhalt });
+        const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus: ziel.modus, sitzung, text: inhalt });
         aendern({ sitzung: antwort.sitzung });
       } catch (e) { orchestratorNachricht(quelle, chat.id, `Problem: ${e instanceof Error ? e.message : String(e)}`); }
       finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
