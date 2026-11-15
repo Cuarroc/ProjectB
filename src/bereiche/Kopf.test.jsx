@@ -82,13 +82,17 @@ it.each(["Liste", "Formular"])("sperrt Projektwechsel über %s bis alle Chats fe
   expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad); expect(chatEingabeQuelle.lesen().kopf.pfad).toBe(projekt.pfad);
 });
 
-it("sperrt das erste Öffnen nicht wegen eines Beispiel-Laufs", async () => {
-  const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" }; vi.mocked(projektOeffnen).mockResolvedValue(projekt);
-  const d = chatEingabeQuelle.lesen(); d.kopf = { ...d.kopf, geoeffnet: false }; d.chats[0].gestartetUm = "14:30"; chatEingabeQuelle.aktualisieren(d);
-  auswahl().inhalt.props.children[0].props.children[1].props.onClick(); await fertig();
-  expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad);
+it("übernimmt kein Projekt, wenn während des Öffnens ein Auftrag startet", async () => {
+  let fertigOeffnen; vi.mocked(projektOeffnen).mockReturnValue(new Promise(r => { fertigOeffnen = r; })); const d = chatEingabeQuelle.lesen();
+  d.kopf = { ...d.kopf, geoeffnet: true }; d.chats.forEach(c => { c.gestartetUm = null; }); chatEingabeQuelle.aktualisieren(d); auswahl().inhalt.props.children[0].props.children[1].props.onClick(); await fertig();
+  d.chats[0].gestartetUm = "12:00"; chatEingabeQuelle.aktualisieren(d); fertigOeffnen({ projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" }); await fertig();
+  expect(chatEingabeQuelle.lesen().kopf.pfad).toBe(d.kopf.pfad); expect(renderToStaticMarkup(auswahl().inhalt)).toContain("Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist.");
 });
-
+it("sperrt das erste Öffnen nicht wegen eines Beispiel-Laufs", async () => {
+  vi.mocked(projektOeffnen).mockResolvedValue({ projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" });
+  const d = chatEingabeQuelle.lesen(); d.kopf = { ...d.kopf, geoeffnet: false }; d.chats[0].gestartetUm = "14:30"; chatEingabeQuelle.aktualisieren(d);
+  auswahl().inhalt.props.children[0].props.children[1].props.onClick(); await fertig(); expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(vorher.kopf.projekte[1]);
+});
 it("öffnet per Formular und setzt Projektname, Pfad, Zweig und die letzte Liste im Kopf", async () => {
   const projekt = { projekt: "Unser Garten", pfad: "D:\\Arbeit\\Garten", zweig: "blumen" };
   vi.mocked(projektOeffnen).mockResolvedValue(projekt);

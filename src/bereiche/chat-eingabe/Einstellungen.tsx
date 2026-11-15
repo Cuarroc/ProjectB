@@ -8,21 +8,22 @@ import { chatEingabeQuelle } from "../ChatEingabe";
 import { einstellungenLaden, einstellungenAendern, einstellungenAenderung } from "../../daten/tauri";
 import "./Einstellungen.css";
 
+type Stand = { aktiv: boolean; gespeichert: Record<string, string[]>; offen: ((w: Record<string, string[]>) => Record<string, string[]>)[]; fehler: Map<string, string>; kette: Promise<unknown> };
+// Außerhalb der Komponente, damit die Schreibreihenfolge je Projekt einen kurzen Abbau der Chateingabe übersteht.
+export const projekte = new Map<string, Stand>();
 export function Einstellungen({ modus }: { modus: string }) {
   const [werte, setWerte] = useState<Record<string, string[]>>({}), [offen, setOffen] = useState(false);
   const [fehler, setFehler] = useState("");
-  type Werte = Record<string, string[]>;
-  const speicher = useRef<{ aktiv: boolean; gespeichert: Werte; offen: ((w: Werte) => Werte)[]; fehler: Map<string, string>; kette: Promise<unknown> } | null>(null);
+  const speicher = useRef<Stand | null>(null);
   useEffect(() => {
     if (!isTauri()) return;
     let pfad: string | undefined;
-    const projekte = new Map<string, NonNullable<typeof speicher.current>>();
     const laden = () => {
       const neu = chatEingabeQuelle.lesen().kopf.pfad;
       if (neu === pfad) return;
       pfad = neu;
       if (speicher.current) speicher.current.aktiv = false;
-      const stand: NonNullable<typeof speicher.current> = { aktiv: true, gespeichert: {}, offen: [], fehler: projekte.get(neu)?.fehler ?? new Map(), kette: Promise.resolve() };
+      const stand: Stand = { aktiv: true, gespeichert: {}, offen: [], fehler: projekte.get(neu)?.fehler ?? new Map(), kette: Promise.resolve() };
       speicher.current = stand; setWerte({}); setFehler("");
       stand.kette = (projekte.get(neu)?.kette ?? Promise.resolve()).then(() => einstellungenLaden(neu)).then(werte => {
         stand.gespeichert = werte; if (stand.aktiv) { if (!stand.offen.length) setWerte(werte); setFehler([...new Set(stand.fehler.values())].join(" ")); }

@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { Children, isValidElement } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Einstellungen } from "./Einstellungen";
+import { Einstellungen, projekte } from "./Einstellungen";
 import { chatEingabeQuelle as quelle } from "../ChatEingabe";
 import { Umschalter } from "../../bausteine/Umschalter";
 const h = vi.hoisted(() => ({ werte: [], refs: [], effekte: [], jetzt: [], i: 0, r: 0, e: 0 }));
@@ -21,7 +21,7 @@ const knopf = el => finde(el, e => e.type === "button" && e.props["aria-haspopup
 const feld = () => finde(render(), e => e.type === Umschalter);
 const leeren = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 const warten = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
-beforeEach(() => { vi.stubGlobal("getComputedStyle", () => ({ getPropertyValue: () => "6000ms" })); vi.stubGlobal("document", { addEventListener: vi.fn(), removeEventListener: vi.fn() }); h.werte = []; h.refs = []; h.effekte = []; vi.mocked(invoke).mockReset(); pfad("A"); });
+beforeEach(() => { vi.stubGlobal("getComputedStyle", () => ({ getPropertyValue: () => "6000ms" })); vi.stubGlobal("document", { addEventListener: vi.fn(), removeEventListener: vi.fn() }); h.werte = []; h.refs = []; h.effekte = []; vi.mocked(invoke).mockReset(); projekte.clear(); pfad("A"); });
 afterEach(() => { h.effekte.forEach(e => e.ab?.()); vi.unstubAllGlobals(); });
 it("lädt je Projekt, sendet ein Feld, zeigt die Kernantwort und springt bei Fehler zurück", async () => {
   vi.mocked(invoke).mockResolvedValue({ ausfuehren: { agentenGleichzeitig: "einer" } });
@@ -98,4 +98,11 @@ it("behält Speicherfehler auch nach Projektwechsel bis genau dieses Feld erfolg
   spaet.reject("Projekt A gesperrt"); await leeren(); expect(status()).toBeUndefined();
   pfad("A"); await leeren(); expect(feld().props.wert).toBe("1");
   expect(status()?.props.children.join(" ")).toContain("Nicht gespeichert: Projekt A gesperrt");
+});
+it("hält die Speicherreihenfolge, wenn die Eingabe kurz abgebaut wird", async () => {
+  const erst = warten(); vi.mocked(invoke).mockResolvedValueOnce({}).mockReturnValueOnce(erst.promise).mockResolvedValue({});
+  const aufbauen = async wert => { render(); await leeren(); knopf(render()).props.onClick(); feld().props.onChange(wert); await leeren(); };
+  await aufbauen("Bis zu 5"); h.effekte.forEach(e => e.ab?.()); h.werte = []; h.refs = []; h.effekte = []; await aufbauen("1");
+  expect(vi.mocked(invoke).mock.calls.filter(([cmd]) => cmd === "einstellungen_speichern")).toHaveLength(1); erst.resolve({}); await leeren();
+  expect(invoke).toHaveBeenLastCalledWith("einstellungen_speichern", { projekt: "A", werte: { ausfuehren: { agentenGleichzeitig: "einer" } } });
 });

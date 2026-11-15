@@ -58,14 +58,15 @@ export function ProjektWahl({ kopf }: { kopf: KopfDaten }) {
   }, []);
   const oeffnen = async (pfad: string, zu: () => void) => {
     if (laedt.current) return;
-    const aktuell = chatEingabeQuelle.lesen();
-    // Nur echte Läufe eines geöffneten Projekts sperren, nicht die Beispieldaten vor dem ersten Öffnen.
-    if (aktuell.kopf.geoeffnet && pfad.trim() !== aktuell.kopf.pfad && aktuell.chats.some(chat => chat.gestartetUm != null)) {
-      setFehler("Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist."); return;
-    }
+    // Nur echte Läufe eines geöffneten Projekts sperren (vor und nach dem await), nicht die Beispieldaten vor dem ersten Öffnen.
+    const gesperrt = (ziel: string) => { const a = chatEingabeQuelle.lesen(); return !!a.kopf.geoeffnet && ziel !== a.kopf.pfad && a.chats.some(chat => chat.gestartetUm != null); };
+    const sperre = "Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist.";
+    if (gesperrt(pfad.trim())) { setFehler(sperre); return; }
     laedt.current = true; setOeffnet(true); setFehler("");
     try {
-      const projekt = await projektOeffnen(pfad.trim()), daten = chatEingabeQuelle.lesen();
+      const projekt = await projektOeffnen(pfad.trim());
+      if (gesperrt(projekt.pfad)) { setFehler(sperre); return; }
+      const daten = chatEingabeQuelle.lesen();
       chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, ...projekt, geoeffnet: true, projekte: [projekt.pfad, ...daten.kopf.projekte.filter(p => p !== projekt.pfad)] } });
       geoeffnet.current = true; setFormular(false); zu();
       try {
