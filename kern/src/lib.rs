@@ -2,6 +2,7 @@
 //! JSON-Ereignisse live und kann sie anhalten (Technik-Probe, Schritt 3).
 pub mod anhalten;
 pub mod chat;
+pub mod chats;
 
 pub mod einstellungen;
 pub mod projekt;
