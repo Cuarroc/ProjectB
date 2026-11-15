@@ -66,6 +66,9 @@ export function ProjektWahl({ kopf }: { kopf: KopfDaten }) {
     laedt.current = true; setOeffnet(true); setFehler("");
     try {
       const projekt = await projektOeffnen(pfad.trim()), daten = chatEingabeQuelle.lesen();
+      if (daten.kopf.geoeffnet && projekt.pfad !== daten.kopf.pfad && daten.chats.some(chat => chat.gestartetUm != null)) {
+        setFehler("Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist."); return;
+      }
       chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, ...projekt, geoeffnet: true, projekte: [projekt.pfad, ...daten.kopf.projekte.filter(p => p !== projekt.pfad)] } });
       geoeffnet.current = true; setFormular(false); zu();
       try {
