@@ -1,9 +1,8 @@
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { Children, isValidElement } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Einstellungen } from "./Einstellungen";
 import { chatEingabeQuelle as quelle } from "../ChatEingabe";
-import { Umschalter } from "../../bausteine/Umschalter";
+let Einstellungen, Umschalter;
 const h = vi.hoisted(() => ({ werte: [], refs: [], effekte: [], jetzt: [], i: 0, r: 0, e: 0 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => true }));
 vi.mock("../ChatEingabe", async () => ({ chatEingabeQuelle: new (await import("../../daten/quelle")).BeispielQuelle() }));
@@ -21,7 +20,9 @@ const knopf = el => finde(el, e => e.type === "button" && e.props["aria-haspopup
 const feld = () => finde(render(), e => e.type === Umschalter);
 const leeren = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 const warten = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
-beforeEach(() => { vi.stubGlobal("getComputedStyle", () => ({ getPropertyValue: () => "6000ms" })); vi.stubGlobal("document", { addEventListener: vi.fn(), removeEventListener: vi.fn() }); h.werte = []; h.refs = []; h.effekte = []; vi.mocked(invoke).mockReset(); pfad("A"); });
+beforeEach(async () => { vi.resetModules(); ({ Einstellungen } = await import("./Einstellungen"));
+  ({ Umschalter } = await import("../../bausteine/Umschalter"));
+  vi.stubGlobal("getComputedStyle", () => ({ getPropertyValue: () => "6000ms" })); vi.stubGlobal("document", { addEventListener: vi.fn(), removeEventListener: vi.fn() }); h.werte = []; h.refs = []; h.effekte = []; vi.mocked(invoke).mockReset(); pfad("A"); });
 afterEach(() => { h.effekte.forEach(e => e.ab?.()); vi.unstubAllGlobals(); });
 it("lädt je Projekt, sendet ein Feld, zeigt die Kernantwort und springt bei Fehler zurück", async () => {
   vi.mocked(invoke).mockResolvedValue({ ausfuehren: { agentenGleichzeitig: "einer" } });
@@ -55,6 +56,21 @@ it.each(["resolve", "reject"])("verwirft alte Antworten (%s) auch nach Abbau und
   const abbau = warten(); vi.mocked(invoke).mockReturnValueOnce(abbau.promise);
   feld().props.onChange("1"); await leeren(); h.effekte.forEach(e => e.ab?.()); const stand = [...h.werte];
   abbau[ergebnis]({ ausfuehren: { agentenGleichzeitig: "einer" } }); await leeren(); expect(h.werte).toEqual(stand);
+});
+it("serialisiert Speichern je Projekt auch nach Abbau und erneutem Einhängen", async () => {
+  const block = warten(); let daten = {}, erster = true;
+  vi.mocked(invoke).mockImplementation(async (cmd, { werte }) => {
+    if (cmd === "einstellungen_laden") return daten;
+    if (erster) { erster = false; await block.promise; }
+    daten = { ausfuehren: { ...daten.ausfuehren, ...werte.ausfuehren } }; return daten;
+  });
+  render(); await leeren(); knopf(render()).props.onClick(); feld().props.onChange("Bis zu 5"); await leeren();
+  h.effekte.forEach(e => e.ab?.()); h.werte = []; h.refs = []; h.effekte = [];
+  render(); knopf(render()).props.onClick(); feld().props.onChange("1"); await leeren();
+  expect(invoke.mock.calls.filter(c => c[0] === "einstellungen_speichern")).toHaveLength(1);
+  block.resolve(); await leeren();
+  expect(invoke.mock.calls.map(c => c[0])).toEqual(["einstellungen_laden", "einstellungen_speichern", "einstellungen_laden", "einstellungen_speichern"]);
+  expect(daten.ausfuehren.agentenGleichzeitig).toBe("einer"); expect(feld().props.wert).toBe("1");
 });
 it("setzt nur den aktiven Modus zurück und behält unbehobene Speicherfehler", async () => {
   vi.useFakeTimers();
