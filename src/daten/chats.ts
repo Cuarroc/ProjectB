@@ -9,6 +9,11 @@ export function neuerChat(): Chat {
     verlauf: [], sitzung: null, gestartetUm: null, kontextProzent: 0 };
 }
 
+export function chatAnlegen(quelle: BeispielQuelle) {
+  const daten = quelle.lesen(), chat = neuerChat();
+  quelle.aktualisieren({ ...daten, chats: [...daten.chats, chat], aktiverChatId: chat.id });
+}
+
 export function chatsVerbinden(quelle: BeispielQuelle, melden: (text: string) => void) {
   if (!isTauri()) return;
   type Stand = { pfad: string; geladen: boolean; zuletzt: string; kette: Promise<unknown> };
