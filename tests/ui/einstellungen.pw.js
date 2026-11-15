@@ -100,3 +100,31 @@ test("Einstellungen je Modus: Zustand, Tastatur und Menügrenzen", async ({ page
   });
 
 });
+
+test("speichert nur ein Feld und zeigt einen Speicherfehler mit Rücksprung", async ({ page }, testInfo) => {
+  test.skip(process.env.UI_BASELINE === "1", "Persistenz wird nur am Kandidaten geprüft.");
+  await page.addInitScript(() => {
+    window.isTauri = true; window.aenderungen = [];
+    window.__TAURI_INTERNALS__ = { invoke: async (cmd, args) => {
+      if (cmd === "einstellungen_laden") return { ausfuehren: { pruefrundenHoechstens: "drei" } };
+      if (cmd === "einstellungen_speichern") {
+        window.aenderungen.push(args);
+        if (window.aenderungen.length > 1) throw "Kein Zugriff";
+        return { ausfuehren: { pruefrundenHoechstens: "zwei" } };
+      }
+      throw "Kein Testwert";
+    } };
+  });
+  await page.goto("/"); await page.evaluate(() => document.fonts.ready);
+  await page.getByRole("button", { name: /^Einstellungen für Ausführen/ }).click();
+  const gruppe = page.getByRole("radiogroup", { name: "Prüfrunden höchstens", exact: true });
+  await gruppe.getByRole("radio", { name: "2", exact: true }).click();
+  await expect(gruppe.getByRole("radio", { name: "2", exact: true })).toHaveAttribute("aria-checked", "true");
+  expect(await page.evaluate(() => window.aenderungen)).toEqual([{ projekt: expect.any(String), werte: { ausfuehren: { pruefrundenHoechstens: "zwei" } } }]);
+  await page.evaluate(() => document.activeElement.blur());
+  if (testInfo.project.name === "1440x900" && process.env.P52B_BILD) await page.screenshot({ path: process.env.P52B_BILD });
+  await gruppe.getByRole("radio", { name: "1", exact: true }).click();
+  await expect(gruppe.getByRole("radio", { name: "2", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("status")).toHaveText("Nicht gespeichert: Kein Zugriff");
+  expect(await page.getByRole("status").locator("svg").count()).toBe(1);
+});

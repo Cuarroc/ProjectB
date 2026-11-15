@@ -103,7 +103,7 @@ pub fn zuletzt_laden(datei: impl AsRef<Path>) -> Vec<String> {
     fs::read(datei).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
 }
 
-fn schluessel(pfad: &str) -> String {
+pub(crate) fn schluessel(pfad: &str) -> String {
     if cfg!(windows) || pfad.as_bytes().get(1) == Some(&b':') || pfad.starts_with(r"\\") || pfad.starts_with("//") {
         pfad.replace('\\', "/").to_lowercase()
     } else {

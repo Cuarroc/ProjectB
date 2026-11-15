@@ -1,12 +1,54 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { CircleAlert, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Umschalter } from "../../bausteine/Umschalter";
-import { Tooltip } from "../../bausteine/Tooltip";
+import { Tooltip, tokenMs } from "../../bausteine/Tooltip";
 import { modusEinstellungen } from "../../daten/beispiel";
+import { isTauri } from "@tauri-apps/api/core";
+import { chatEingabeQuelle } from "../ChatEingabe";
+import { einstellungenLaden, einstellungenAendern, einstellungenAenderung } from "../../daten/tauri";
 import "./Einstellungen.css";
 
 export function Einstellungen({ modus }: { modus: string }) {
   const [werte, setWerte] = useState<Record<string, string[]>>({}), [offen, setOffen] = useState(false);
+  const [fehler, setFehler] = useState("");
+  const speicher = useRef<{ aktiv: boolean; gespeichert: Record<string, string[]>; auftrag: number; kette: Promise<unknown> } | null>(null);
+  useEffect(() => {
+    if (!isTauri()) return;
+    let pfad: string | undefined;
+    const laden = () => {
+      const neu = chatEingabeQuelle.lesen().kopf.pfad;
+      if (neu === pfad) return;
+      pfad = neu;
+      if (speicher.current) speicher.current.aktiv = false;
+      const stand = { aktiv: true, gespeichert: {}, auftrag: 0, kette: Promise.resolve() as Promise<unknown> };
+      speicher.current = stand; setWerte({}); setFehler("");
+      stand.kette = einstellungenLaden(neu).then(werte => {
+        if (stand.aktiv) { stand.gespeichert = werte; if (!stand.auftrag) setWerte(werte); }
+      }).catch(e => { if (stand.aktiv) setFehler(`Nicht geladen: ${String(e)}`); });
+    };
+    const ab = chatEingabeQuelle.abonnieren(laden); laden();
+    return () => { ab(); if (speicher.current) speicher.current.aktiv = false; };
+  }, []);
+  useEffect(() => {
+    if (!fehler) return;
+    const timer = setTimeout(() => setFehler(""), tokenMs("standzeit-toast-info"));
+    return () => clearTimeout(timer);
+  }, [fehler]);
+  const aendern = (neu: string[], index?: number) => {
+    setWerte(vorher => ({ ...vorher, [modus]: neu }));
+    if (!isTauri() || !speicher.current) return;
+    const stand = speicher.current, nr = ++stand.auftrag, pfad = chatEingabeQuelle.lesen().kopf.pfad;
+    const delta = einstellungenAenderung(modus, neu, index);
+    stand.kette = stand.kette.then(async () => {
+      if (!stand.aktiv) return;
+      try {
+        const gespeichert = await einstellungenAendern(pfad, delta);
+        if (stand.aktiv) { stand.gespeichert = gespeichert; if (nr === stand.auftrag) { setWerte(gespeichert); setFehler(""); } }
+      } catch (e) {
+        if (stand.aktiv && nr === stand.auftrag) { setWerte(stand.gespeichert); setFehler(`Nicht gespeichert: ${String(e)}`); }
+      }
+    });
+  };
   const ort = useRef<HTMLSpanElement>(null), knopf = useRef<HTMLButtonElement>(null), rueckgabe = useRef(false), id = useId();
   const zeilen = modusEinstellungen[modus as keyof typeof modusEinstellungen];
   const aktuell = werte[modus] ?? zeilen?.map(z => z.empfohlen) ?? [];
@@ -41,9 +83,10 @@ export function Einstellungen({ modus }: { modus: string }) {
       {zeilen.map((z, i) => <div className="zeile" key={z.name}><span className="kopf"><span>{z.name}</span>
         <span className="empf">Empfohlen: {z.empfohlen}</span></span>
         <Umschalter beschriftung={z.name} moeglichkeiten={z.werte} wert={aktuell[i]} onChange={wert =>
-          setWerte(vorher => ({ ...vorher, [modus]: aktuell.map((w, n) => n === i ? wert : w) }))} /></div>)}
+          aendern(aktuell.map((w, n) => n === i ? wert : w), i)} /></div>)}
+      {fehler && <span className="einst-fehler" role="status"><CircleAlert aria-hidden="true" />{fehler}</span>}
       <span><button type="button" className="kn kn-leise einst-zurueck" disabled={empfohlen}
-        onClick={() => { setWerte(vorher => ({ ...vorher, [modus]: zeilen.map(z => z.empfohlen) }));
+        onClick={() => { aendern(zeilen.map(z => z.empfohlen));
           ort.current?.querySelector<HTMLButtonElement>(`[aria-label="${zeilen[0].empfohlen}"]`)?.focus(); }}>Auf Empfohlen zurücksetzen</button></span>
     </div>}
   </span></span>;

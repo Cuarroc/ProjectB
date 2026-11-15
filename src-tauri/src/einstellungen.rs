@@ -29,8 +29,7 @@ pub fn einstellungen_speichern(
     let ordner = pfad.parent().ok_or("Einstellungsordner fehlt")?;
     fs::create_dir_all(ordner)
         .map_err(|e| format!("Einstellungsordner konnte nicht angelegt werden: {e}"))?;
-    let werte = einstellungen::aus_json(&werte);
-    einstellungen::speichern(pfad, &werte)
+    let werte = einstellungen::aendern(pfad, &werte)
         .map_err(|e| format!("Einstellungen konnten nicht gespeichert werden: {e}"))?;
     Ok(einstellungen::als_json(&werte))
 }
