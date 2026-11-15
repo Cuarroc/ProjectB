@@ -46,6 +46,7 @@ pub enum Ereignis {
     },
     /// Hinweis: Zeile auf der Fehlerausgabe (z. B. „nicht angemeldet“) oder ein Befehl, der scheiterte.
     Meldung(String),
+    Kontingent(verbrauch::Stand),
     Unbekannt(String),
 }
 
@@ -83,7 +84,9 @@ pub fn lies_claude(v: &Value) -> Vec<Ereignis> {
             vec![Ereignis::Gestartet { modell: text(v, "/model") }]
         }
         Some("system") | Some("user") => vec![],
-        Some("rate_limit_event") => vec![Ereignis::Meldung("Hinweis zum Kontingent".into())],
+        Some("rate_limit_event") => vec![verbrauch::aus_claude(v)
+            .map(Ereignis::Kontingent)
+            .unwrap_or_else(|| Ereignis::Meldung("Hinweis zum Kontingent".into()))],
         Some("assistant") => v
             .pointer("/message/content")
             .and_then(Value::as_array)
@@ -438,6 +441,7 @@ impl fmt::Display for Ereignis {
                 code.map_or_else(|| "unbekannt".into(), |c| c.to_string())
             ),
             Ereignis::Meldung(m) => write!(f, "Meldung: {}", kurz(m)),
+            Ereignis::Kontingent(stand) => write!(f, "Kontingent: {} % genutzt", stand.prozent),
             Ereignis::Unbekannt(art) => write!(f, "unbekanntes Ereignis: {art}"),
         }
     }
@@ -466,6 +470,17 @@ mod tests {
         // Beobachtet in der Probe auf Windows (PR #2): Kontingent-Hinweis von Claude.
         let kontingent = json!({"type":"rate_limit_event"});
         assert_eq!(lies_claude(&kontingent), vec![Ereignis::Meldung("Hinweis zum Kontingent".into())]);
+    }
+
+    #[test]
+    fn claude_wochenkontingent() {
+        let zeile = json!({"type":"rate_limit_event","rate_limit_info":{"unifiedWindows":{
+            "seven_day":{"utilization":0.08,"resetsAt":4_000_000_000u64}}}});
+        assert_eq!(
+            lies_claude(&zeile),
+            vec![Ereignis::Kontingent(verbrauch::Stand { prozent: 8, endet: 4_000_000_000 })]
+        );
+        assert_eq!(lies_claude(&zeile)[0].to_string(), "Kontingent: 8 % genutzt");
     }
 
     #[test]

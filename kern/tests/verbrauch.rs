@@ -1,4 +1,6 @@
-use projectb_kern::verbrauch::{aus_claude, aus_codex, codex_aus_sitzungen, laden, merken, soll, Stand};
+use projectb_kern::verbrauch::{
+    anzeige, aus_claude, aus_codex, codex_aus_sitzungen, laden, merken, soll, Anzeige, Stand, Wert,
+};
 use serde_json::{json, Value};
 use std::{
     fs,
@@ -72,10 +74,18 @@ fn rundung_begrenzung_und_abgelaufene_fenster() {
     }
     let mut c = claude(90.0);
     c["rate_limit_info"]["unifiedWindows"]["seven_day"]["resetsAt"] = json!(0);
-    assert_eq!(aus_claude(&c), Some(Stand { prozent: 0, endet: 0 }));
+    // P3: Das Ende muss mitrollen, damit das Soll zur neuen Woche gehört.
+    let stand = aus_claude(&c).unwrap();
+    assert_eq!(stand.prozent, 0);
+    assert!(stand.endet > 0);
+    assert_eq!(stand.endet % 604800, 0);
     let mut c = codex(90.0, "primary");
     c["payload"]["rate_limits"]["primary"]["resets_at"] = json!(0);
-    assert_eq!(aus_codex(&c), Some(Stand { prozent: 0, endet: 0 }));
+    // P3: Auch Codex braucht nach Ablauf das Ende der neuen Woche.
+    let stand = aus_codex(&c).unwrap();
+    assert_eq!(stand.prozent, 0);
+    assert!(stand.endet > 0);
+    assert_eq!(stand.endet % 604800, 0);
 }
 
 #[test]
@@ -170,4 +180,63 @@ fn kaputter_eintrag_erhaelt_andere_anbieter_beim_laden_und_merken() {
     assert_eq!(laden(&datei), [("claude".into(), stand.clone())].into());
     merken(&datei, "dritter", &stand).unwrap();
     assert_eq!(laden(&datei), [("claude".into(), stand.clone()), ("dritter".into(), stand)].into());
+}
+
+#[test]
+fn anzeige_ohne_stand_und_mit_eigenem_soll_je_anbieter() {
+    let ordner = Ordner::neu();
+    let datei = ordner.0.join("verbrauch.json");
+    let sitzungen = ordner.0.join("sitzungen");
+    let jetzt = ENDE - 302400;
+    assert_eq!(anzeige(&datei, &sitzungen, jetzt), Anzeige { claude: None, codex: None });
+    merken(&datei, "claude", &Stand { prozent: 8, endet: ENDE }).unwrap();
+    assert_eq!(
+        anzeige(&datei, &sitzungen, jetzt),
+        Anzeige { claude: Some(Wert { genutzt: 8, soll: 50 }), codex: None }
+    );
+    merken(&datei, "codex", &Stand { prozent: 15, endet: ENDE + 151200 }).unwrap();
+    assert_eq!(
+        anzeige(&datei, &sitzungen, jetzt),
+        Anzeige { claude: Some(Wert { genutzt: 8, soll: 50 }), codex: Some(Wert { genutzt: 15, soll: 25 }) }
+    );
+}
+
+#[test]
+fn anzeige_codex_bevorzugt_sitzung_sonst_cache_auch_ohne_claude() {
+    let ordner = Ordner::neu();
+    let datei = ordner.0.join("verbrauch.json");
+    let sitzungen = ordner.0.join("sitzungen");
+    let tag = sitzungen.join("2026/11/15");
+    fs::create_dir_all(&tag).unwrap();
+    fs::write(tag.join("rollout-1.jsonl"), codex(42.0, "secondary").to_string()).unwrap();
+    merken(&datei, "codex", &Stand { prozent: 15, endet: ENDE + 151200 }).unwrap();
+    assert_eq!(
+        anzeige(&datei, &sitzungen, ENDE - 302400),
+        Anzeige { claude: None, codex: Some(Wert { genutzt: 42, soll: 50 }) }
+    );
+    fs::write(tag.join("rollout-1.jsonl"), "kaputt").unwrap();
+    assert_eq!(
+        anzeige(&datei, &sitzungen, ENDE - 302400),
+        Anzeige { claude: None, codex: Some(Wert { genutzt: 15, soll: 25 }) }
+    );
+}
+
+#[test]
+fn anzeige_abgelaufenes_fenster_aus_cache_und_sitzung_rollt_mit() {
+    let ordner = Ordner::neu();
+    let datei = ordner.0.join("verbrauch.json");
+    let sitzungen = ordner.0.join("sitzungen");
+    let tag = sitzungen.join("2026/11/15");
+    fs::create_dir_all(&tag).unwrap();
+    fs::write(tag.join("rollout-1.jsonl"), codex(90.0, "primary").to_string()).unwrap();
+    merken(&datei, "claude", &Stand { prozent: 90, endet: ENDE }).unwrap();
+    merken(&datei, "codex", &Stand { prozent: 90, endet: ENDE }).unwrap();
+    for (jetzt, erwartet) in [(ENDE, 0), (ENDE + 2 * 604800 + 302400, 50)] {
+        let erwartet = Anzeige {
+            claude: Some(Wert { genutzt: 0, soll: erwartet }),
+            codex: Some(Wert { genutzt: 0, soll: erwartet }),
+        };
+        assert_eq!(anzeige(&datei, &sitzungen, jetzt), erwartet);
+        assert_eq!(anzeige(&datei, &ordner.0.join("fehlt"), jetzt), erwartet);
+    }
 }
