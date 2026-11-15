@@ -34,7 +34,7 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
   const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" });
   await feld.fill("Prüfe den CSV-Export im geöffneten Projekt."); await feld.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(1);
-  expect(await page.evaluate(() => window.auftraege[0])).toEqual({ chat: "csv-export", pfad: "C:\\ProjectB", modell: "Opus 5.5", effort: "Hoch", sitzung: null, text: "Prüfe den CSV-Export im geöffneten Projekt." });
+  expect(await page.evaluate(() => window.auftraege[0])).toEqual({ chat: "csv-export", pfad: "C:\\ProjectB", modell: "Opus 5.5", effort: "Hoch", modus: "Ausführen", sitzung: null, text: "Prüfe den CSV-Export im geöffneten Projekt." });
   await expect(page.getByRole("log").getByText("Prüfe den CSV-Export im geöffneten Projekt.")).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "Orchestrator arbeitet …" })).toBeVisible();
   await expect(feld).toHaveAccessibleDescription(/Bitte warte vor dem nächsten Senden/);

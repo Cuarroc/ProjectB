@@ -40,7 +40,7 @@ describe("Projektbrücke", () => {
   });
 });
 
-const auftrag = { chat: "chat-1", pfad: "D:\\Mein Projekt", modell: "gpt-6.1-sol", effort: "Sehr hoch" as const, sitzung: { id: "s-0", anbieter: "Codex" as const, pfad: "D:\\Mein Projekt" }, text: "Baue CSV" };
+const auftrag = { chat: "chat-1", pfad: "D:\\Mein Projekt", modell: "gpt-6.1-sol", effort: "Sehr hoch" as const, modus: "Ausführen" as const, sitzung: { id: "s-0", anbieter: "Codex" as const, pfad: "D:\\Mein Projekt" }, text: "Baue CSV" };
 it("sendet genau die Auftragsfelder an den Desktop-Command", async () => {
   vi.mocked(isTauri).mockReturnValue(true);
   vi.mocked(invoke).mockResolvedValue({ sitzung: { id: "s-1", anbieter: "Codex", pfad: auftrag.pfad }, erfolg: true });

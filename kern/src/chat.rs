@@ -1,9 +1,17 @@
 use crate::{start, verbrauch, Anbieter, Ereignis};
 use std::{io, path::Path};
 
+const PLANEN_ROLLE: &str = "Erstelle nur einen Plan. Ändere keine Dateien. Höchstens 3 Teilaufgaben, \
+    jede mit Abnahme-Kriterien (\"Fertig, wenn …\"). Frage am Ende, ob der Plan freigegeben \
+    oder mit Kommentaren zurückgegeben wird.";
+const INTERVIEW_ROLLE: &str = "Stelle genau eine Frage pro Antwort, wenn möglich mit 2–4 kurzen \
+    Antwortvorschlägen als Liste. Frage weiter, bis du sicher bist. Fasse dann den Auftrag zusammen \
+    und bitte um Bestätigung. Ändere keine Dateien.";
+
 pub fn startwunsch(
     modell: &str,
     effort: &str,
+    modus: &str,
     sitzung: Option<(&str, &str, &str)>,
     pfad: &str,
     text: String,
@@ -11,13 +19,20 @@ pub fn startwunsch(
     let (name, cli_modell) = start::modell(modell).ok_or_else(|| format!("Unbekanntes Modell: {modell}"))?;
     let anbieter = crate::anbieter(name).ok_or_else(|| format!("Unbekannter Anbieter: {name}"))?;
     let effort = start::Effort::aus_text(effort).ok_or_else(|| format!("Unbekannter Effort: {effort}"))?;
+    let rolle = match modus {
+        "Ausführen" => None,
+        "Planen" => Some(PLANEN_ROLLE.into()),
+        "Interview" => Some(INTERVIEW_ROLLE.into()),
+        _ => return Err(format!("Unbekannter Modus: {modus}")),
+    };
     let fortsetzen = sitzung
         .filter(|(_, alt, ort)| alt.eq_ignore_ascii_case(anbieter.name) && *ort == pfad)
         .map(|(id, _, _)| id.to_owned());
     Ok((
         anbieter,
         start::Startwunsch {
-            rolle: None,
+            nur_lesen: rolle.is_some(),
+            rolle,
             modell: Some(cli_modell.into()),
             effort: Some(effort),
             fortsetzen,
