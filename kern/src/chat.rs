@@ -21,7 +21,9 @@ pub fn ausfuehren(
 ) -> io::Result<Antwort> {
     let mut lauf = start::starten(anbieter, wunsch, ordner)?;
     let mut antwort = Antwort { sitzung: None, erfolg: false };
-    let mut letzter_text = None;
+    let mut letzter_text: Option<String> = None;
+    let mut fehler = String::new();
+    let mut letzte_meldung = String::new();
     for e in &lauf.ereignisse {
         match &e {
             Ereignis::Sitzung(id) => antwort.sitzung = Some(id.clone()),
@@ -31,9 +33,22 @@ pub fn ausfuehren(
                 }
             }
             Ereignis::Beendet { erfolg, .. } => antwort.erfolg = *erfolg,
+            Ereignis::Meldung(m) => letzte_meldung = m.chars().take(300).collect(),
+            Ereignis::Fertig { erfolg: false, zusammenfassung } => {
+                fehler = zusammenfassung.clone();
+                continue; // Erst Beendet liefert den verbindlichen Exit-Code.
+            }
             _ => {}
         }
-        if let Some(text) = chat_text(&e, letzter_text.as_deref()) {
+        if let Some(mut text) = chat_text(&e, letzter_text.as_deref()) {
+            if matches!(e, Ereignis::Beendet { erfolg: false, .. }) {
+                if letzter_text.as_deref().is_some_and(|t| t.trim() == fehler.trim()) {
+                    fehler.clear();
+                }
+                for grund in [&fehler, &letzte_meldung].into_iter().filter(|t| !t.is_empty()) {
+                    text.push_str(&format!(" {grund}"));
+                }
+            }
             zeigen(text.clone());
             letzter_text = Some(text);
         }
@@ -54,14 +69,10 @@ pub fn chat_text(e: &Ereignis, letzter_text: Option<&str>) -> Option<String> {
                 format!("Der Auftrag ist fehlgeschlagen: {zusammenfassung}")
             },
         ),
-        Ereignis::Beendet { erfolg: false, code }
-            if !letzter_text.is_some_and(|t| t.starts_with("Der Auftrag ist fehlgeschlagen")) =>
-        {
-            Some(format!(
-                "Der Auftrag ist fehlgeschlagen (Exit-Code: {}).",
-                code.map_or_else(|| "unbekannt".into(), |c| c.to_string())
-            ))
-        }
+        Ereignis::Beendet { erfolg: false, code } => Some(format!(
+            "Der Auftrag ist fehlgeschlagen (Exit-Code: {}).",
+            code.map_or_else(|| "unbekannt".into(), |c| c.to_string())
+        )),
         _ => None,
     }
 }

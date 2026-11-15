@@ -2,7 +2,7 @@ use projectb_kern::{
     chat::ausfuehren,
     start::Startwunsch,
     verbrauch::{laden, Stand},
-    Anbieter, CLAUDE, CODEX,
+    Anbieter, Ereignis, CLAUDE, CODEX,
 };
 use std::{fs, path::Path};
 
@@ -16,22 +16,22 @@ fn wunsch() -> Startwunsch {
 }
 
 #[test]
-fn beide_anbieter_liefern_text_sitzung_und_erfolg() {
+fn beide_anbieter_liefern_text_sitzung_und_erfolg_nur_mit_ergebnis() {
     for a in [agent(false, &[]), agent(true, &["--codex"])] {
         let mut texte = Vec::new();
         let antwort = ausfuehren(&a, &wunsch(), Path::new("."), None, |t| texte.push(t)).unwrap();
         assert_eq!(texte, ["Auftrag: Hallo"]);
-        assert_eq!(antwort.sitzung.as_deref(), Some("test-sitzung"));
-        assert!(antwort.erfolg);
         assert_eq!(antwort.json(), serde_json::json!({"sitzung":"test-sitzung", "erfolg":true}));
     }
+    let antwort = ausfuehren(&agent(false, &["--ohne-lesen"]), &wunsch(), Path::new("."), None, |_| {}).unwrap();
+    assert_eq!(antwort.json(), serde_json::json!({"sitzung":null, "erfolg":false}));
 }
 
 #[test]
 fn fehler_erscheint_im_chat_und_exit_code_entscheidet() {
     for (a, erwartet) in [
-        (agent(false, &["--fehler"]), "Exit-Code: 7"),
-        (agent(true, &["--codex", "--exit-3"]), "fehlgeschlagen"),
+        (agent(true, &["--codex", "--exit-3"]), "Exit-Code: 3"),
+        (agent(false, &["--fehler"]), "Exit-Code: 7). eine Meldung"),
         (agent(true, &["--codex", "--turn-failed"]), "Verbindung verloren"),
     ] {
         let mut texte = Vec::new();
@@ -70,9 +70,7 @@ fn letzte_sitzung_gilt_und_folgenachricht_erreicht_den_startweg() {
     let a = Anbieter {
         lesen: |v| {
             let mut e = projectb_kern::lies_claude(v);
-            if v["type"] == "system" {
-                e.push(projectb_kern::Ereignis::Sitzung("letzte-sitzung".into()));
-            }
+            e.extend((v["type"] == "system").then(|| Ereignis::Sitzung("letzte-sitzung".into())));
             e
         },
         ..agent(false, &[])
@@ -109,24 +107,33 @@ fn text_kommt_vor_prozessende_im_gewaehlten_ordner() {
 }
 
 #[test]
-fn ohne_sitzung_bleibt_json_null_und_ohne_ergebnis_keine_erfolgsmeldung() {
-    let antwort = ausfuehren(&agent(false, &["--ohne-lesen"]), &wunsch(), Path::new("."), None, |_| {}).unwrap();
-    assert_eq!(antwort.json(), serde_json::json!({"sitzung":null, "erfolg":false}));
-}
-
-#[test]
-fn letzter_gezeigter_text_verhindert_doppelten_fehlertext() {
+fn fehlerfolgen_behalten_code_und_grund_ohne_doppelten_fehlersatz() {
+    use Ereignis::{Fertig, Meldung, Text};
     let a = Anbieter {
-        lesen: |v| {
-            if v["type"] == "result" {
-                vec![projectb_kern::Ereignis::Fertig { erfolg: false, zusammenfassung: "Auftrag: Hallo".into() }]
-            } else {
-                projectb_kern::lies_claude(v)
-            }
+        lesen: |v| match v["item"]["text"].as_str() {
+            Some("Auftrag: Leer") => vec![Fertig { erfolg: false, zusammenfassung: "".into() }],
+            Some("Auftrag: Fehler") => vec![Fertig { erfolg: false, zusammenfassung: "X".into() }],
+            Some("Auftrag: Erfolg") => vec![Fertig { erfolg: true, zusammenfassung: "".into() }],
+            Some("Auftrag: Text") => vec![Text("X".into()), Fertig { erfolg: false, zusammenfassung: "X".into() }],
+            Some("Auftrag: Meldung") => vec![Meldung("alter Grund".into()), Meldung("ü".repeat(301))],
+            _ => vec![],
         },
-        ..agent(false, &[])
+        ..agent(true, &["--codex", "--exit-1"])
     };
-    let mut texte = Vec::new();
-    assert!(!ausfuehren(&a, &wunsch(), Path::new("."), None, |t| texte.push(t)).unwrap().erfolg);
-    assert_eq!(texte, ["Auftrag: Hallo", "Der Auftrag ist fehlgeschlagen."]);
+    for (fall, argumente, erwartet) in [
+        ("Leer", &["--codex", "--exit-3"][..], vec!["Der Auftrag ist fehlgeschlagen (Exit-Code: 3).".into()]),
+        ("Fehler", a.argumente, vec!["Der Auftrag ist fehlgeschlagen (Exit-Code: 1). X".into()]),
+        ("Erfolg", a.argumente, vec!["Der Auftrag ist fehlgeschlagen (Exit-Code: 1).".into()]),
+        ("Text", a.argumente, vec!["X".into(), "Der Auftrag ist fehlgeschlagen (Exit-Code: 1).".into()]),
+        ("Meldung", a.argumente, vec![format!("Der Auftrag ist fehlgeschlagen (Exit-Code: 1). {}", "ü".repeat(300))]),
+    ] {
+        let mut texte = Vec::new();
+        let w = Startwunsch { auftrag: fall.into(), ..wunsch() };
+        assert!(!ausfuehren(&Anbieter { argumente, ..a }, &w, Path::new("."), None, |t| texte.push(t)).unwrap().erfolg);
+        assert_eq!(texte, erwartet, "{fall}");
+    }
+    assert_eq!(
+        projectb_kern::chat::chat_text(&Ereignis::Beendet { erfolg: false, code: None }, None),
+        Some("Der Auftrag ist fehlgeschlagen (Exit-Code: unbekannt).".into())
+    );
 }

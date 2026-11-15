@@ -79,6 +79,9 @@ fn main() {
             aus.flush().unwrap();
             std::thread::sleep(std::time::Duration::from_secs(60));
         }
+        if hat("--exit-1") {
+            std::process::exit(1);
+        }
         if hat("--exit-3") {
             std::process::exit(3);
         }
