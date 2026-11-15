@@ -11,7 +11,8 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
       invoke: async (cmd, args) => {
         if (cmd === "plugin:event|listen") { window.listener.add(args.handler); return args.handler; }
         if (cmd === "plugin:event|unlisten") { window.listener.delete(args.eventId); return; }
-        if (cmd === "projekte_zuletzt") return [];
+        if (cmd === "projekte_zuletzt") return ["C:\\ProjectB"];
+        if (cmd === "projekt_pruefen") return { projekt: "ProjectB", pfad: args.pfad, zweig: "main" };
         if (cmd === "kontingent") return { claude: null, codex: null };
         if (cmd === "einstellungen_laden") return {};
         if (cmd === "auftrag_senden") {
@@ -30,6 +31,12 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
   await expect(page.getByRole("log").getByText("Prüfe den CSV-Export im geöffneten Projekt.")).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "Orchestrator arbeitet …" })).toBeVisible();
   await expect(feld).toHaveAccessibleDescription(/Bitte warte vor dem nächsten Senden/);
+  const abstand = await page.locator(".ein-arbeitet").evaluate(hinweis => {
+    const form = document.querySelector(".chat-eingabe .ein"), h = hinweis.getBoundingClientRect(), f = form.getBoundingClientRect();
+    return { einzug: h.left - f.left, innen: parseFloat(getComputedStyle(form).paddingLeft), unten: f.top - h.bottom,
+      soll: parseFloat(getComputedStyle(hinweis).getPropertyValue("--abstand-6")) };
+  });
+  expect(abstand.einzug).toBe(abstand.innen); expect(abstand.unten).toBe(abstand.soll);
   await page.evaluate(() => window.antwort("Ich prüfe den CSV-Export und seine Tests."));
   await expect(page.getByRole("log").getByText("Ich prüfe den CSV-Export und seine Tests.")).toBeVisible();
   await feld.fill("Eine zweite Nachricht"); await feld.press("Enter");

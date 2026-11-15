@@ -65,6 +65,7 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
   return <ChatEingabeAnsicht chat={chat} modelle={[...new Set([...daten.chats, ...daten.agenten].map(a => a.modell))]}
     text={text} fehler={fehler} laeuft={laufende.current.has(chat.id)} aendern={aendern} schreiben={schreiben} senden={async inhalt => {
       if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
+      if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
       try { nachrichtAblegen(quelle, inhalt); schreiben(""); setFehler(""); }
       catch { setFehler("Nicht gesendet. Dein Text bleibt stehen."); return; }
       if (!isTauri()) return;
@@ -73,10 +74,11 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
       const aktuell = quelle.lesen(), ziel = aktuell.chats.find(c => c.id === chat.id)!;
       // shortcut: Modell und Effort gehen in P-5-2f mit
       const anbieter = /^GPT|Codex/i.test(ziel.modell) ? "Codex" : "Claude";
+      const pfad = aktuell.kopf.pfad, sitzung = ziel.sitzung?.anbieter === anbieter && ziel.sitzung.pfad === pfad ? ziel.sitzung.id : null;
       try {
         await empfang.current;
-        const antwort = await auftragSenden({ chat: ziel.id, pfad: aktuell.kopf.pfad, anbieter, sitzung: ziel.sitzung ?? null, text: inhalt });
-        aendern({ sitzung: antwort.sitzung });
+        const antwort = await auftragSenden({ chat: ziel.id, pfad, anbieter, sitzung, text: inhalt });
+        aendern({ sitzung: antwort.sitzung ? { id: antwort.sitzung, anbieter, pfad } : null });
       } catch (e) { orchestratorNachricht(quelle, chat.id, `Problem: ${e instanceof Error ? e.message : String(e)}`); }
       finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
     }} />;

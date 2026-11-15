@@ -1,5 +1,5 @@
 .chat-eingabe { container: chat-eingabe / inline-size; flex: none; width: 100%; max-width: var(--chat-max-breite); margin-inline: auto; }
-.ein-arbeitet { margin: 0 0 var(--abstand-2); color: var(--text-2); font: var(--schrift-klein); }
+.ein-arbeitet { margin: 0 var(--abstand-5) var(--abstand-6); color: var(--text-2); font: var(--schrift-klein); }
 .chat-eingabe .ein-modi { gap: calc(var(--abstand-3) * .6); padding: 0; background: none; }
 .chat-eingabe .um-pille { display: none; }
 .chat-eingabe .ein-modi button { gap: calc(var(--abstand-1) * 1.75); height: var(--steuer-hoehe); border-radius: var(--rund-knopf); padding: 0 var(--abstand-4) 0 var(--abstand-3); box-shadow: inset 0 0 0 1px var(--flaeche-4); }

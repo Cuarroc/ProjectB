@@ -76,7 +76,7 @@ it("öffnet per Formular und setzt Projektname, Pfad, Zweig und die letzte Liste
   inhalt.props.onSubmit({ preventDefault: vi.fn() }); inhalt.props.onSubmit({ preventDefault: vi.fn() }); await fertig();
   expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad); expect(zu).toHaveBeenCalledOnce();
   expect(projekteZuletzt).toHaveBeenCalledOnce();
-  expect(chatEingabeQuelle.lesen().kopf).toMatchObject({ ...projekt, projekte: [projekt.pfad, ...vorher.kopf.projekte] });
+  expect(chatEingabeQuelle.lesen().kopf).toMatchObject({ ...projekt, geoeffnet: true, projekte: [projekt.pfad, ...vorher.kopf.projekte] });
   const html = renderToStaticMarkup(<Kopf />);
   for (const text of Object.values(projekt)) expect(html).toContain(text);
   expect(html).toContain(">Unser Garten</span>");
@@ -138,6 +138,7 @@ it("zeigt beim Desktop-Start das erste gemerkte Projekt mit Pfad und Zweig", asy
   auswahl(); const aufraeumen = hooks.effekte[0](); await fertig(); aufraeumen();
   expect(projektPruefen).toHaveBeenCalledExactlyOnceWith(projekt.pfad);
   expect(projektOeffnen).not.toHaveBeenCalled();
+  expect(chatEingabeQuelle.lesen().kopf.geoeffnet).toBe(true);
   expect(chatEingabeQuelle.lesen().kopf.projekte).toEqual([projekt.pfad, vorher.kopf.pfad]);
   const html = renderToStaticMarkup(<Kopf />);
   expect(html).toContain(`aria-label="Projekt wählen: ${projekt.projekt} ${projekt.pfad} ${projekt.zweig}"`);
@@ -151,6 +152,7 @@ it.each(["leere Liste", "Prüffehler", "Listenfehler"])("behält beim Desktop-St
   auswahl(); const aufraeumen = hooks.effekte[0](); await fertig(); await fertig(); aufraeumen();
   const { projekt, pfad, zweig } = vorher.kopf;
   expect(chatEingabeQuelle.lesen().kopf).toMatchObject({ projekt, pfad, zweig });
+  expect(chatEingabeQuelle.lesen().kopf.geoeffnet).toBeUndefined();
   expect(projektPruefen).toHaveBeenCalledTimes(fall === "Prüffehler" ? 1 : 0);
   expect(renderToStaticMarkup(auswahl().inhalt)).not.toMatch(/ein-meldung|Ordner gelöscht|Nicht erreichbar/);
 });
@@ -167,6 +169,7 @@ it.each(["geschlossen", "manuell geöffnet"])("verwirft eine späte Startprüfun
   let antwort; vi.mocked(projektPruefen).mockReturnValue(new Promise(resolve => { antwort = resolve; }));
   auswahl(); const aufraeumen = hooks.effekte[0](); await fertig();
   expect(projektPruefen).toHaveBeenCalledExactlyOnceWith("C:\\Alt");
+  expect(chatEingabeQuelle.lesen().kopf.geoeffnet).toBeUndefined();
   const projekt = { projekt: "Neu", pfad: "C:\\Neu", zweig: "neu" };
   if (fall === "geschlossen") aufraeumen();
   else {
