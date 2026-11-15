@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { Check, ChevronRight, Circle, Copy, MessageCircleQuestion, Users } from "lucide-react";
-import { BeispielQuelle, type Datenquelle } from "../daten/quelle";
+import { BeispielQuelle } from "../daten/quelle";
+import { chatAnlegen } from "../daten/chats";
 import { Knopf } from "../bausteine/Knopf";
 import { Fortschrittsring } from "../bausteine/Fortschrittsring";
 import { Statusmarke, zustaende as statusDefinitionen, type Zustand } from "../bausteine/Statusmarke";
@@ -13,11 +14,12 @@ import Interview, { type InterviewZustand } from "./Interview";
 import { AnhalteHinweis, useAnhalten } from "./anhalten";
 
 const standardQuelle = new BeispielQuelle();
+const LaufSymbol = statusDefinitionen.arbeitet.Symbol;
 const zustaende: Record<Planschritt["zustand"], Zustand> = {
   Offen: "offen", Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fertig", Problem: "problem",
 };
 type Props = {
-  quelle?: Datenquelle;
+  quelle?: BeispielQuelle;
   onPlanOeffnen?: (planId: string) => void;
   onAntwort?: (frageId: string, antwortId: string) => void;
   onAktion?: (nachrichtId: string, aktionId: string) => void;
@@ -44,6 +46,14 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
     return abmelden;
   }, [quelle]);
   const chat = daten.chats.find(c => c.id === daten.aktiverChatId);
+  const [, zeitAktualisieren] = useState(0);
+  useEffect(() => {
+    if (!chat?.gestartetUm) return;
+    const timer = setInterval(() => zeitAktualisieren(wert => wert + 1), 60_000);
+    return () => clearInterval(timer);
+  }, [chat?.gestartetUm]);
+  const jetzt = new Date(), [stunden, minuten] = (chat?.gestartetUm ?? "00:00").split(":").map(Number);
+  const laufzeit = (jetzt.getHours() * 60 + jetzt.getMinutes() - stunden * 60 - minuten + 1440) % 1440;
   // Die kompakte Karte zählt die Teilaufgaben mit Agenten; der volle Plan bleibt erreichbar.
   const teilaufgaben = daten.plan.schritte.filter(s => s.agentId !== null);
   const fertig = teilaufgaben.filter(s => s.zustand === "Fertig").length;
@@ -53,7 +63,14 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
     catch { setMeldung("Kopieren fehlgeschlagen."); }
   };
   return <>
-    <header className="chat-kopf"><h2 id="chat">Chat</h2></header>
+    <header className="chat-kopf">
+      <h2 id="chat">Chat</h2>
+      <span className="chat-empfaenger">An <span className="r-avatar"><Users size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /></span><strong>Orchestrator</strong></span>
+      {chat?.gestartetUm && <span className="chat-laufzeit statusmarke" role="timer" aria-live="off" data-zustand="arbeitet">
+        <LaufSymbol size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />Läuft seit {laufzeit < 1 ? "weniger als 1 min" : `${laufzeit} min`}
+      </span>}
+      <Knopf text="Neuer Chat" disabled={!daten.chats.length} onClick={() => chatAnlegen(quelle)} />
+    </header>
     <AnhalteHinweis pause={pause} />
     <div className="chat-verlauf" role="log" aria-label="Chatverlauf" aria-relevant="additions text">
       {chat?.modus === "Interview" && <Interview key={chat.id} zustand={interviews[chat.id] ?? { antworten: [], auswahl: "", frei: "" }} aendern={wert => setInterviews(v => ({ ...v, [chat.id]: wert }))} />}
