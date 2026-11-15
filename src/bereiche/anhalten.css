@@ -1,0 +1,8 @@
+.anhalte-hinweis { display: flex; align-items: center; flex-wrap: wrap; gap: var(--abstand-2); padding: var(--abstand-3); margin-bottom: var(--abstand-3); border-radius: var(--rund-liste); background: var(--flaeche-2); color: var(--text-2); font: var(--schrift-klein); }
+.anhalte-kopf { display: inline-flex; align-items: center; gap: var(--abstand-2); flex-shrink: 0; }
+.mk.pause-marke { background: var(--status-offen-grund); color: var(--text-2); }
+.anhalte-hinweis > button { margin-left: auto; }
+.kopf > .knopf { flex-shrink: 0; }
+@media (width < 80rem) { .kopf-zweig { display: none; } .kopf-logo strong { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
+@media (width < 80rem) { .app-rahmen .app-kopf.kopf { gap: var(--abstand-1); } .kopf .kopf-projekt { min-width: calc(2 * var(--steuer-hoehe) + var(--abstand-2)); } .kopf .kopf-kontingent { padding-inline: var(--abstand-1); } .kopf .kopf-nutzung { gap: var(--abstand-1); } .kopf .kopf-nutzung + .kopf-nutzung { padding-left: var(--abstand-2); } }
+@media (width < 80rem) { .kopf:has(.anhalte-kopf .pause-marke) .kopf-projekt { min-width: calc(var(--leiste-breite) + var(--abstand-1)); } .kopf:has(.anhalte-kopf .pause-marke) .kopf-projekt > button > code { display: none; } .kopf:has(.anhalte-kopf .pause-marke) .kopf-kontingent { padding-inline: var(--abstand-2); } }

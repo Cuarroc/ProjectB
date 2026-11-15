@@ -32,7 +32,7 @@ test('Team-Ansichten mit Tastatur, Antworten und lesbaren Zeitspuren', async ({ 
         if (ansicht === 'Board') pruefe(await page.locator('.team-bfortschritt progress').evaluate(el => getComputedStyle(el).appearance === 'none'), 'Fortschrittsfüllung bleibt unsichtbar');
         if (breite === 1024) {
           pruefe(await page.locator('.team-ansichten .um-teil>span').evaluateAll(els => els.every(el => getComputedStyle(el).display === 'none')), 'Ansichtswörter bleiben sichtbar');
-          pruefe(await page.getByRole('button',{name:'Alle anhalten',exact:true}).isVisible(), 'Alle anhalten fehlt');
+          pruefe(await page.locator('.team-kopf').getByRole('button',{name:'Alles anhalten',exact:true}).isVisible(), 'Alles anhalten fehlt');
         }
         if (modus === 'voll') {
           const path = bilder ? `${bilder}_${ansicht.toLowerCase()}_${breite}.png` : testInfo.outputPath(`${ansicht}_${breite}.png`);
@@ -52,8 +52,8 @@ test('Team-Ansichten mit Tastatur, Antworten und lesbaren Zeitspuren', async ({ 
   await page.locator('.team-spurzeile[data-agent=kern] button').click();
   pruefe(await page.getByRole('complementary',{name:'Details: CSV-Export im Kern'}).isVisible(), 'Zeitstrahl öffnet keine Details');
   await page.getByRole('button',{name:'Schließen',exact:true}).click();
-  await page.getByRole('button',{name:'Alle anhalten',exact:true}).click();
-  pruefe(await page.locator('.team-spurzeile[data-agent=kern] .mk').innerText() === 'Wartet auf dich', 'Anhalten erreicht Zeitstrahl nicht');
+  await page.locator('.team-kopf').getByRole('button',{name:'Alles anhalten',exact:true}).click();
+  pruefe(await page.locator('.team-spurzeile[data-agent=kern] .mk').innerText() === 'Angehalten', 'Anhalten erreicht Zeitstrahl nicht');
   await page.getByRole('radio',{name:'Board',exact:true}).click();
   await page.locator('.team-bkarte[data-agent=kern] .team-bdetails').click();
   pruefe(await page.getByRole('complementary',{name:'Details: CSV-Export im Kern'}).isVisible(), 'Board öffnet keine Details');

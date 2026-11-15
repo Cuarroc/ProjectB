@@ -6,8 +6,9 @@ import { Zeitspur, type Phase, type ZeitspurProps } from "../bausteine/Zeitspur"
 import { orchestratorBeispiel, teamTokenverlauf } from "../daten/quelle";
 import type { Agent, Datenstand } from "../daten/typen";
 import "./TeamAnsichten.css";
+import { AnhalteMarke } from "./anhalten";
 
-type Props = { daten: Datenstand; agenten: Agent[]; waehlen: (id: string) => void; auswahl?: string | null };
+type Props = { daten: Datenstand; agenten: Agent[]; waehlen: (id: string) => void; auswahl?: string | null; pause?: boolean };
 const status = { Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fertig", Problem: "problem" } as const;
 const dauer = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 const tokens = (n: number) => `${(n / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })}k`;
@@ -24,7 +25,7 @@ export function spur(agent: Agent): ZeitspurProps {
     schaetzung: agent.schaetzung ? sekunden(`${agent.schaetzung.fertigUm}:00`) : undefined };
 }
 
-export function TeamBoard({ daten, agenten, waehlen, auswahl }: Props) {
+export function TeamBoard({ daten, agenten, waehlen, auswahl, pause = false }: Props) {
   const [antworten, setAntworten] = useState<Record<string, string>>({});
   const orch = { id: "orchestrator", name: "Orchestrator", anbieter: "Claude", modell: daten.chats[0]?.modell,
     zustand: teamAngehalten(agenten) ? "Wartet auf dich" : "Arbeitet",
@@ -33,10 +34,10 @@ export function TeamBoard({ daten, agenten, waehlen, auswahl }: Props) {
     const karten = [...agenten, orch].filter(a => (a.zustand === "Problem" ? "wartet" : status[a.zustand]) === z);
     const offen = z === "offen" ? daten.plan.schritte.filter(s => s.zustand === "Offen") : [];
     return <section className={`team-feld team-feld-${z}`} key={z} aria-label={z === "offen" ? "Offen" : z === "wartet" ? "Wartet" : z === "arbeitet" ? "Arbeitet" : "Fertig"}>
-      <header><Statusmarke zustand={z as "wartet" | "arbeitet" | "offen" | "fertig"} /><b>{karten.length + offen.length}</b></header>
+      <header>{pause && z === "wartet" ? <AnhalteMarke /> : <Statusmarke zustand={z as "wartet" | "arbeitet" | "offen" | "fertig"} />}<b>{karten.length + offen.length}</b></header>
       {karten.map(a => <div className="team-bkarte" key={a.id} data-agent={a.id}><button className="team-bdetails" aria-expanded={auswahl === a.id} aria-controls={auswahl === a.id ? "team-details" : undefined} onClick={() => waehlen(a.id)}>
         <span className="team-bmodell">{a.anbieter} · {a.modell}</span><strong>{a.name}<ChevronRight size={16} aria-hidden="true" strokeWidth={1.5} absoluteStrokeWidth /></strong>
-        <Statusmarke zustand={status[a.zustand]} />
+        {pause && a.zustand !== "Fertig" ? <AnhalteMarke /> : <Statusmarke zustand={status[a.zustand]} />}
         {a.fortschritt !== undefined && a.zustand === "Arbeitet" && <span className="team-bfortschritt"><progress max={100} value={a.fortschritt} aria-label={`Fortschritt: ${a.name}`} />{a.fortschritt} %</span>}
         <span>{daten.fragen.find(f => f.agentId === a.id)?.text ?? a.liveZeile}</span>
         </button>{daten.fragen.filter(f => f.agentId === a.id).map(f => <div className="team-bantworten" key={f.id}>{f.antwortknoepfe.map(k => <Knopf key={k.id} text={k.text} variante="antwort" aria-pressed={antworten[f.id] === k.id} onClick={() => setAntworten(v => ({ ...v, [f.id]: k.id }))} />)}</div>)}
@@ -47,7 +48,7 @@ export function TeamBoard({ daten, agenten, waehlen, auswahl }: Props) {
   })}</div>;
 }
 
-export function TeamZeitstrahl({ daten, agenten, waehlen, auswahl }: Props) {
+export function TeamZeitstrahl({ daten, agenten, waehlen, auswahl, pause = false }: Props) {
   const angehalten = teamAngehalten(agenten);
   const reihen = [{ id: "orchestrator", name: "Orchestrator", anbieter: daten.chats[0]?.modell, tokens: orchestratorBeispiel.tokens,
     zustand: angehalten ? "wartet" : "arbeitet", spur: { jetzt, phasen: orchestratorBeispiel.phasen.map(p => ({ ...p, laufend: p.art === "koordiniert" && !angehalten })), zustand: angehalten ? "wartet" : "arbeitet" } },
@@ -71,8 +72,8 @@ export function TeamZeitstrahl({ daten, agenten, waehlen, auswahl }: Props) {
     <section className="team-spuren" aria-label="Zeitstrahl der Agenten">
       <div className="team-achse"><span className="team-jetzt">Jetzt 14:37</span><div>{["14:30", "14:32", "14:34", "14:36", "14:38", "14:40"].map(t => <span key={t}>{t}</span>)}</div></div>
       {reihen.map(r => <div className="team-spurzeile" key={r.id} data-agent={r.id}>
-        <button title={r.name} aria-expanded={auswahl === r.id} aria-controls={auswahl === r.id ? "team-details" : undefined} onClick={() => waehlen(r.id)}><strong>{r.name}</strong><span><Statusmarke zustand={r.zustand} /> · {r.anbieter}</span><b>{tokens(r.tokens)}</b></button>
-        <Zeitspur {...r.spur} zustand={r.zustand} />
+        <button title={r.name} aria-expanded={auswahl === r.id} aria-controls={auswahl === r.id ? "team-details" : undefined} onClick={() => waehlen(r.id)}><strong>{r.name}</strong><span>{pause && r.zustand !== "fertig" ? <AnhalteMarke /> : <Statusmarke zustand={r.zustand} />} · {r.anbieter}</span><b>{tokens(r.tokens)}</b></button>
+        <Zeitspur {...r.spur} zustand={r.zustand} angehalten={pause && r.zustand !== "fertig"} />
       </div>)}
     </section>
     <div className="team-phasenlegende" aria-label="Legende mit Dauern">{["Lesen", "Bauen", "Testen", "Review", "Koordiniert"].map(name => <span key={name}><i style={{ background: `var(--phase-${name.toLowerCase()}-verlauf)` }} />{name} <b>{dauer(phasen.filter(p => p.art === name.toLowerCase()).reduce((s, p) => s + p.ende - p.start, 0))} min</b></span>)}

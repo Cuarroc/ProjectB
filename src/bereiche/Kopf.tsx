@@ -4,6 +4,8 @@ import { chatEingabeQuelle } from "./ChatEingabe";
 import { PostfachKnopf } from "./PostfachKnopf";
 import "./Kopf.css";
 import Berechtigungen from "./Berechtigungen";
+import { AnhalteKnopf, AnhalteMarke, useAnhalten } from "./anhalten";
+import { frageTon } from "./fragenHinweise";
 
 export type Bewegung = "auto" | "voll" | "reduziert";
 export function bewegungSetzen(wahl: Bewegung, wurzel = document.documentElement) { wurzel.dataset.bewegung = wahl; }
@@ -34,6 +36,7 @@ function KopfMenue({ name, inhalt, children, klasse = "", beschriftung = name }:
 }
 
 export default function Kopf() {
+  const pause = useAnhalten(), [ton, setTon] = useState(frageTon.lesen);
   const [daten, setDaten] = useState(() => chatEingabeQuelle.lesen()), [projekt, waehleProjekt] = useState(daten.kopf.pfad);
   const [bewegung, waehleBewegung] = useState<Bewegung>("auto"), [ruhig, setRuhig] = useState(false);
   useEffect(() => chatEingabeQuelle.abonnieren(() => setDaten(chatEingabeQuelle.lesen())), []);
@@ -50,6 +53,7 @@ export default function Kopf() {
         <span className="kopf-wahl-titel">{bewegung === w ? <CircleDot {...symbol} /> : <Circle {...symbol} />}{w === "auto" ? "Automatisch (wie Windows)" : w === "voll" ? "Voll" : "Reduziert"}{w === "auto" && <span className="kopf-gerade">{aktuell}</span>}</span>
         {w !== "auto" && <><span className="kopf-probe"><span /></span><span>{w === "voll" ? "Flüssig, mit Glanz und weichen Übergängen" : "Ruhiger, ohne Dauer-Animationen"}</span></>}
       </button>)}</div>
+      <button type="button" role="menuitemcheckbox" tabIndex={-1} aria-checked={ton} onClick={() => { frageTon.setzen(!ton); setTon(!ton); }}>Ton bei Fragen: {ton ? "An" : "Aus"}</button>
     </KopfMenue>
     <KopfMenue name="Projekt wählen" klasse="kopf-projekt" beschriftung={`Projekt wählen: ${projekt} ${daten.kopf.zweig}`} inhalt={<><Folder {...symbol} /><code>{projekt}</code>{" "}<code className="kopf-zweig">{daten.kopf.zweig}</code><ChevronDown {...symbol} /></>}>
       <h2 role="presentation">Projekt wählen</h2>{daten.kopf.projekte.map(p => <button key={p} type="button" role="menuitemradio" tabIndex={-1} aria-checked={projekt === p} onClick={() => waehleProjekt(p)}>{p}</button>)}
@@ -61,6 +65,7 @@ export default function Kopf() {
     </div>
     <Berechtigungen daten={daten.berechtigungen} quelle={chatEingabeQuelle} />
     <PostfachKnopf zahl={daten.kopf.postfach} />
+    <span className="anhalte-kopf">{pause && <AnhalteMarke />}<AnhalteKnopf pause={pause} /></span>
     <KopfMenue name="Rollen" klasse="kopf-rollen" inhalt={<><IdCard {...symbol} /><span>Rollen</span></>}>
       <h2 role="presentation">Rollen</h2>{["Orchestrator", "Arbeiter Codex", "Prüfer Claude"].map(r => <button type="button" role="menuitem" aria-disabled="true" tabIndex={-1} key={r}>{r}</button>)}
     </KopfMenue>

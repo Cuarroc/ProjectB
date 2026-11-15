@@ -13,6 +13,7 @@
 .tm-status{display:flex;align-items:center;white-space:pre;color:var(--status-arbeitet-text);background:var(--status-arbeitet-grund);border-radius:var(--rund-voll);padding-right:var(--abstand-3)}
 .team-details .statusmarke{color:var(--status-farbe);background:var(--status-grund)}.tm-status .statusmarke{background:none;padding-right:0}
 .tm-status:has(.mk-wartet){color:var(--status-wartet-text);background:var(--status-wartet-grund)}.tm-status:has(.mk-fertig){color:var(--status-fertig);background:var(--status-fertig-grund)}.tm-status:has(.mk-problem){color:var(--status-problem);background:var(--status-problem-grund)}
+.tm-status:has(.pause-marke){color:var(--text-2);background:var(--status-offen-grund)}
 .tm-det-knoepfe{display:flex;gap:var(--abstand-2);margin-left:auto;flex-wrap:wrap}.tm-det-knoepfe .knopf-inhalt{white-space:nowrap}
 .tm-det-raster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--abstand-3)}
 .tm-dkarte{display:flex;flex-direction:column;gap:var(--abstand-3);min-width:0;padding:var(--abstand-4) var(--abstand-5) var(--abstand-5);border-radius:var(--rund-kachel);background:var(--flaeche-2);box-shadow:var(--schatten-kante)}
