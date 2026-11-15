@@ -12,6 +12,7 @@ pub mod pr;
 
 pub mod pruefung;
 
+pub mod verbrauch;
 pub mod zustand;
 
 use serde_json::Value;
