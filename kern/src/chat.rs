@@ -1,4 +1,61 @@
-use crate::Ereignis;
+use crate::{start, verbrauch, Anbieter, Ereignis};
+use std::{io, path::Path};
+
+pub struct Antwort {
+    pub sitzung: Option<String>,
+    pub erfolg: bool,
+}
+
+impl Antwort {
+    pub fn json(&self) -> serde_json::Value {
+        serde_json::json!({"sitzung": self.sitzung, "erfolg": self.erfolg})
+    }
+}
+
+pub fn ausfuehren(
+    anbieter: &Anbieter,
+    wunsch: &start::Startwunsch,
+    ordner: &Path,
+    kontingent: Option<&Path>,
+    mut zeigen: impl FnMut(String),
+) -> io::Result<Antwort> {
+    let mut lauf = start::starten(anbieter, wunsch, ordner)?;
+    let mut antwort = Antwort { sitzung: None, erfolg: false };
+    let mut letzter_text: Option<String> = None;
+    let mut fehler = String::new();
+    let mut letzte_meldung = String::new();
+    for e in &lauf.ereignisse {
+        match &e {
+            Ereignis::Sitzung(id) => antwort.sitzung = Some(id.clone()),
+            Ereignis::Kontingent(stand) => {
+                if let Some(datei) = kontingent {
+                    let _ = verbrauch::merken(datei, anbieter.name, stand);
+                }
+            }
+            Ereignis::Beendet { erfolg, .. } => antwort.erfolg = *erfolg,
+            Ereignis::Meldung(m) => letzte_meldung = m.chars().take(300).collect(),
+            Ereignis::Fertig { erfolg: false, zusammenfassung } => {
+                fehler = zusammenfassung.clone();
+                continue; // Erst Beendet liefert den verbindlichen Exit-Code.
+            }
+            _ => {}
+        }
+        if let Some(mut text) = chat_text(&e, letzter_text.as_deref()) {
+            if matches!(e, Ereignis::Beendet { erfolg: false, .. }) {
+                if letzter_text.as_deref().is_some_and(|t| t.trim() == fehler.trim()) {
+                    fehler.clear();
+                }
+                for grund in [&fehler, &letzte_meldung].into_iter().filter(|t| !t.is_empty()) {
+                    text.push_str(&format!(" {grund}"));
+                }
+            }
+            zeigen(text.clone());
+            letzter_text = Some(text);
+        }
+    }
+    lauf.warten()?;
+    Ok(antwort)
+}
 
 /// Sichtbare Chat-Antworten ohne doppelte Erfolgs- oder Fehlertexte.
 /// Aufrufer geben den letzten angezeigten Text desselben Laufs mit, sonst `None`.
@@ -12,6 +69,10 @@ pub fn chat_text(e: &Ereignis, letzter_text: Option<&str>) -> Option<String> {
                 format!("Der Auftrag ist fehlgeschlagen: {zusammenfassung}")
             },
         ),
+        Ereignis::Beendet { erfolg: false, code } => Some(format!(
+            "Der Auftrag ist fehlgeschlagen (Exit-Code: {}).",
+            code.map_or_else(|| "unbekannt".into(), |c| c.to_string())
+        )),
         _ => None,
     }
 }

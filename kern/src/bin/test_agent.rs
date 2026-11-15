@@ -30,8 +30,13 @@ fn main() {
     }
     let mut auftrag = String::new();
     std::io::stdin().read_to_string(&mut auftrag).expect("stdin");
+    let text = if hat("--argumente") {
+        std::env::args().skip(1).collect::<Vec<_>>().join(" ")
+    } else {
+        format!("Auftrag: {}", auftrag.trim())
+    };
     let antwort = serde_json::json!({"type":"assistant","message":{"content":[
-        {"type":"text","text":format!("Auftrag: {}", auftrag.trim())},{"type":"tool_use","name":"Read"}]}});
+        {"type":"text","text":text},{"type":"tool_use","name":"Read"}]}});
     if hat("--codex") {
         writeln!(aus, r#"{{"type":"thread.started","thread_id":"test-sitzung"}}"#).unwrap();
     } else {
@@ -44,7 +49,24 @@ fn main() {
     if hat("--kein-json") {
         writeln!(aus, "  einfache Ausgabe  \n  ").unwrap();
     }
+    if hat("--kontingent") {
+        // Claude-Format vom 15.11.; das Fenster liegt für zeitunabhängige Tests in der Zukunft.
+        writeln!(
+            aus,
+            "{}",
+            serde_json::json!({"type":"rate_limit_event", "rate_limit_info":{
+                "status":"allowed", "resetsAt":1794736200, "rateLimitType":"five_hour",
+                "overageStatus":"rejected", "overageDisabledReason":"out_of_credits", "isUsingOverage":false,
+                "unifiedWindows":{
+                    "five_hour":{"utilization":0.15,"resetsAt":1794736200,"status":"allowed"},
+                    "seven_day":{"utilization":0.08,"resetsAt":4_000_000_000u64,"status":"allowed"}}
+            }})
+        )
+        .unwrap();
+    }
     if hat("--codex") {
+        writeln!(aus, "{}", serde_json::json!({"type":"item.completed","item":{"type":"agent_message","text":text}}))
+            .unwrap();
         if hat("--wiederverbindung") {
             writeln!(aus, r#"{{"type":"error","message":"Reconnecting… 1/5"}}"#).unwrap();
         }
@@ -57,6 +79,9 @@ fn main() {
             aus.flush().unwrap();
             std::thread::sleep(std::time::Duration::from_secs(60));
         }
+        if hat("--exit-1") {
+            std::process::exit(1);
+        }
         if hat("--exit-3") {
             std::process::exit(3);
         }
@@ -64,6 +89,20 @@ fn main() {
     }
     writeln!(aus, "{antwort}").unwrap();
     aus.flush().unwrap();
+    if hat("--chat-live") {
+        let frist = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !std::path::Path::new(auftrag.trim()).is_file() {
+            assert!(std::time::Instant::now() < frist, "Chat-Text kam nicht live an");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        writeln!(
+            aus,
+            "{}",
+            serde_json::json!({"type":"assistant","message":{"content":[
+            {"type":"text","text":"Antwort bestätigt"}]}})
+        )
+        .unwrap();
+    }
     eprintln!("eine Meldung");
     if hat("--enkel") {
         assert!(Command::new(ich).arg("--zwischen").stdin(Stdio::null()).status().expect("zwischen").success());
