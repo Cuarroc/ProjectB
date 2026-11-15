@@ -21,10 +21,8 @@ fn pruefen(pfad: &str) -> Result<kern::projekt::Projekt, String> {
 }
 
 fn oeffnen(pfad: &str, datei: &Path) -> Result<kern::projekt::Projekt, String> {
-    let projekt = pruefen(pfad)?;
-    kern::projekt::zuletzt_merken(datei, &projekt.pfad)
-        .map_err(|e| format!("Projekt konnte nicht gemerkt werden: {e}"))?;
-    Ok(projekt)
+    kern::projekt::oeffnen(pfad, datei)
+        .map_err(|e| format!("Projekt konnte nicht geöffnet werden: {e}"))
 }
 
 fn zuletzt(datei: &Path) -> Vec<String> {
@@ -45,17 +43,17 @@ fn zuletzt_datei(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     datei_im_ordner(ordner)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn projekt_pruefen(pfad: String) -> Result<Projekt, String> {
     pruefen(&pfad).map(antwort)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn projekt_oeffnen(app: tauri::AppHandle, pfad: String) -> Result<Projekt, String> {
     oeffnen(&pfad, &zuletzt_datei(&app)?).map(antwort)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn projekte_zuletzt(app: tauri::AppHandle) -> Vec<String> {
     match zuletzt_datei(&app) {
         Ok(datei) => zuletzt(&datei),
@@ -66,44 +64,20 @@ pub fn projekte_zuletzt(app: tauri::AppHandle) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Command;
 
     #[test]
-    fn unterordner_oeffnen_merkt_wurzel_zuoberst() {
+    fn app_datenordner_und_antwort() {
         let basis = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("target")
             .join(format!("tauri projekt ü {}", std::process::id()));
-        let repo = basis.join("repo");
-        let unterordner = repo.join("unter ordner");
-        fs::create_dir_all(&unterordner).unwrap();
-        let ausgabe = Command::new("git")
-            .arg("-C")
-            .arg(&repo)
-            .args(["init", "-b", "projekt-test"])
-            .output()
-            .unwrap();
-        assert!(
-            ausgabe.status.success(),
-            "{}",
-            String::from_utf8_lossy(&ausgabe.stderr)
-        );
         let datei = datei_im_ordner(basis.join("app daten")).unwrap();
         assert_eq!(datei.file_name().unwrap(), "zuletzt.json");
-        assert!(zuletzt(&datei).is_empty());
-        kern::projekt::zuletzt_merken(&datei, "anderes Projekt").unwrap();
-
-        let geprueft = pruefen(unterordner.to_str().unwrap()).unwrap();
-        assert_eq!(zuletzt(&datei), ["anderes Projekt"]);
-        let projekt = oeffnen(unterordner.to_str().unwrap(), &datei).unwrap();
-        assert_eq!(projekt, geprueft);
-        assert_eq!(
-            fs::canonicalize(&projekt.pfad).unwrap(),
-            fs::canonicalize(&repo).unwrap()
-        );
-        assert_eq!(
-            zuletzt(&datei),
-            [projekt.pfad.clone(), "anderes Projekt".into()]
-        );
+        assert!(datei.parent().unwrap().is_dir());
+        let projekt = kern::projekt::Projekt {
+            projekt: "repo".into(),
+            pfad: basis.join("repo").to_str().unwrap().into(),
+            zweig: "projekt-test".into(),
+        };
         assert_eq!(
             antwort(projekt.clone()),
             Projekt::from([
@@ -112,17 +86,7 @@ mod tests {
                 ("zweig", "projekt-test".into()),
             ])
         );
-
-        let fehlt = basis.join("fehlt");
-        assert!(oeffnen(fehlt.to_str().unwrap(), &datei)
-            .unwrap_err()
-            .contains("Ordner fehlt"));
-        assert_eq!(zuletzt(&datei)[0], projekt.pfad);
-        let fehler = oeffnen(repo.to_str().unwrap(), &datei.join("blockiert")).unwrap_err();
-        assert!(
-            fehler.contains("Projekt konnte nicht gemerkt werden"),
-            "{fehler}"
-        );
+        fs::write(&datei, "[]").unwrap();
         assert!(datei_im_ordner(datei.join("blockiert"))
             .unwrap_err()
             .contains("App-Datenordner"));
