@@ -86,3 +86,46 @@ fn startweg_validiert_und_verwendet_lauf_ohne_echte_cli() {
     w.effort = Some(Effort::Hoch);
     assert_eq!(starten(&a, &w, Path::new(".")).err().unwrap().kind(), ErrorKind::NotFound);
 }
+
+#[test]
+fn sehr_hoch_wird_fuer_beide_clis_uebersetzt() {
+    let w = Startwunsch { effort: Some(Effort::SehrHoch), ..wunsch() };
+    assert_eq!(
+        argumente(&CLAUDE, &w).unwrap(),
+        ["-p", "--output-format", "stream-json", "--verbose", "--effort", "xhigh"]
+    );
+    assert_eq!(argumente(&CODEX, &w).unwrap(), ["exec", "--json", "-c", "model_reasoning_effort=\"xhigh\"", "-"]);
+}
+
+#[test]
+fn effort_aus_text_akzeptiert_nur_die_vier_ui_werte() {
+    for (text, erwartet) in [
+        ("Niedrig", Effort::Niedrig),
+        ("Mittel", Effort::Mittel),
+        ("Hoch", Effort::Hoch),
+        ("Sehr hoch", Effort::SehrHoch),
+    ] {
+        assert_eq!(Effort::aus_text(text), Some(erwartet));
+    }
+    for text in ["", "high", "niedrig", "Sehr Hoch", " Hoch", "Hoch "] {
+        assert_eq!(Effort::aus_text(text), None, "{text:?}");
+    }
+}
+
+#[test]
+fn modelltabelle_liefert_anbieter_und_gueltige_cli_namen() {
+    for (anzeige, anbieter, cli_modell) in [
+        ("Opus 5.5", &CLAUDE, "claude-opus-5-5"),
+        ("Sonnet 5.5", &CLAUDE, "claude-sonnet-5-5"),
+        ("Haiku 5.5", &CLAUDE, "claude-haiku-5-5"),
+        ("gpt-6.1-sol", &CODEX, "gpt-6.1-sol"),
+    ] {
+        let eintrag = projectb_kern::start::modell(anzeige);
+        assert_eq!(eintrag, Some((anbieter.name, cli_modell)));
+        let w = Startwunsch { modell: Some(eintrag.unwrap().1.into()), ..wunsch() };
+        assert!(argumente(anbieter, &w).unwrap().windows(2).any(|paar| paar == ["--model", cli_modell]));
+    }
+    for anzeige in ["unbekannt", "", "opus 5.5", "Opus 5.5 "] {
+        assert_eq!(projectb_kern::start::modell(anzeige), None, "{anzeige:?}");
+    }
+}
