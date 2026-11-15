@@ -69,6 +69,29 @@ pub fn laden(pfad: impl AsRef<Path>) -> Einstellungen {
     aus_json(&v)
 }
 
+/// Ändert nur übergebene Felder; Lesefehler außer „fehlt“ verhindern jedes Schreiben.
+pub fn aendern(pfad: impl AsRef<Path>, aenderung: &Value) -> io::Result<Einstellungen> {
+    let pfad = pfad.as_ref();
+    let basis = match fs::read(pfad) {
+        Ok(daten) => serde_json::from_slice(&daten).unwrap_or_default(),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Value::Null,
+        Err(e) => return Err(e),
+    };
+    let mut werte = als_json(&aus_json(&basis));
+    for modus in ["ausfuehren", "planen"] {
+        if let (Some(ziel), Some(delta)) = (werte[modus].as_object_mut(), aenderung[modus].as_object()) {
+            for (feld, wert) in delta {
+                if let Some(alt) = ziel.get_mut(feld) {
+                    *alt = wert.clone();
+                }
+            }
+        }
+    }
+    let werte = aus_json(&werte);
+    speichern(pfad, &werte)?;
+    Ok(werte)
+}
+
 /// Liest dieselben Schlüssel und Rückfallwerte wie die Einstellungsdatei.
 pub fn aus_json(v: &Value) -> Einstellungen {
     let a = &v["ausfuehren"];
@@ -107,16 +130,7 @@ pub fn als_json(e: &Einstellungen) -> Value {
 
 /// Stabiler FNV-1a-64-Dateiname im App-Datenordner, ohne Zugriff aufs Projekt.
 pub fn datei_fuer(ordner: &Path, projektpfad: &str) -> PathBuf {
-    // Dieselbe Windows-Normalisierung wie in projekt::schluessel.
-    let pfad = if cfg!(windows)
-        || projektpfad.as_bytes().get(1) == Some(&b':')
-        || projektpfad.starts_with(r"\\")
-        || projektpfad.starts_with("//")
-    {
-        projektpfad.replace('\\', "/").to_lowercase()
-    } else {
-        projektpfad.to_owned()
-    };
+    let pfad = crate::projekt::schluessel(projektpfad);
     let hash =
         pfad.bytes().fold(0xcbf29ce484222325u64, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3));
     ordner.join("einstellungen").join(format!("{hash:016x}.json"))

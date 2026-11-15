@@ -1,12 +1,60 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { CircleAlert, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Umschalter } from "../../bausteine/Umschalter";
-import { Tooltip } from "../../bausteine/Tooltip";
+import { Tooltip, tokenMs } from "../../bausteine/Tooltip";
 import { modusEinstellungen } from "../../daten/beispiel";
+import { isTauri } from "@tauri-apps/api/core";
+import { chatEingabeQuelle } from "../ChatEingabe";
+import { einstellungenLaden, einstellungenAendern, einstellungenAenderung } from "../../daten/tauri";
 import "./Einstellungen.css";
 
 export function Einstellungen({ modus }: { modus: string }) {
   const [werte, setWerte] = useState<Record<string, string[]>>({}), [offen, setOffen] = useState(false);
+  const [fehler, setFehler] = useState("");
+  type Werte = Record<string, string[]>;
+  const speicher = useRef<{ aktiv: boolean; gespeichert: Werte; offen: ((w: Werte) => Werte)[]; fehler: Map<string, string>; kette: Promise<unknown> } | null>(null);
+  useEffect(() => {
+    if (!isTauri()) return;
+    let pfad: string | undefined;
+    const projekte = new Map<string, NonNullable<typeof speicher.current>>();
+    const laden = () => {
+      const neu = chatEingabeQuelle.lesen().kopf.pfad;
+      if (neu === pfad) return;
+      pfad = neu;
+      if (speicher.current) speicher.current.aktiv = false;
+      const stand: NonNullable<typeof speicher.current> = { aktiv: true, gespeichert: {}, offen: [], fehler: projekte.get(neu)?.fehler ?? new Map(), kette: Promise.resolve() };
+      speicher.current = stand; setWerte({}); setFehler("");
+      stand.kette = (projekte.get(neu)?.kette ?? Promise.resolve()).then(() => einstellungenLaden(neu)).then(werte => {
+        stand.gespeichert = werte; if (stand.aktiv) { if (!stand.offen.length) setWerte(werte); setFehler([...new Set(stand.fehler.values())].join(" ")); }
+      }).catch(e => { if (stand.aktiv) setFehler(`Nicht geladen: ${String(e)}`); });
+      projekte.set(neu, stand);
+    };
+    const ab = chatEingabeQuelle.abonnieren(laden); laden();
+    return () => { ab(); if (speicher.current) speicher.current.aktiv = false; };
+  }, []);
+  useEffect(() => {
+    if (!fehler || speicher.current?.fehler.size) return;
+    const timer = setTimeout(() => setFehler(""), tokenMs("standzeit-toast-info"));
+    return () => clearTimeout(timer);
+  }, [fehler]);
+  const aendern = (neu: string[], index?: number) => {
+    setWerte(vorher => ({ ...vorher, [modus]: neu }));
+    if (!isTauri() || !speicher.current) return;
+    const stand = speicher.current, pfad = chatEingabeQuelle.lesen().kopf.pfad;
+    const delta = einstellungenAenderung(modus, neu, index);
+    const felder = neu.flatMap((_, i) => index === undefined || index === i ? [`${modus}:${i}`] : []);
+    stand.offen.push(w => ({ ...w, [modus]: (w[modus] ?? neu).map((alt, i) => index === undefined || index === i ? neu[i] : alt) }));
+    stand.kette = stand.kette.then(async () => {
+      try {
+        stand.gespeichert = await einstellungenAendern(pfad, delta);
+        felder.forEach(feld => stand.fehler.delete(feld));
+      } catch (e) {
+        felder.forEach(feld => stand.fehler.set(feld, `Nicht gespeichert: ${String(e)}`));
+      }
+      stand.offen.shift();
+      if (stand.aktiv) { setWerte(stand.offen.reduce((w, anwenden) => anwenden(w), stand.gespeichert)); setFehler([...new Set(stand.fehler.values())].join(" ")); }
+    });
+  };
   const ort = useRef<HTMLSpanElement>(null), knopf = useRef<HTMLButtonElement>(null), rueckgabe = useRef(false), id = useId();
   const zeilen = modusEinstellungen[modus as keyof typeof modusEinstellungen];
   const aktuell = werte[modus] ?? zeilen?.map(z => z.empfohlen) ?? [];
@@ -41,9 +89,10 @@ export function Einstellungen({ modus }: { modus: string }) {
       {zeilen.map((z, i) => <div className="zeile" key={z.name}><span className="kopf"><span>{z.name}</span>
         <span className="empf">Empfohlen: {z.empfohlen}</span></span>
         <Umschalter beschriftung={z.name} moeglichkeiten={z.werte} wert={aktuell[i]} onChange={wert =>
-          setWerte(vorher => ({ ...vorher, [modus]: aktuell.map((w, n) => n === i ? wert : w) }))} /></div>)}
+          aendern(aktuell.map((w, n) => n === i ? wert : w), i)} /></div>)}
+      {fehler && <span className="einst-fehler" role="status"><CircleAlert aria-hidden="true" />{fehler}</span>}
       <span><button type="button" className="kn kn-leise einst-zurueck" disabled={empfohlen}
-        onClick={() => { setWerte(vorher => ({ ...vorher, [modus]: zeilen.map(z => z.empfohlen) }));
+        onClick={() => { aendern(zeilen.map(z => z.empfohlen));
           ort.current?.querySelector<HTMLButtonElement>(`[aria-label="${zeilen[0].empfohlen}"]`)?.focus(); }}>Auf Empfohlen zurücksetzen</button></span>
     </div>}
   </span></span>;

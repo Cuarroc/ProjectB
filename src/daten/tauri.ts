@@ -1,5 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { beispiel } from "./beispiel";
+import { beispiel, modusEinstellungen } from "./beispiel";
 import type { Kontingent, Kopf } from "./typen";
 
 export type Projekt = Pick<Kopf, "projekt" | "pfad" | "zweig">;
@@ -26,4 +26,28 @@ export async function projekteZuletzt(): Promise<string[]> {
 
 export async function kontingentLesen(): Promise<Kontingent> {
   return isTauri() ? invoke<Kontingent>("kontingent") : beispiel.kopf.kontingent;
+}
+
+const felder = {
+  Ausführen: [["agentenGleichzeitig", ["einer", "bisZu3", "bisZu5"]], ["pruefungDurch", ["andereModellfamilie", "gleicheFamilie"]], ["pruefrundenHoechstens", ["eins", "zwei", "drei"]]],
+  Planen: [["plan", ["kurz", "normal", "ausfuehrlich"]], ["dauerUndTokensSchaetzen", ["an", "aus"]], ["beiUnklaremNachfragen", ["an", "aus"]]],
+} as const;
+type Kernwerte = Record<string, Record<string, string>>;
+const modusSchluessel = (modus: string) => modus === "Ausführen" ? "ausfuehren" : "planen";
+function anzeigen(daten: Kernwerte): Record<string, string[]> {
+  return Object.fromEntries(Object.entries(felder).map(([modus, zeilen]) => [modus, zeilen.map(([feld, texte], i) => {
+    const z = modusEinstellungen[modus as keyof typeof modusEinstellungen][i];
+    return z.werte[(texte as readonly string[]).indexOf(daten[modusSchluessel(modus)]?.[feld])] ?? z.empfohlen;
+  })]));
+}
+export function einstellungenAenderung(modus: string, werte: string[], index?: number): Kernwerte {
+  const zeilen = modusEinstellungen[modus as keyof typeof modusEinstellungen];
+  return { [modusSchluessel(modus)]: Object.fromEntries(felder[modus as keyof typeof felder]
+    .flatMap(([feld, texte], i) => index !== undefined && index !== i ? [] : [[feld, texte[(zeilen[i].werte as readonly string[]).indexOf(werte[i])]]])) };
+}
+export async function einstellungenLaden(projekt: string) {
+  return anzeigen(await invoke<Kernwerte>("einstellungen_laden", { projekt }));
+}
+export async function einstellungenAendern(projekt: string, werte: Kernwerte) {
+  return anzeigen(await invoke<Kernwerte>("einstellungen_speichern", { projekt, werte }));
 }
