@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { beispiel } from "./beispiel";
-import { projektOeffnen, projektPruefen, projekteZuletzt } from "./tauri";
+import { auftragSenden, chatNachrichtenHoeren, projektOeffnen, projektPruefen, projekteZuletzt } from "./tauri";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: vi.fn(() => false) }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
 
 describe("Projektbrücke", () => {
@@ -36,4 +38,25 @@ describe("Projektbrücke", () => {
     vi.mocked(invoke).mockRejectedValueOnce("Ordner fehlt");
     await expect(projektOeffnen("/fehlt")).rejects.toBe("Ordner fehlt");
   });
+});
+
+const auftrag = { chat: "chat-1", pfad: "D:\\Mein Projekt", anbieter: "Codex" as const, sitzung: null, text: "Baue CSV" };
+it("sendet genau die Auftragsfelder an den Desktop-Command", async () => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  vi.mocked(invoke).mockResolvedValue({ sitzung: "s-1", erfolg: true });
+  await expect(auftragSenden(auftrag)).resolves.toEqual({ sitzung: "s-1", erfolg: true });
+  expect(invoke).toHaveBeenCalledExactlyOnceWith("auftrag_senden", auftrag);
+});
+it("abonniert chat-nachricht und reicht die Nutzdaten und das Abmelden weiter", async () => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  const cb = vi.fn(), abmelden = vi.fn(); vi.mocked(listen).mockResolvedValue(abmelden);
+  expect(await chatNachrichtenHoeren(cb)).toBe(abmelden);
+  expect(listen).toHaveBeenCalledExactlyOnceWith("chat-nachricht", expect.any(Function));
+  vi.mocked(listen).mock.calls[0][1]({ event: "chat-nachricht", id: 1, payload: { chat: "chat-1", text: "Antwort" } });
+  expect(cb).toHaveBeenCalledExactlyOnceWith("chat-1", "Antwort");
+});
+it("weist Browseraufträge zurück und liefert dort ein leeres Abmelden", async () => {
+  await expect(auftragSenden(auftrag)).rejects.toThrow("Echte Aufträge gehen nur in der Desktop-App.");
+  (await chatNachrichtenHoeren(vi.fn()))();
+  expect(invoke).not.toHaveBeenCalled(); expect(listen).not.toHaveBeenCalled();
 });

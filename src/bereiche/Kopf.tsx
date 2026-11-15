@@ -51,7 +51,7 @@ export function ProjektWahl({ kopf }: { kopf: KopfDaten }) {
       if (!isTauri() || !projekte.length) return;
       const projekt = await projektPruefen(projekte[0]);
       if (aktiv && !geoeffnet.current && !laedt.current) {
-        const daten = chatEingabeQuelle.lesen(); chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, ...projekt } });
+        const daten = chatEingabeQuelle.lesen(); chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, ...projekt, geoeffnet: true } });
       }
     }).catch(() => { /* Beim Start bleiben nicht erreichbare Projekte still beim bisherigen Zustand. */ });
     return () => { aktiv = false; };
@@ -61,7 +61,7 @@ export function ProjektWahl({ kopf }: { kopf: KopfDaten }) {
     laedt.current = true; setOeffnet(true); setFehler("");
     try {
       const projekt = await projektOeffnen(pfad.trim()), daten = chatEingabeQuelle.lesen();
-      chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, ...projekt, projekte: [projekt.pfad, ...daten.kopf.projekte.filter(p => p !== projekt.pfad)] } });
+      chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, ...projekt, geoeffnet: true, projekte: [projekt.pfad, ...daten.kopf.projekte.filter(p => p !== projekt.pfad)] } });
       geoeffnet.current = true; setFormular(false); zu();
       try {
         const projekte = await projekteZuletzt(), daten = chatEingabeQuelle.lesen();
