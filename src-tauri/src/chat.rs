@@ -8,6 +8,7 @@ pub async fn auftrag_senden(
     pfad: String,
     modell: String,
     effort: String,
+    modus: String,
     sitzung: Option<BTreeMap<String, String>>,
     text: String,
 ) -> Result<tauri::ipc::Response, String> {
@@ -23,7 +24,8 @@ pub async fn auftrag_senden(
                 Ok::<_, String>((feld("id")?, feld("anbieter")?, feld("pfad")?))
             })
             .transpose()?;
-        let (anbieter, wunsch) = kern::chat::startwunsch(&modell, &effort, sitzung, &pfad, text)?;
+        let (anbieter, wunsch) =
+            kern::chat::startwunsch(&modell, &effort, &modus, sitzung, &pfad, text)?;
         let ordner = Path::new(&pfad);
         if !ordner.is_dir() {
             return Err("Ordner fehlt oder ist kein Ordner".into());

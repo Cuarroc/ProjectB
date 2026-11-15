@@ -4,7 +4,14 @@ use std::io::ErrorKind;
 use std::path::Path;
 
 fn wunsch() -> Startwunsch {
-    Startwunsch { rolle: None, modell: None, effort: None, fortsetzen: None, auftrag: "Prüfe den Code.".into() }
+    Startwunsch {
+        rolle: None,
+        modell: None,
+        effort: None,
+        fortsetzen: None,
+        nur_lesen: false,
+        auftrag: "Prüfe den Code.".into(),
+    }
 }
 
 #[test]
@@ -128,4 +135,11 @@ fn modelltabelle_liefert_anbieter_und_gueltige_cli_namen() {
     for anzeige in ["unbekannt", "", "opus 5.5", "Opus 5.5 "] {
         assert_eq!(projectb_kern::start::modell(anzeige), None, "{anzeige:?}");
     }
+}
+
+#[test]
+fn unbekannter_anbieter_darf_nicht_still_schreibend_starten() {
+    let a = Anbieter { name: "unbekannt", ..CLAUDE };
+    let w = Startwunsch { nur_lesen: true, ..wunsch() };
+    assert_eq!(argumente(&a, &w).unwrap_err().kind(), ErrorKind::Unsupported);
 }
