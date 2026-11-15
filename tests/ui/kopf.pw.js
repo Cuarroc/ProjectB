@@ -4,7 +4,7 @@ import AxeBuilder from "@axe-core/playwright";
 test("Kopf: Soll-Bilder, Menüs, Bewegung und axe", async ({ page }, info) => {
   test.skip(process.env.UI_BASELINE === "1", "Kopf ist im Basisstand ein Platzhalter.");
   await page.emulateMedia({ reducedMotion: "no-preference" }); await page.goto("/");
-  await page.evaluate(() => document.fonts.ready);
+  await page.waitForLoadState("networkidle"); await page.evaluate(() => document.fonts.ready);
   const kopf = page.getByRole("banner"), logo = kopf.getByRole("button", { name: "ProjectB", exact: true });
   const bild = async name => { const path = info.outputPath(`${name}.png`); await page.screenshot({ path, animations: "disabled" }); await info.attach(name, { path, contentType: "image/png" }); };
   const grenzen = async locator => expect(await locator.evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; })).toBe(true);
@@ -41,11 +41,44 @@ test("Kopf: Soll-Bilder, Menüs, Bewegung und axe", async ({ page }, info) => {
     await expect(kopf.getByRole("menu")).toHaveCSS("animation-name", reducedMotion === "reduce" ? "kopf-blende" : "kopf-auf"); await page.keyboard.press("Escape");
   }
   await kopf.getByRole("button", { name: /^Projekt wählen/ }).click();
-  await kopf.getByRole("menuitemradio").last().click(); await expect(kopf.getByRole("button", { name: /^Projekt wählen/ })).toContainText("C:\\ProjectB-Beispiel");
+  await kopf.getByRole("menuitemradio").first().click(); await expect(kopf.getByRole("button", { name: /^Projekt wählen/ })).toContainText("C:\\ProjectB");
   for (const knopf of await kopf.getByRole("button").all()) await grenzen(knopf);
   const rechte = kopf.getByRole("button", { name: /^Berechtigungen:/ }); await rechte.click();
   await expect(page.getByRole("dialog", { name: "Berechtigungen" })).toBeVisible(); await page.keyboard.press("Escape"); await expect(rechte).toBeFocused();
   const post = kopf.getByRole("button", { name: "Postfach 3 warten auf dich" }); await post.click();
   await expect(kopf.getByRole("status")).toHaveText("3 warten auf dich."); await grenzen(kopf.getByRole("status"));
   await page.keyboard.press("Escape"); await expect(kopf.getByRole("status")).toHaveCount(0); await expect(post).toBeFocused();
+});
+
+test("Projekt wählen: Liste, Pfad, Fehler, Tastatur und axe", async ({ page }, info) => {
+  await page.goto("/"); await page.waitForLoadState("networkidle"); await page.evaluate(() => document.fonts.ready);
+  const kopf = page.getByRole("banner"), knopf = kopf.getByRole("button", { name: /^Projekt wählen/ });
+  const bild = async szene => {
+    if (!["1440x900", "1024x700"].includes(info.project.name)) return;
+    const path = info.outputPath(`PR-p51c_${szene}_${info.project.name}.png`);
+    await page.screenshot({ path, animations: "disabled" }); await info.attach(szene, { path, contentType: "image/png" });
+  };
+  await knopf.click();
+  const menue = kopf.getByRole("menu", { name: "Projekt wählen" });
+  await expect(menue.getByRole("menuitemradio")).toHaveText(["C:\\ProjectB", "C:\\ProjectB-Beispiel"]);
+  await bild("liste");
+  await menue.getByRole("menuitemradio").last().click();
+  const feld = kopf.getByRole("textbox", { name: "Pfad zum Projekt" }), fehler = kopf.locator("#projekt-fehler");
+  await expect(feld).toBeFocused(); await expect(feld).toHaveValue("C:\\ProjectB-Beispiel");
+  await expect(fehler).toHaveText("Echte Projekte lassen sich nur in der Desktop-App prüfen und öffnen.");
+  await page.keyboard.press("Escape"); await expect(knopf).toBeFocused();
+  await knopf.click(); await expect(menue).toBeVisible({ timeout: 3000 });
+  await menue.getByRole("menuitem", { name: "Ordner öffnen…" }).click(); await expect(feld).toBeFocused();
+  await feld.fill("C:\\Fehlt"); await page.keyboard.press("Enter");
+  await expect(fehler).toContainText("Echte Projekte lassen sich nur in der Desktop-App");
+  await expect(feld).toHaveAttribute("aria-invalid", "true"); await expect(fehler.locator("svg")).toBeVisible();
+  const dialog = kopf.getByRole("dialog", { name: "Projekt wählen" });
+  expect(await dialog.evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight && el.scrollWidth <= el.clientWidth; })).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]); await bild("fehler");
+  await feld.fill("C:\\ProjectB"); await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "Öffnen", exact: true })).toBeFocused(); await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0); await expect(knopf).toBeFocused(); await expect(knopf).toContainText("main");
+  await knopf.click(); await menue.getByRole("menuitem", { name: "Ordner öffnen…" }).click();
+  await expect(feld).toBeFocused(); await page.keyboard.press("Home"); await expect(feld).toBeFocused();
+  await page.keyboard.press("Escape"); await expect(knopf).toBeFocused();
 });

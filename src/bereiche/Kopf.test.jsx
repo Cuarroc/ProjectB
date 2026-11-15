@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import Kopf, { bewegungSetzen, bewegungAktuell } from "./Kopf";
+import Kopf, { ProjektWahl, bewegungSetzen, bewegungAktuell } from "./Kopf";
+import { Children } from "react";
+import { projektOeffnen, projekteZuletzt } from "../daten/tauri";
 import { chatEingabeQuelle } from "./ChatEingabe";
 
 describe("Kopf", () => {
@@ -26,4 +28,75 @@ describe("Kopf", () => {
       expect(html).toContain("Weiße Marke: Soll 57 %"); expect(html).not.toContain("Soll 48 %");
     } finally { chatEingabeQuelle.aktualisieren(vorher); }
   });
+});
+
+const hooks = vi.hoisted(() => ({ aktiv: false, werte: [], index: 0, effekte: [] }));
+vi.mock("../daten/tauri", () => ({ projektOeffnen: vi.fn(), projekteZuletzt: vi.fn() }));
+vi.mock("react", async original => {
+  const react = await original();
+  return { ...react, useEffect: (...args) => { if (!hooks.aktiv) return react.useEffect(...args); hooks.effekte.push(args[0]); },
+    useRef: (...args) => hooks.aktiv ? (hooks.werte[hooks.index++] ??= { current: args[0] }) : react.useRef(...args),
+    useState: (...args) => {
+      if (!hooks.aktiv) return react.useState(...args);
+      const i = hooks.index++; if (!(i in hooks.werte)) hooks.werte[i] = args[0];
+      return [hooks.werte[i], wert => { hooks.werte[i] = wert; }];
+    } };
+});
+const vorher = chatEingabeQuelle.lesen();
+afterEach(() => { hooks.aktiv = false; hooks.werte = []; hooks.effekte = []; vi.clearAllMocks(); chatEingabeQuelle.aktualisieren(vorher); });
+const auswahl = () => {
+  hooks.aktiv = true; hooks.index = 0;
+  const menue = ProjektWahl({ kopf: chatEingabeQuelle.lesen().kopf });
+  hooks.aktiv = false;
+  const zu = vi.fn(), teile = Children.toArray(menue.props.children(zu).props.children);
+  return { menue, zu, inhalt: teile[1] };
+};
+const formular = pfad => {
+  const liste = auswahl(); Children.toArray(liste.inhalt.props.children).at(-1).props.onClick();
+  const form = auswahl().inhalt; form.props.children[1].props.onChange({ target: { value: pfad } });
+  return auswahl();
+};
+const fertig = async () => { await Promise.resolve(); await Promise.resolve(); };
+
+it("öffnet per Formular und setzt Projektname, Pfad, Zweig und die letzte Liste im Kopf", async () => {
+  const projekt = { projekt: "Unser Garten", pfad: "D:\\Arbeit\\Garten", zweig: "blumen" };
+  vi.mocked(projektOeffnen).mockResolvedValue(projekt);
+  const { inhalt, zu } = formular(` ${projekt.pfad} `);
+  inhalt.props.onSubmit({ preventDefault: vi.fn() }); inhalt.props.onSubmit({ preventDefault: vi.fn() }); await fertig();
+  expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad); expect(zu).toHaveBeenCalledOnce();
+  expect(chatEingabeQuelle.lesen().kopf).toMatchObject({ ...projekt, projekte: [projekt.pfad, ...vorher.kopf.projekte] });
+  const html = renderToStaticMarkup(<Kopf />);
+  for (const text of Object.values(projekt)) expect(html).toContain(text);
+  expect(html).toContain(">Unser Garten</span>");
+});
+it.each([new Error("Der Ordner ist kein Git-Projekt."), "Der Ordner ist nicht erreichbar."])("zeigt den deutschen Fehler am unveränderten Feld: %s", async fehler => {
+  vi.mocked(projektOeffnen).mockRejectedValue(fehler);
+  const { inhalt, zu } = formular("D:\\Fehlt"); inhalt.props.onSubmit({ preventDefault: vi.fn() }); await fertig();
+  const html = renderToStaticMarkup(auswahl().inhalt);
+  expect(html).toContain('aria-invalid="true"'); expect(html).toContain('aria-describedby="projekt-fehler"');
+  expect(html).toMatch(/id="projekt-fehler"[^]*?<svg[^]*?Der Ordner/); expect(html).toContain('value="D:\\Fehlt"');
+  expect(zu).not.toHaveBeenCalled(); expect(chatEingabeQuelle.lesen().kopf).toEqual(vorher.kopf);
+});
+it("öffnet einen Listeneintrag über projektOeffnen und stellt ihn ohne Doppelung nach oben", async () => {
+  const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" };
+  vi.mocked(projektOeffnen).mockResolvedValue(projekt);
+  const { inhalt, zu } = auswahl(); inhalt.props.children[0].props.children[1].props.onClick(); await fertig();
+  expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad); expect(zu).toHaveBeenCalledOnce();
+  expect(chatEingabeQuelle.lesen().kopf).toMatchObject({ ...projekt, projekte: [projekt.pfad, vorher.kopf.pfad] });
+});
+
+it("lädt zuletzt geöffnete Projekte und lässt eine späte Antwort kein neu geöffnetes Projekt verdrängen", async () => {
+  let antwort; vi.mocked(projekteZuletzt).mockReturnValue(new Promise(resolve => { antwort = resolve; }));
+  const { inhalt } = auswahl(), aufraeumen = hooks.effekte[0]();
+  const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "neu" };
+  vi.mocked(projektOeffnen).mockResolvedValue(projekt);
+  inhalt.props.children[0].props.children[1].props.onClick(); await fertig();
+  antwort([vorher.kopf.pfad]); await fertig(); aufraeumen();
+  expect(projekteZuletzt).toHaveBeenCalledOnce(); expect(chatEingabeQuelle.lesen().kopf.projekte[0]).toBe(projekt.pfad);
+});
+
+it.each([[], ["D:\\Arbeit\\Garten"]])("übernimmt projekteZuletzt: %j", async projekte => {
+  vi.mocked(projekteZuletzt).mockResolvedValue(projekte); auswahl();
+  const aufraeumen = hooks.effekte[0](); await fertig(); aufraeumen();
+  expect(chatEingabeQuelle.lesen().kopf.projekte).toEqual(projekte);
 });
