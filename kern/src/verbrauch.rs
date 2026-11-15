@@ -63,9 +63,10 @@ pub fn codex_aus_sitzungen(ordner: &Path) -> Option<Stand> {
         .filter(|p| {
             p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("rollout-") && n.ends_with(".jsonl"))
         })
+        .map(|p| (fs::metadata(&p).and_then(|m| m.modified()).ok(), p))
         .collect();
     dateien.sort();
-    for pfad in dateien.iter().rev().take(3) {
+    for (_, pfad) in dateien.iter().rev().take(3) {
         let Ok(datei) = fs::File::open(pfad) else { continue };
         let mut leser = BufReader::new(datei);
         let (mut zeile, mut letzter) = (Vec::new(), None);
@@ -93,10 +94,12 @@ pub fn soll(endet: u64, jetzt: u64) -> u8 {
 
 fn lesen(daten: &[u8]) -> Option<BTreeMap<String, Stand>> {
     let werte: BTreeMap<String, Value> = serde_json::from_slice(daten).ok()?;
-    werte.into_iter().map(|(name, v)| Some((name, stand(v["prozent"].as_f64()?, v["endet"].as_u64()?)))).collect()
+    let werte =
+        werte.into_iter().filter_map(|(name, v)| Some((name, stand(v["prozent"].as_f64()?, v["endet"].as_u64()?))));
+    Some(werte.collect())
 }
 
-/// Fehlende, unlesbare oder kaputte Dateien ergeben eine leere Map.
+/// Ungültige Einträge werden übersprungen; unlesbare Dateien ergeben eine leere Map.
 pub fn laden(datei: impl AsRef<Path>) -> BTreeMap<String, Stand> {
     fs::read(datei).ok().and_then(|b| lesen(&b)).unwrap_or_default()
 }

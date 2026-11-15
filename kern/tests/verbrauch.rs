@@ -147,3 +147,27 @@ fn lesefehler_laesst_datei_und_inhalt_unveraendert() {
     assert_eq!(fs::read_dir(&datei).unwrap().count(), 1);
     assert_eq!(fs::read_dir(&ordner.0).unwrap().count(), 1);
 }
+
+#[test]
+fn sitzungen_neueste_aenderung_gewinnt_vor_pfad() {
+    let ordner = Ordner::neu();
+    let pfad = ordner.0.join("2026/11/15");
+    fs::create_dir_all(&pfad).unwrap();
+    for (name, prozent, sekunden) in [("rollout-a.jsonl", 42.0, 2), ("rollout-z.jsonl", 8.0, 1)] {
+        let datei = fs::File::create(pfad.join(name)).unwrap();
+        serde_json::to_writer(&datei, &codex(prozent, "primary")).unwrap();
+        datei.set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(sekunden)).unwrap();
+    }
+    assert_eq!(codex_aus_sitzungen(&ordner.0), Some(Stand { prozent: 42, endet: ENDE }));
+}
+
+#[test]
+fn kaputter_eintrag_erhaelt_andere_anbieter_beim_laden_und_merken() {
+    let ordner = Ordner::neu();
+    let datei = ordner.0.join("verbrauch.json");
+    fs::write(&datei, json!({"claude": {"prozent": 8, "endet": ENDE}, "codex": {}}).to_string()).unwrap();
+    let stand = Stand { prozent: 8, endet: ENDE };
+    assert_eq!(laden(&datei), [("claude".into(), stand.clone())].into());
+    merken(&datei, "dritter", &stand).unwrap();
+    assert_eq!(laden(&datei), [("claude".into(), stand.clone()), ("dritter".into(), stand)].into());
+}
