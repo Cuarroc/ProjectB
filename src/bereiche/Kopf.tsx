@@ -56,6 +56,10 @@ export function ProjektWahl({ kopf }: { kopf: KopfDaten }) {
       const projekt = await projektOeffnen(pfad.trim()), daten = chatEingabeQuelle.lesen();
       chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, ...projekt, projekte: [projekt.pfad, ...daten.kopf.projekte.filter(p => p !== projekt.pfad)] } });
       geoeffnet.current = true; setFormular(false); zu();
+      try {
+        const projekte = await projekteZuletzt(), daten = chatEingabeQuelle.lesen();
+        chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, projekte } });
+      } catch { setFehler("Zuletzt geöffnete Projekte konnten nicht geladen werden."); }
     } catch (e) {
       setPfad(pfad); setFormular(true); setFehler(typeof e === "string" ? e : e instanceof Error ? e.message : "Der Ordner konnte nicht geöffnet werden.");
     } finally { laedt.current = false; setOeffnet(false); }

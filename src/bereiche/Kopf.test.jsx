@@ -61,9 +61,12 @@ const fertig = async () => { await Promise.resolve(); await Promise.resolve(); }
 it("öffnet per Formular und setzt Projektname, Pfad, Zweig und die letzte Liste im Kopf", async () => {
   const projekt = { projekt: "Unser Garten", pfad: "D:\\Arbeit\\Garten", zweig: "blumen" };
   vi.mocked(projektOeffnen).mockResolvedValue(projekt);
+  // Das Formular muss nach Erfolg die gespeicherte Liste nachladen.
+  vi.mocked(projekteZuletzt).mockResolvedValue([projekt.pfad, ...vorher.kopf.projekte]);
   const { inhalt, zu } = formular(` ${projekt.pfad} `);
   inhalt.props.onSubmit({ preventDefault: vi.fn() }); inhalt.props.onSubmit({ preventDefault: vi.fn() }); await fertig();
   expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad); expect(zu).toHaveBeenCalledOnce();
+  expect(projekteZuletzt).toHaveBeenCalledOnce();
   expect(chatEingabeQuelle.lesen().kopf).toMatchObject({ ...projekt, projekte: [projekt.pfad, ...vorher.kopf.projekte] });
   const html = renderToStaticMarkup(<Kopf />);
   for (const text of Object.values(projekt)) expect(html).toContain(text);
@@ -77,22 +80,39 @@ it.each([new Error("Der Ordner ist kein Git-Projekt."), "Der Ordner ist nicht er
   expect(html).toMatch(/id="projekt-fehler"[^]*?<svg[^]*?Der Ordner/); expect(html).toContain('value="D:\\Fehlt"');
   expect(zu).not.toHaveBeenCalled(); expect(chatEingabeQuelle.lesen().kopf).toEqual(vorher.kopf);
 });
-it("öffnet einen Listeneintrag über projektOeffnen und stellt ihn ohne Doppelung nach oben", async () => {
+it("öffnet einen Listeneintrag und übernimmt die neu geladene Liste", async () => {
   const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" };
   vi.mocked(projektOeffnen).mockResolvedValue(projekt);
+  // Der zusätzliche Pfad unterscheidet Nachladen von bloßem lokalem Umsortieren.
+  const projekte = [projekt.pfad, "D:\\Weiteres-Projekt", vorher.kopf.pfad];
+  vi.mocked(projekteZuletzt).mockResolvedValue(projekte);
   const { inhalt, zu } = auswahl(); inhalt.props.children[0].props.children[1].props.onClick(); await fertig();
   expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad); expect(zu).toHaveBeenCalledOnce();
+  expect(projekteZuletzt).toHaveBeenCalledOnce();
+  expect(chatEingabeQuelle.lesen().kopf).toMatchObject({ ...projekt, projekte });
+});
+
+// Ein Fehler beim Nachladen darf das bereits erfolgreiche Öffnen nicht als gescheitert melden.
+it("behält bei Ladefehler das geöffnete Projekt und meldet nur den Listenfehler", async () => {
+  const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" };
+  vi.mocked(projektOeffnen).mockResolvedValue(projekt);
+  vi.mocked(projekteZuletzt).mockRejectedValue(new Error("Nicht erreichbar"));
+  const { inhalt, zu } = auswahl(); inhalt.props.children[0].props.children[1].props.onClick(); await fertig();
+  expect(zu).toHaveBeenCalledOnce(); expect(auswahl().menue.props.formular).toBe(false);
   expect(chatEingabeQuelle.lesen().kopf).toMatchObject({ ...projekt, projekte: [projekt.pfad, vorher.kopf.pfad] });
+  expect(renderToStaticMarkup(auswahl().inhalt)).toContain("Zuletzt geöffnete Projekte konnten nicht geladen werden.");
 });
 
 it("lädt zuletzt geöffnete Projekte und lässt eine späte Antwort kein neu geöffnetes Projekt verdrängen", async () => {
-  let antwort; vi.mocked(projekteZuletzt).mockReturnValue(new Promise(resolve => { antwort = resolve; }));
+  // Die alte Startantwort darf die nach dem Öffnen neu geladene Liste nicht verdrängen.
+  let antwort; vi.mocked(projekteZuletzt).mockReturnValueOnce(new Promise(resolve => { antwort = resolve; }));
   const { inhalt } = auswahl(), aufraeumen = hooks.effekte[0]();
   const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "neu" };
   vi.mocked(projektOeffnen).mockResolvedValue(projekt);
+  vi.mocked(projekteZuletzt).mockResolvedValue([projekt.pfad, vorher.kopf.pfad]);
   inhalt.props.children[0].props.children[1].props.onClick(); await fertig();
   antwort([vorher.kopf.pfad]); await fertig(); aufraeumen();
-  expect(projekteZuletzt).toHaveBeenCalledOnce(); expect(chatEingabeQuelle.lesen().kopf.projekte[0]).toBe(projekt.pfad);
+  expect(projekteZuletzt).toHaveBeenCalledTimes(2); expect(chatEingabeQuelle.lesen().kopf.projekte[0]).toBe(projekt.pfad);
 });
 
 it.each([[], ["D:\\Arbeit\\Garten"]])("übernimmt projekteZuletzt: %j", async projekte => {
