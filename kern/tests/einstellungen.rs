@@ -118,3 +118,97 @@ fn kaputte_datei_und_schreibfehler_ohne_panic() {
     assert!(speichern(datei.0.join("fehlt.json"), &Einstellungen::default()).is_err());
     assert_eq!(fs::read_to_string(&datei.0).unwrap(), r#"{"ausfuehren":42,"planen":false}"#);
 }
+
+#[test]
+fn json_rundreise_aller_wertekombinationen() {
+    for agenten in [AgentenGleichzeitig::Einer, AgentenGleichzeitig::BisZu3, AgentenGleichzeitig::BisZu5] {
+        for pruefung in [PruefungDurch::AndereModellfamilie, PruefungDurch::GleicheFamilie] {
+            for runden in [Pruefrunden::Eins, Pruefrunden::Zwei, Pruefrunden::Drei] {
+                for plan in [Plan::Kurz, Plan::Normal, Plan::Ausfuehrlich] {
+                    for schaetzen in [Schalter::An, Schalter::Aus] {
+                        for nachfragen in [Schalter::An, Schalter::Aus] {
+                            let e = Einstellungen {
+                                ausfuehren: Ausfuehren {
+                                    agenten_gleichzeitig: agenten,
+                                    pruefung_durch: pruefung,
+                                    pruefrunden_hoechstens: runden,
+                                },
+                                planen: Planen {
+                                    plan,
+                                    dauer_und_tokens_schaetzen: schaetzen,
+                                    bei_unklarem_nachfragen: nachfragen,
+                                },
+                            };
+                            assert_eq!(aus_json(&als_json(&e)), e);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn json_schluessel_und_rueckfall_je_feld_wie_beim_laden() {
+    let datei = Datei::neu();
+    let gueltig = json!({
+        "ausfuehren": {"agentenGleichzeitig": "einer", "pruefungDurch": "gleicheFamilie", "pruefrundenHoechstens": "zwei"},
+        "planen": {"plan": "ausfuehrlich", "dauerUndTokensSchaetzen": "aus", "beiUnklaremNachfragen": "aus"}
+    });
+    assert_eq!(als_json(&aus_json(&gueltig)), gueltig);
+    let empfohlen = json!({
+        "ausfuehren": {"agentenGleichzeitig": "bisZu3", "pruefungDurch": "andereModellfamilie", "pruefrundenHoechstens": "drei"},
+        "planen": {"plan": "normal", "dauerUndTokensSchaetzen": "an", "beiUnklaremNachfragen": "an"}
+    });
+    for modus in ["ausfuehren", "planen"] {
+        for feld in gueltig[modus].as_object().unwrap().keys() {
+            for defekt in [
+                None,
+                Some(json!("unbekannt")),
+                Some(json!(42)),
+                Some(json!(false)),
+                Some(json!(null)),
+                Some(json!([])),
+                Some(json!({})),
+            ] {
+                let mut kaputt = gueltig.clone();
+                kaputt[modus].as_object_mut().unwrap().remove(feld);
+                if let Some(wert) = defekt {
+                    kaputt[modus][feld] = wert;
+                }
+                let mut erwartet = gueltig.clone();
+                erwartet[modus][feld] = empfohlen[modus][feld].clone();
+                fs::write(&datei.0, kaputt.to_string()).unwrap();
+                let e = aus_json(&kaputt);
+                assert_eq!(als_json(&e), erwartet, "{modus}.{feld}");
+                assert_eq!(e, laden(&datei.0));
+                speichern(&datei.0, &e).unwrap();
+                assert_eq!(
+                    serde_json::from_slice::<serde_json::Value>(&fs::read(&datei.0).unwrap()).unwrap(),
+                    erwartet
+                );
+            }
+        }
+    }
+    for kaputt in [json!(null), json!([]), json!(42), json!({}), json!({"ausfuehren": false, "planen": 42})] {
+        assert_eq!(als_json(&aus_json(&kaputt)), empfohlen);
+    }
+}
+
+#[test]
+fn projektdateien_sind_stabil_getrennt_und_windows_unabhaengig() {
+    let datei = Datei::neu();
+    let basis = datei.0.parent().unwrap();
+    let erster = datei_fuer(basis, r"C:\Repo\X");
+    assert_eq!(erster, basis.join("einstellungen").join("51b03d1b19c77b1a.json"));
+    assert_eq!(erster, datei_fuer(basis, "c:/repo/x"));
+    assert_eq!(datei_fuer(basis, r"\\Server\Repo\X"), datei_fuer(basis, "//server/repo/x"));
+    let zweiter = datei_fuer(basis, "c:/repo/y");
+    assert_ne!(erster, zweiter);
+    assert!(!erster.parent().unwrap().exists());
+    fs::create_dir_all(erster.parent().unwrap()).unwrap();
+    let e = aus_json(&json!({"planen": {"plan": "kurz"}}));
+    speichern(&erster, &e).unwrap();
+    assert_eq!(laden(&erster), e);
+    assert_eq!(laden(&zweiter), Einstellungen::default());
+}
