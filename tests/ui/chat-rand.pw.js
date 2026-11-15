@@ -51,6 +51,7 @@ test("Chat-Rand: Tastatur, Beispielzustand, Bilder und axe", async ({ page }, te
 });
 
 test("Neuer Chat wird im offenen Rand aktiv", async ({ page }, testInfo) => {
+  test.skip(process.env.UI_BASELINE === "1", "Neuer Chat fehlt im Basisstand.");
   await page.goto("/");
   const rand = page.getByRole("region", { name: "Chats und Aufgaben" });
   await rand.getByRole("button", { name: /Chats und Aufgaben öffnen/ }).click();

@@ -16,7 +16,8 @@ export function chatsVerbinden(quelle: BeispielQuelle, melden: (text: string) =>
   let aktuell: Stand | undefined;
   const fehler = (stand: Stand, art: string, e: unknown) => {
     const grund = e instanceof Error ? e.message : String(e), titel = `Chats konnten nicht ${art} werden: `;
-    if (aktuell === stand) melden(grund.startsWith(titel) ? grund : titel + grund);
+    const meldung = grund.startsWith(titel) ? grund : titel + grund;
+    if (aktuell === stand) melden(art === "geladen" ? `${meldung.replace(/\.$/, "")}. Änderungen werden nicht gespeichert.` : meldung);
   };
   const lesen = () => {
     const daten = quelle.lesen(), pfad = daten.kopf.geoeffnet ? daten.kopf.pfad : undefined;
@@ -30,7 +31,10 @@ export function chatsVerbinden(quelle: BeispielQuelle, melden: (text: string) =>
       stand.kette = stand.kette.then(() => chatsLaden(pfad)).then(geladen => {
         if (aktuell !== stand) return;
         if (!geladen || !Array.isArray(geladen.chats) || !(geladen.aktiverChatId === null || typeof geladen.aktiverChatId === "string")) throw new Error("Ungültiges Chat-Format");
-        stand.zuletzt = JSON.stringify({ chats: geladen.chats, aktiverChatId: geladen.aktiverChatId });
+        if (!geladen.chats.every(chat => chat && typeof chat === "object" && typeof chat.id === "string" && typeof chat.titel === "string" && Array.isArray(chat.verlauf))) throw new Error("Ungültiges Chat-Format");
+        // Nach dem Laden läuft kein Auftrag, ein gespeichertes gestartetUm würde den Projektwechsel für immer sperren.
+        geladen = { chats: geladen.chats.map(chat => ({ ...chat, gestartetUm: null })), aktiverChatId: geladen.aktiverChatId };
+        stand.zuletzt = JSON.stringify(geladen);
         if (!geladen.chats.length) {
           const chat = neuerChat(); geladen = { chats: [chat], aktiverChatId: chat.id };
         }

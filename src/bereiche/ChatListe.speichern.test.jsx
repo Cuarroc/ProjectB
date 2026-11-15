@@ -22,7 +22,7 @@ const spaeter = () => { let resolve; const promise = new Promise(r => { resolve 
 const finden = (node, passt) => !node || typeof node !== "object" ? undefined : passt(node.props) ? node : [node.props?.children].flat(Infinity).map(n => finden(n, passt)).find(Boolean);
 beforeEach(() => {
   vi.resetAllMocks(); vi.mocked(isTauri).mockReturnValue(true); h.werte = []; quelle = new BeispielQuelle();
-  gespeichert = { aktiverChatId: quelle.lesen().aktiverChatId, chats: quelle.lesen().chats };
+  gespeichert = { aktiverChatId: quelle.lesen().aktiverChatId, chats: quelle.lesen().chats.map(c => ({ ...c, gestartetUm: null })) };
   vi.mocked(invoke).mockImplementation(async cmd => cmd === "chats_laden" ? structuredClone(gespeichert) : undefined);
   ansicht(); aufraeumen = h.effekte.map(fn => fn());
 });
@@ -47,13 +47,15 @@ it("legt für eine leere Datei einen leeren Standard-Chat an und speichert ihn",
 });
 it("meldet Ladefehler und überschreibt die Datei auch nach Änderungen nie", async () => {
   vi.mocked(invoke).mockRejectedValueOnce("kaputtes JSON"); auf(); await warten();
-  expect(html()).toContain("Chats konnten nicht geladen werden: kaputtes JSON");
+  expect(html()).toContain("Chats konnten nicht geladen werden: kaputtes JSON. Änderungen werden nicht gespeichert.");
+  expect(finden(ansicht(), p => p.text === "Neuer Chat").props.disabled).toBe(true);
   const d = quelle.lesen(); d.chats = gespeichert.chats; quelle.aktualisieren(d); neu(); await warten();
   expect(invoke).toHaveBeenCalledTimes(1);
 });
-it.each([{}, null, { chats: "falsch", aktiverChatId: null }])("behandelt unbrauchbare Dateiinhalte %j als Ladefehler ohne Speichern", async inhalt => {
+it.each([{}, null, { chats: "falsch", aktiverChatId: null }, { chats: [null], aktiverChatId: null },
+  ...[{ id: 1, titel: "T", verlauf: [] }, { id: "a", titel: null, verlauf: [] }, { id: "a", titel: "T", verlauf: {} }].map(chat => ({ chats: [chat], aktiverChatId: null }))])("behandelt unbrauchbare Dateiinhalte %j als Ladefehler ohne Speichern", async inhalt => {
   vi.mocked(invoke).mockResolvedValueOnce(inhalt); auf(); await warten();
-  expect(html()).toContain("Chats konnten nicht geladen werden:");
+  expect(html()).toContain("Chats konnten nicht geladen werden: Ungültiges Chat-Format. Änderungen werden nicht gespeichert.");
   const d = quelle.lesen(); d.chats = gespeichert.chats; quelle.aktualisieren(d); neu(); await warten();
   expect(invoke).toHaveBeenCalledTimes(1);
 });
@@ -69,6 +71,12 @@ it("legt mit dem Knopf einen eigenen aktiven Chat an und behält den alten Verla
   expect(d.chats).toHaveLength(2); expect(d.chats[0]).toEqual(gespeichert.chats[0]);
   expect(d.aktiverChatId).toBe(d.chats[1].id); expect(d.chats[1]).toMatchObject({ titel: "Neuer Chat", verlauf: [], sitzung: null });
   expect(html()).toContain('aria-current="true"');
+});
+it("sperrt Neuer Chat bis zum erfolgreichen Laden", async () => {
+  const offen = spaeter(); vi.mocked(invoke).mockReturnValueOnce(offen.promise); auf(); await warten();
+  expect(html()).toMatch(/disabled=""[^>]*>[^]*?Neuer Chat/); expect(quelle.lesen().chats).toEqual([]);
+  offen.resolve(gespeichert); await warten();
+  expect(finden(ansicht(), p => p.text === "Neuer Chat").props.disabled).toBe(false);
 });
 it("behält eine unmittelbar vor dem Chatwechsel eintreffende Antwort", async () => {
   auf(); await warten(); const wechsel = finden(ansicht(), p => p.className === "rand-chat").props.onClick;
@@ -93,8 +101,12 @@ it("speichert nacheinander und wartet beim Zurückwechseln auf offene Schreibvor
 });
 it("tut ohne Tauri nichts und behält die Beispieldaten", async () => {
   aufraeumen.forEach(fn => fn?.()); vi.mocked(isTauri).mockReturnValue(false); ansicht(); aufraeumen = h.effekte.map(fn => fn());
-  auf(); await warten(); expect(quelle.lesen().chats).toEqual(gespeichert.chats);
+  const vorher = structuredClone(quelle.lesen().chats); auf(); await warten(); expect(quelle.lesen().chats).toEqual(vorher);
   expect(await chatsLaden("A")).toBeUndefined(); await chatsSpeichern("A", gespeichert); expect(invoke).not.toHaveBeenCalled();
+});
+it("setzt gestartetUm beim Laden zurück, damit kein alter Lauf den Projektwechsel sperrt", async () => {
+  gespeichert = { ...gespeichert, chats: gespeichert.chats.map(c => ({ ...c, gestartetUm: "12:00" })) }; auf(); await warten();
+  expect(quelle.lesen().chats.every(c => c.gestartetUm === null)).toBe(true);
 });
 it("wendet nach dem Abmelden kein Ladeergebnis mehr an", async () => {
   const offen = spaeter(); vi.mocked(invoke).mockReturnValueOnce(offen.promise); auf(); await warten();

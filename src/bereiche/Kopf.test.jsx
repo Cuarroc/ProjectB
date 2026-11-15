@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import Kopf, { ProjektWahl, bewegungSetzen, bewegungAktuell } from "./Kopf";
 import { Children } from "react";
@@ -51,6 +51,7 @@ vi.mock("react", async original => {
     } };
 });
 const vorher = chatEingabeQuelle.lesen();
+beforeEach(() => { const d = chatEingabeQuelle.lesen(); d.chats.forEach(c => { c.gestartetUm = null; }); chatEingabeQuelle.aktualisieren(d); });
 // Desktop-Mocks und Kontingent-Timer dürfen spätere Tests nicht beeinflussen.
 afterEach(() => { vi.useRealTimers(); hooks.aktiv = false; hooks.werte = []; hooks.effekte = []; vi.resetAllMocks(); vi.mocked(isTauri).mockReturnValue(false); chatEingabeQuelle.aktualisieren(vorher); });
 const auswahl = () => {
@@ -66,6 +67,21 @@ const formular = pfad => {
   return auswahl();
 };
 const fertig = async () => { await Promise.resolve(); await Promise.resolve(); };
+
+it.each(["Liste", "Formular"])("sperrt Projektwechsel über %s bis alle Chats fertig sind", async weg => {
+  const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" };
+  vi.mocked(projektOeffnen).mockResolvedValue(projekt); vi.mocked(projekteZuletzt).mockResolvedValue([projekt.pfad]);
+  const ausloesen = () => { const { inhalt } = weg === "Liste" || auswahl().menue.props.formular ? auswahl() : formular(projekt.pfad);
+    if (weg === "Liste") inhalt.props.children[0].props.children[1].props.onClick();
+    else inhalt.props.onSubmit({ preventDefault: vi.fn() }); };
+  const d = chatEingabeQuelle.lesen(); d.chats.push({ ...d.chats[0], id: "laufend", gestartetUm: "12:00" }); chatEingabeQuelle.aktualisieren(d);
+  ausloesen(); await fertig();
+  expect(projektOeffnen).not.toHaveBeenCalled(); expect(projekteZuletzt).not.toHaveBeenCalled();
+  expect(chatEingabeQuelle.lesen().kopf).toEqual(d.kopf);
+  expect(renderToStaticMarkup(auswahl().inhalt)).toContain("Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist.");
+  d.chats[1].gestartetUm = null; chatEingabeQuelle.aktualisieren(d); ausloesen(); await fertig();
+  expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad); expect(chatEingabeQuelle.lesen().kopf.pfad).toBe(projekt.pfad);
+});
 
 it("öffnet per Formular und setzt Projektname, Pfad, Zweig und die letzte Liste im Kopf", async () => {
   const projekt = { projekt: "Unser Garten", pfad: "D:\\Arbeit\\Garten", zweig: "blumen" };

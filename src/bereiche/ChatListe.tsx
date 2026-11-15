@@ -25,7 +25,7 @@ export default function ChatListe({ quelle, offen, umschalten }: Props) {
       <h2>Chats und Aufgaben</h2>
       <div className="rand-inhalt">
         <section className="rand-karte" aria-labelledby="chats"><h3 id="chats">Chats</h3>
-          <Knopf text="Neuer Chat" symbol={Plus} onClick={() => {
+          <Knopf text="Neuer Chat" symbol={Plus} disabled={!daten.chats.length} onClick={() => {
             const neu = quelle.lesen(), chat = neuerChat();
             quelle.aktualisieren({ ...neu, chats: [...neu.chats, chat], aktiverChatId: chat.id });
           }} />
