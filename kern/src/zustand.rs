@@ -56,7 +56,7 @@ impl AgentZustand {
                 self.problem |= text.to_lowercase().contains("nicht angemeldet");
                 self.zeilen(text);
             }
-            Ereignis::ErgebnisAusstehend | Ereignis::Unbekannt(_) => {}
+            Ereignis::ErgebnisAusstehend | Ereignis::Unbekannt(_) | Ereignis::Kontingent(_) => {}
         }
     }
 
