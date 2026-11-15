@@ -8,15 +8,17 @@ import { chatEingabeQuelle } from "../ChatEingabe";
 import { einstellungenLaden, einstellungenAendern, einstellungenAenderung } from "../../daten/tauri";
 import "./Einstellungen.css";
 
+type Werte = Record<string, string[]>;
+type Speicher = { aktiv: boolean; gespeichert: Werte; offen: ((w: Werte) => Werte)[]; fehler: Map<string, string>; kette: Promise<unknown> };
+const projekte = new Map<string, Speicher>();
+
 export function Einstellungen({ modus }: { modus: string }) {
   const [werte, setWerte] = useState<Record<string, string[]>>({}), [offen, setOffen] = useState(false);
   const [fehler, setFehler] = useState("");
-  type Werte = Record<string, string[]>;
-  const speicher = useRef<{ aktiv: boolean; gespeichert: Werte; offen: ((w: Werte) => Werte)[]; fehler: Map<string, string>; kette: Promise<unknown> } | null>(null);
+  const speicher = useRef<Speicher | null>(null);
   useEffect(() => {
     if (!isTauri()) return;
     let pfad: string | undefined;
-    const projekte = new Map<string, NonNullable<typeof speicher.current>>();
     const laden = () => {
       const neu = chatEingabeQuelle.lesen().kopf.pfad;
       if (neu === pfad) return;

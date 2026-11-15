@@ -82,6 +82,19 @@ it.each(["Liste", "Formular"])("sperrt Projektwechsel über %s bis alle Chats fe
   expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad); expect(chatEingabeQuelle.lesen().kopf.pfad).toBe(projekt.pfad);
 });
 
+it.each(["Liste", "Formular"])("sperrt verspäteten Projektwechsel über %s bei inzwischen gestartetem Chat", async weg => {
+  const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" }; let aufloesen;
+  vi.mocked(projektOeffnen).mockReturnValue(new Promise(resolve => { aufloesen = resolve; }));
+  const d = chatEingabeQuelle.lesen(); d.kopf.geoeffnet = true; d.chats.forEach(c => { c.gestartetUm = null; }); chatEingabeQuelle.aktualisieren(d);
+  const { inhalt, zu } = weg === "Liste" ? auswahl() : formular(projekt.pfad);
+  if (weg === "Liste") inhalt.props.children[0].props.children[1].props.onClick();
+  else inhalt.props.onSubmit({ preventDefault: vi.fn() });
+  expect(projektOeffnen).toHaveBeenCalledExactlyOnceWith(projekt.pfad);
+  d.chats[0].gestartetUm = "12:00"; chatEingabeQuelle.aktualisieren(d); aufloesen(projekt); await fertig();
+  expect(chatEingabeQuelle.lesen().kopf.pfad).toBe(d.kopf.pfad); expect(zu).not.toHaveBeenCalled();
+  expect(renderToStaticMarkup(auswahl().inhalt)).toContain("Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist.");
+});
+
 it("sperrt das erste Öffnen nicht wegen eines Beispiel-Laufs", async () => {
   const projekt = { projekt: "Beispiel", pfad: vorher.kopf.projekte[1], zweig: "testen" }; vi.mocked(projektOeffnen).mockResolvedValue(projekt);
   const d = chatEingabeQuelle.lesen(); d.kopf = { ...d.kopf, geoeffnet: false }; d.chats[0].gestartetUm = "14:30"; chatEingabeQuelle.aktualisieren(d);
