@@ -1,11 +1,13 @@
 .hauptbildschirm > .chat-spalte { padding: 0; overflow: hidden; }
-.chat-kopf { display: flex; align-items: center; flex-wrap: wrap; gap: var(--abstand-3); flex: 0 0 auto; min-height: var(--kopf-hoehe); padding: var(--abstand-2) var(--abstand-7); box-sizing: border-box; }
-.chat-empfaenger { display: inline-flex; align-items: center; gap: var(--abstand-2); padding: var(--abstand-1) var(--abstand-3); border-radius: var(--rund-voll); background: var(--flaeche-2); box-shadow: var(--schatten-kante); font: var(--schrift-klein); color: var(--text-2); white-space: nowrap; }
-.chat-empfaenger strong { color: var(--text-1); }
+.chat-kopf { display: flex; align-items: center; gap: var(--abstand-3); flex: 0 0 var(--kopf-hoehe); padding: var(--abstand-2) var(--abstand-7); box-sizing: border-box; }
+.chat-kopf > :not(.chat-empfaenger) { flex-shrink: 0; }
+.chat-empfaenger { display: inline-flex; align-items: center; min-width: 0; gap: var(--abstand-2); padding: var(--abstand-1) var(--abstand-3); border-radius: var(--rund-voll); background: var(--flaeche-2); box-shadow: var(--schatten-kante); font: var(--schrift-klein); color: var(--text-2); white-space: nowrap; }
+.chat-empfaenger strong { color: var(--text-1); overflow: hidden; text-overflow: ellipsis; }
 .chat-empfaenger .r-avatar { width: var(--abstand-8); height: var(--abstand-8); flex-basis: var(--abstand-8); }
 .chat-kopf .chat-laufzeit { color: var(--text-2); background: var(--flaeche-3); font-weight: 400; }
 .chat-laufzeit svg { color: var(--status-arbeitet); flex-shrink: 0; }
 .chat-kopf > .knopf { margin-left: auto; }
+@media (width < 80rem) { .chat-empfaenger .r-avatar { display: none; } }
 .chat-verlauf { flex: 1; min-height: 0; overflow-y: auto; padding: var(--abstand-4) var(--abstand-8) var(--abstand-8); scrollbar-width: thin; scrollbar-color: var(--neutral-3) transparent; }
 .chat-nachrichten { display: flex; flex-direction: column; gap: var(--abstand-5); max-width: var(--chat-max-breite); margin: auto; padding: 0; list-style: none; }
 .chat-nachrichten > li { min-width: 0; }

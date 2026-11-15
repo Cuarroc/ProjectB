@@ -30,7 +30,7 @@ it("zeigt den festen Empfänger und ohne Start keine Laufzeit", () => {
 it.each([["14:30", 14, 37, "7 min"], ["23:58", 0, 3, "5 min"], ["14:37", 14, 37, "weniger als 1 min"]])(
   "zählt seit %s um %i:%i: %s", (start, stunde, minute, text) => {
     vi.setSystemTime(new Date(2026, 10, 15, stunde, minute)); starten(start);
-    expect(html()).toContain(`role="status"`);
+    expect(html()).toContain(`role="timer" aria-live="off"`);
     expect(html()).toContain(`Läuft seit ${text}`);
   });
 it("aktualisiert jede Minute und räumt den Timer auf", () => {
