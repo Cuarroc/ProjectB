@@ -3,15 +3,19 @@ use projectb_kern::{Anbieter, Lauf};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{Duration, Instant};
 
 struct Temp(PathBuf);
 impl Temp {
     fn neu() -> Self {
-        let zeit = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        // Zähler statt Uhrzeit: parallele Tests bekamen sonst denselben Ordner.
+        static NR: AtomicUsize = AtomicUsize::new(0);
+        let nr = NR.fetch_add(1, Ordering::Relaxed);
         let pfad = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("target/anhalten-tests")
-            .join(format!("{}-{zeit}", std::process::id()));
+            .join(format!("{}-{nr}", std::process::id()));
+        let _ = fs::remove_dir_all(&pfad); // Rest eines abgebrochenen Laufs mit derselben PID
         fs::create_dir_all(&pfad).unwrap();
         Self(pfad)
     }
