@@ -4,7 +4,7 @@ use std::io::ErrorKind;
 use std::path::Path;
 
 fn wunsch() -> Startwunsch {
-    Startwunsch { rolle: None, modell: None, effort: None, auftrag: "Prüfe den Code.".into() }
+    Startwunsch { rolle: None, modell: None, effort: None, fortsetzen: None, auftrag: "Prüfe den Code.".into() }
 }
 
 #[test]
