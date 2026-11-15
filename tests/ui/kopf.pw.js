@@ -87,3 +87,30 @@ test("Projekt wählen: Liste, Pfad, Fehler, Tastatur und axe", async ({ page }, 
   await expect(feld).toBeFocused(); await page.keyboard.press("Home"); await expect(feld).toBeFocused();
   await page.keyboard.press("Escape"); await expect(knopf).toBeFocused();
 });
+
+test("Projekt wählen: Listenfehler bleibt sichtbar und beschreibt den Menüeintrag", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Der Listenfehler fehlt im Basisstand.");
+  await page.addInitScript(() => {
+    window.isTauri = true;
+    let geoeffnet = false;
+    window.__TAURI_INTERNALS__ = { invoke: async cmd => {
+      if (cmd === "projekte_zuletzt") {
+        if (geoeffnet) throw new Error("Liste nicht erreichbar");
+        return ["C:\\ProjectB-Handbuch"];
+      }
+      if (cmd === "projekt_oeffnen") geoeffnet = true;
+      return { projekt: "ProjectB-Handbuch", pfad: "C:\\ProjectB-Handbuch", zweig: "handbuch" };
+    } };
+  });
+  await page.goto("/"); await page.evaluate(() => document.fonts.ready);
+  const kopf = page.getByRole("banner"), knopf = kopf.getByRole("button", { name: /^Projekt wählen/ });
+  await expect(knopf).toHaveAccessibleName("Projekt wählen: ProjectB-Handbuch C:\\ProjectB-Handbuch handbuch");
+  await knopf.click(); await kopf.getByRole("menuitemradio", { name: "C:\\ProjectB-Handbuch", exact: true }).click();
+  await expect(knopf).toHaveAttribute("aria-expanded", "false"); await knopf.click();
+  const fehler = kopf.getByText("Zuletzt geöffnete Projekte konnten nicht geladen werden.");
+  await expect(fehler).toBeVisible(); await expect(fehler.locator("svg")).toBeVisible();
+  await expect(kopf.getByRole("menuitem", { name: "Ordner öffnen…" })).toHaveAccessibleDescription(await fehler.innerText());
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  const path = info.outputPath("listenfehler.png");
+  await page.screenshot({ path, animations: "disabled" }); await info.attach("Listenfehler", { path, contentType: "image/png" });
+});

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Circle, CircleDot, CircleX, Folder, IdCard } from "lucide-react";
+import { isTauri } from "@tauri-apps/api/core";
 import { chatEingabeQuelle } from "./ChatEingabe";
-import { projektOeffnen, projekteZuletzt } from "../daten/tauri";
+import { projektOeffnen, projektPruefen, projekteZuletzt } from "../daten/tauri";
 import type { Kopf as KopfDaten } from "../daten/typen";
 import "../bausteine/Eingabefeld.css";
 import { PostfachKnopf } from "./PostfachKnopf";
@@ -44,9 +45,15 @@ export function ProjektWahl({ kopf }: { kopf: KopfDaten }) {
   const laedt = useRef(false), geoeffnet = useRef(false);
   useEffect(() => {
     let aktiv = true;
-    projekteZuletzt().then(projekte => {
-      if (aktiv && !geoeffnet.current) { const daten = chatEingabeQuelle.lesen(); chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, projekte } }); }
-    }).catch(() => { if (aktiv && !geoeffnet.current) setFehler("Zuletzt geöffnete Projekte konnten nicht geladen werden."); });
+    projekteZuletzt().then(async projekte => {
+      if (!aktiv || geoeffnet.current || laedt.current) return;
+      const daten = chatEingabeQuelle.lesen(); chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, projekte } });
+      if (!isTauri() || !projekte.length) return;
+      const projekt = await projektPruefen(projekte[0]);
+      if (aktiv && !geoeffnet.current && !laedt.current) {
+        const daten = chatEingabeQuelle.lesen(); chatEingabeQuelle.aktualisieren({ ...daten, kopf: { ...daten.kopf, ...projekt } });
+      }
+    }).catch(() => { /* Beim Start bleiben nicht erreichbare Projekte still beim bisherigen Zustand. */ });
     return () => { aktiv = false; };
   }, []);
   const oeffnen = async (pfad: string, zu: () => void) => {
@@ -77,8 +84,8 @@ export function ProjektWahl({ kopf }: { kopf: KopfDaten }) {
       </form> : <>
         <div className="kopf-projekte" role="group" aria-label="Zuletzt geöffnet">{kopf.projekte.map(p => <button key={p} type="button" role="menuitemradio" tabIndex={-1}
           data-bleibt aria-disabled={oeffnet} aria-checked={kopf.pfad === p} onClick={() => { void oeffnen(p, zu); }}>{p}</button>)}</div>
-        {fehler && <p className="ein-meldung" role="status"><CircleX {...symbol} />{fehler}</p>}
-        <button type="button" role="menuitem" tabIndex={-1} data-bleibt onClick={() => { setFehler(""); setFormular(true); }}>Ordner öffnen…</button>
+        {fehler && <p id="projekt-listenfehler" className="ein-meldung"><CircleX {...symbol} />{fehler}</p>}
+        <button type="button" role="menuitem" tabIndex={-1} data-bleibt aria-describedby={fehler ? "projekt-listenfehler" : undefined} onClick={() => { setFehler(""); setFormular(true); }}>Ordner öffnen…</button>
       </>}
     </>}
   </KopfMenue>;
