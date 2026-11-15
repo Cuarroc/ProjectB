@@ -94,6 +94,8 @@ test("Projekt wählen: Listenfehler bleibt sichtbar und beschreibt den Menüeint
     window.isTauri = true;
     let geoeffnet = false;
     window.__TAURI_INTERNALS__ = { invoke: async cmd => {
+      // Die Projektattrappe muss auch den neuen Kontingentbefehl beantworten.
+      if (cmd === "kontingent") return { claude: { genutzt: 42, soll: 48 }, codex: { genutzt: 51, soll: 48 } };
       if (cmd === "projekte_zuletzt") {
         if (geoeffnet) throw new Error("Liste nicht erreichbar");
         return ["C:\\ProjectB-Handbuch"];
@@ -113,4 +115,25 @@ test("Projekt wählen: Listenfehler bleibt sichtbar und beschreibt den Menüeint
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   const path = info.outputPath("listenfehler.png");
   await page.screenshot({ path, animations: "disabled" }); await info.attach("Listenfehler", { path, contentType: "image/png" });
+});
+
+test("Kontingent: Claude unbekannt und Codex mit eigenem Wochenstand", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Echte Kontingente fehlen im Basisstand.");
+  await page.addInitScript(() => {
+    window.isTauri = true;
+    window.__TAURI_INTERNALS__ = { invoke: async cmd => {
+      if (cmd === "kontingent") return { claude: null, codex: { genutzt: 51, soll: 48 } };
+      if (cmd === "projekte_zuletzt") return [];
+      throw new Error(`Unerwarteter Befehl: ${cmd}`);
+    } };
+  });
+  await page.goto("/"); await page.evaluate(() => document.fonts.ready);
+  const kopf = page.getByRole("banner"), claude = kopf.locator('[aria-label="Claude: unbekannt"]');
+  await expect(claude).toHaveText("Claudeunbekannt"); await expect(claude.locator(".kopf-balken")).toHaveCount(0);
+  const codex = kopf.locator('[aria-label="Codex: Genutzt 51 %, Soll 48 %"]');
+  await expect(codex).toHaveText("Codex51 %");
+  await expect(codex.locator(".kopf-soll")).toHaveAttribute("style", "left: 48%;");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  const path = info.outputPath(`PR-p55c_kopf_${info.project.name}.png`);
+  await page.screenshot({ path, animations: "disabled" }); await info.attach("Kontingent", { path, contentType: "image/png" });
 });

@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import Kopf, { ProjektWahl, bewegungSetzen, bewegungAktuell } from "./Kopf";
 import { Children } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { projektOeffnen, projektPruefen, projekteZuletzt } from "../daten/tauri";
+// Kontingent wird wie die Projektbefehle über die Datenbrücke geprüft.
+import { kontingentLesen, projektOeffnen, projektPruefen, projekteZuletzt } from "../daten/tauri";
 import { chatEingabeQuelle } from "./ChatEingabe";
 
 describe("Kopf", () => {
@@ -21,12 +22,14 @@ describe("Kopf", () => {
     const html = renderToStaticMarkup(<Kopf />); expect(html).toContain("Berechtigungen: Nur bei Wichtigem");
     expect(html.match(/data-an="true"/g)).toHaveLength(2); expect(html.match(/data-an="false"/g)).toHaveLength(2);
   });
+  // Getrennte Soll-Marken dürfen beim Wechsel der Datenquelle nicht zusammenfallen.
   it("liest geänderte Kontingente aus derselben Quelle wie der Chat", () => {
-    const vorher = chatEingabeQuelle.lesen(), neu = structuredClone(vorher); neu.kopf.kontingent = { claude: 17, codex: 86, soll: 57 };
+    const vorher = chatEingabeQuelle.lesen(), neu = structuredClone(vorher); neu.kopf.kontingent = { claude: { genutzt: 17, soll: 57 }, codex: { genutzt: 86, soll: 63 } };
     try { chatEingabeQuelle.aktualisieren(neu); const html = renderToStaticMarkup(<Kopf />);
-      expect(html).toContain("Genutzt 17 %, Soll 57 %"); expect(html).toContain("Genutzt 86 %, Soll 57 %");
-      expect(html.match(/class="kopf-soll" style="left:57%"/g)).toHaveLength(2);
-      expect(html).toContain("Weiße Marke: Soll 57 %"); expect(html).not.toContain("Soll 48 %");
+      expect(html).toContain("Genutzt 17 %, Soll 57 %"); expect(html).toContain("Genutzt 86 %, Soll 63 %");
+      expect(html).toContain('class="kopf-soll" style="left:57%"');
+      expect(html).toContain('class="kopf-soll" style="left:63%"');
+      expect(html).toContain("Weiße Marke: Soll"); expect(html).not.toContain("Soll 48 %");
     } finally { chatEingabeQuelle.aktualisieren(vorher); }
   });
 });
@@ -34,20 +37,22 @@ describe("Kopf", () => {
 const hooks = vi.hoisted(() => ({ aktiv: false, werte: [], index: 0, effekte: [] }));
 // Desktop-Start und Browser-Verhalten brauchen getrennte Antworten.
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn(() => false) }));
-vi.mock("../daten/tauri", () => ({ projektOeffnen: vi.fn(), projektPruefen: vi.fn(), projekteZuletzt: vi.fn() }));
+// Die neue Verbrauchsabfrage bleibt von Projektantworten getrennt.
+vi.mock("../daten/tauri", () => ({ kontingentLesen: vi.fn(), projektOeffnen: vi.fn(), projektPruefen: vi.fn(), projekteZuletzt: vi.fn() }));
 vi.mock("react", async original => {
   const react = await original();
   return { ...react, useEffect: (...args) => { if (!hooks.aktiv) return react.useEffect(...args); hooks.effekte.push(args[0]); },
     useRef: (...args) => hooks.aktiv ? (hooks.werte[hooks.index++] ??= { current: args[0] }) : react.useRef(...args),
     useState: (...args) => {
       if (!hooks.aktiv) return react.useState(...args);
-      const i = hooks.index++; if (!(i in hooks.werte)) hooks.werte[i] = args[0];
+      // Kopf initialisiert seine Daten verzögert wie echtes React.
+      const i = hooks.index++; if (!(i in hooks.werte)) hooks.werte[i] = typeof args[0] === "function" ? args[0]() : args[0];
       return [hooks.werte[i], wert => { hooks.werte[i] = wert; }];
     } };
 });
 const vorher = chatEingabeQuelle.lesen();
-// Desktop-Mocks dürfen die folgenden Browser-Tests nicht beeinflussen.
-afterEach(() => { hooks.aktiv = false; hooks.werte = []; hooks.effekte = []; vi.resetAllMocks(); vi.mocked(isTauri).mockReturnValue(false); chatEingabeQuelle.aktualisieren(vorher); });
+// Desktop-Mocks und Kontingent-Timer dürfen spätere Tests nicht beeinflussen.
+afterEach(() => { vi.useRealTimers(); hooks.aktiv = false; hooks.werte = []; hooks.effekte = []; vi.resetAllMocks(); vi.mocked(isTauri).mockReturnValue(false); chatEingabeQuelle.aktualisieren(vorher); });
 const auswahl = () => {
   hooks.aktiv = true; hooks.index = 0;
   const menue = ProjektWahl({ kopf: chatEingabeQuelle.lesen().kopf });
@@ -170,4 +175,50 @@ it.each(["geschlossen", "manuell geöffnet"])("verwirft eine späte Startprüfun
   }
   antwort({ projekt: "Alt", pfad: "C:\\Alt", zweig: "alt" }); await fertig(); aufraeumen();
   expect(chatEingabeQuelle.lesen().kopf.pfad).toBe(fall === "geschlossen" ? vorher.kopf.pfad : projekt.pfad);
+});
+
+const kopfHtml = () => {
+  hooks.aktiv = true; hooks.index = 0; hooks.effekte = [];
+  try { return renderToStaticMarkup(<Kopf />); } finally { hooks.aktiv = false; }
+};
+it("zeigt geladene Anbieter mit eigenem Soll und null als unbekannt ohne Balken", async () => {
+  vi.mocked(kontingentLesen).mockResolvedValueOnce({ claude: { genutzt: 17, soll: 57 }, codex: { genutzt: 86, soll: 63 } })
+    .mockResolvedValueOnce({ claude: null, codex: { genutzt: 51, soll: 48 } });
+  vi.useFakeTimers(); kopfHtml(); const stoppen = hooks.effekte[1](); await fertig();
+  const html = kopfHtml();
+  expect(html).toContain('aria-label="Claude: Genutzt 17 %, Soll 57 %"');
+  expect(html).toContain('aria-label="Codex: Genutzt 86 %, Soll 63 %"');
+  expect(html).toContain('class="kopf-soll" style="left:57%"');
+  expect(html).toContain('class="kopf-soll" style="left:63%"');
+  await vi.advanceTimersByTimeAsync(300000); const unbekannt = kopfHtml(); stoppen();
+  expect(unbekannt).toContain('aria-label="Claude: unbekannt">Claude<b>unbekannt</b>');
+  expect(unbekannt.match(/class="kopf-balken"/g)).toHaveLength(1);
+  expect(unbekannt).toContain('aria-label="Codex: Genutzt 51 %, Soll 48 %"');
+  expect(kontingentLesen).toHaveBeenCalledTimes(2);
+});
+it("behält bei Fehler den letzten Wert und stoppt beim Abbau Timer und späte Antworten", async () => {
+  let antwort;
+  vi.mocked(kontingentLesen).mockResolvedValueOnce({ claude: null, codex: { genutzt: 21, soll: 39 } })
+    .mockRejectedValueOnce(new Error("Nicht erreichbar")).mockReturnValueOnce(new Promise(resolve => { antwort = resolve; }));
+  vi.useFakeTimers(); kopfHtml(); const stoppen = hooks.effekte[1](); await fertig();
+  const html = kopfHtml(); await vi.advanceTimersByTimeAsync(299999);
+  expect(kontingentLesen).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1); expect(kopfHtml()).toBe(html);
+  await vi.advanceTimersByTimeAsync(300000); stoppen();
+  const stand = [...hooks.werte];
+  antwort({ claude: null, codex: { genutzt: 99, soll: 99 } }); await fertig();
+  expect(hooks.werte).toEqual(stand);
+  await vi.advanceTimersByTimeAsync(300000); expect(kontingentLesen).toHaveBeenCalledTimes(3);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("startet in Tauri ohne Beispielverbrauch und verwirft auch die erste späte Antwort", async () => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  let antwort; vi.mocked(kontingentLesen).mockReturnValueOnce(new Promise(resolve => { antwort = resolve; }));
+  vi.useFakeTimers(); const html = kopfHtml();
+  for (const name of ["Claude", "Codex"]) expect(html).toContain(`aria-label="${name}: unbekannt"`);
+  expect(html).not.toContain('class="kopf-balken"');
+  const stoppen = hooks.effekte[1](); stoppen(); const stand = [...hooks.werte];
+  antwort(vorher.kopf.kontingent); await fertig(); expect(hooks.werte).toEqual(stand);
+  expect(vi.getTimerCount()).toBe(0);
 });
