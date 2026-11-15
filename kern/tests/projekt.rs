@@ -1,4 +1,4 @@
-use projectb_kern::projekt::{pruefen, zuletzt_laden, zuletzt_merken};
+use projectb_kern::projekt::{oeffnen, pruefen, zuletzt_laden, zuletzt_merken};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -28,6 +28,28 @@ impl Drop for Ordner {
     fn drop(&mut self) {
         fs::remove_dir_all(&self.0).unwrap();
     }
+}
+
+#[test]
+fn oeffnen_merkt_nur_die_gepruefte_wurzel_und_meldet_fehler() {
+    let repo = Ordner::neu();
+    repo.git(&["init", "-b", "projekt-test"]);
+    let unterordner = repo.0.join("unter ordner");
+    fs::create_dir(&unterordner).unwrap();
+    let datei = repo.0.join("zuletzt.json");
+    zuletzt_merken(&datei, "anderes Projekt").unwrap();
+
+    let projekt = oeffnen(&unterordner, &datei).unwrap();
+    assert_eq!(projekt, pruefen(&unterordner).unwrap());
+    assert_eq!(fs::canonicalize(&projekt.pfad).unwrap(), fs::canonicalize(&repo.0).unwrap());
+    let erwartet = vec![projekt.pfad, "anderes Projekt".into()];
+    assert_eq!(zuletzt_laden(&datei), erwartet);
+
+    assert!(oeffnen(repo.0.join("fehlt"), &datei).is_err());
+    assert_eq!(zuletzt_laden(&datei), erwartet);
+    // Eine Datei als Elternpfad verhindert das Schreiben auch ohne Rechtewechsel.
+    assert!(oeffnen(&unterordner, datei.join("blockiert.json")).is_err());
+    assert_eq!(zuletzt_laden(&datei), erwartet);
 }
 
 #[test]
