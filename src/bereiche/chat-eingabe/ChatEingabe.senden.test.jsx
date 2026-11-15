@@ -90,6 +90,13 @@ it("meldet einen erst nach dem Unmount bereitstehenden Listener ab", async () =>
   aufraeumen.forEach(fn => fn?.()); await Promise.resolve();
   expect(abmelden).toHaveBeenCalledOnce(); aufraeumen = [];
 });
+it("ignoriert den Abschluss eines beim Projektwechsel entfernten Chats", async () => {
+  let beenden; vi.mocked(auftragSenden).mockReturnValueOnce(new Promise(resolve => { beenden = resolve; }));
+  const laufend = ansicht().props.senden("Baue"); await Promise.resolve();
+  const d = quelle.lesen(); d.chats = []; d.aktiverChatId = null; quelle.aktualisieren(d);
+  beenden({ sitzung: null, erfolg: true }); await expect(laufend).resolves.toBeUndefined();
+  expect(quelle.lesen().chats).toEqual([]);
+});
 
 it("lässt einen anderen Chat senden und ordnet späte Ergebnisse dem ursprünglichen Chat zu", async () => {
   let beenden; vi.mocked(auftragSenden).mockReturnValueOnce(new Promise(resolve => { beenden = resolve; }));

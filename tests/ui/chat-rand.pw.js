@@ -49,3 +49,23 @@ test("Chat-Rand: Tastatur, Beispielzustand, Bilder und axe", async ({ page }, te
     await expect(page.getByRole("heading", { name: "Team", exact: true })).toBeVisible();
   }
 });
+
+test("Neuer Chat wird im offenen Rand aktiv", async ({ page }, testInfo) => {
+  test.skip(process.env.UI_BASELINE === "1", "Neuer Chat fehlt im Basisstand.");
+  await page.goto("/");
+  const rand = page.getByRole("region", { name: "Chats und Aufgaben" });
+  await rand.getByRole("button", { name: /Chats und Aufgaben öffnen/ }).click();
+  await rand.getByRole("button", { name: "Neuer Chat", exact: true }).click();
+  const chats = rand.locator(".rand-chat");
+  await expect(chats).toHaveCount(2);
+  await expect(chats.last()).toHaveText("Neuer Chat");
+  await expect(chats.last()).toHaveAttribute("aria-current", "true");
+  await expect(chats.first()).not.toHaveAttribute("aria-current");
+  if (testInfo.project.name === "1440x900") {
+    await page.evaluate(() => document.fonts.ready);
+    const name = "PR-p52i_chats_1440x900.png";
+    const path = process.env.BILD_ORDNER ? `${process.env.BILD_ORDNER}/${name}` : testInfo.outputPath(name);
+    await page.screenshot({ path, animations: "disabled" });
+    await testInfo.attach(name, { path, contentType: "image/png" });
+  }
+});

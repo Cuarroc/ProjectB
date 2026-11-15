@@ -1,7 +1,15 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beispiel, modusEinstellungen } from "./beispiel";
-import type { Chat, Kontingent, Kopf } from "./typen";
+import type { Chat, Datenstand, Kontingent, Kopf } from "./typen";
+
+export type Chats = Pick<Datenstand, "chats" | "aktiverChatId">;
+export async function chatsLaden(projekt: string): Promise<Chats | undefined> {
+  if (isTauri()) return invoke<Chats>("chats_laden", { projekt });
+}
+export async function chatsSpeichern(projekt: string, daten: Chats): Promise<void> {
+  if (isTauri()) await invoke("chats_speichern", { projekt, daten });
+}
 
 export async function auftragSenden(auftrag: { chat: string; pfad: string; modell: string; effort: Chat["effort"]; sitzung: NonNullable<Chat["sitzung"]> | null; text: string }): Promise<{ sitzung: NonNullable<Chat["sitzung"]> | null; erfolg: boolean }> {
   if (!isTauri()) throw new Error("Echte Aufträge gehen nur in der Desktop-App.");

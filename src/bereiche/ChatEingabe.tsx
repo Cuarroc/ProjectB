@@ -59,6 +59,7 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
   if (!chat) return null;
   const aendern = (werte: Partial<Chat>) => {
     const neu = quelle.lesen(), ziel = neu.chats.find(c => c.id === chat.id)!;
+    if (!ziel) return;
     if (werte.kontextfenster && !Object.hasOwn(werte, "kontextProzent")) werte.kontextProzent = ziel.kontextProzent * ziel.kontextfenster / werte.kontextfenster;
     Object.assign(ziel, werte); quelle.aktualisieren(neu);
   };
