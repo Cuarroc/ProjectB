@@ -9,6 +9,7 @@ test("Interview und Berechtigungen: bild-und-axe, Fokus und Beispielzustand", as
   const knopf = page.getByRole("button", { name: /^Berechtigungen:/ }), dialog = page.getByRole("dialog", { name: /Berechtigungen/ });
   const abbrechen = dialog.getByRole("button", { name: "Abbrechen" }), speichern = dialog.getByRole("button", { name: "Übernehmen" });
   await knopf.click(); await expect(abbrechen).toBeFocused(); await expect(speichern).toBeDisabled();
+  await expect(dialog).toContainText("„Alles anhalten“ wirkt sofort.");
   await expect.soft(dialog.getByLabel("Nächstes Übernehmen schlägt fehl")).toHaveCount(0);
   expect.soft(await dialog.locator("#ber-meldung").evaluate(el => { const r = el.getBoundingClientRect(), b = el.nextElementSibling.getBoundingClientRect(); return getComputedStyle(el).backgroundColor !== "rgba(0, 0, 0, 0)" && b.left - r.right <= 16; })).toBe(true);
   expect.soft(await dialog.locator(".ber-auch").evaluateAll(els => els.length === 1 && els[0].children[0].textContent.includes("Protokoll") && els[0].children[1].querySelector("svg") !== null && getComputedStyle(els[0]).borderTopStyle === "solid")).toBe(true);

@@ -11,7 +11,7 @@ const karten = (baum, typ = Agentenkarte) => Children.toArray(baum).flatMap(k =>
 describe("Team", () => {
   it("speichert beim Anhalten ohne Beleg nur Originaldaten und erhält fertige Agenten", () => {
     const daten = { ...beispiel, belege: [] }, aendern = vi.fn();
-    karten(ansicht(daten, aendern), Knopf).find(k => k.props.text === "Alle anhalten").props.onClick();
+    karten(ansicht(daten, aendern), Knopf).find(k => k.props.text === "Alles anhalten").props.onClick();
     expect(aendern.mock.calls[0][0].agenten[0]).toEqual(beispiel.agenten[0]);
     karten(ansicht(daten, aendern)).find(k => k.props.name === beispiel.agenten[1].name).props.onAktion();
     expect(aendern.mock.calls[1][0].agenten[0]).toEqual(beispiel.agenten[0]);

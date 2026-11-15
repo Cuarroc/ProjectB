@@ -54,7 +54,7 @@ export default function Berechtigungen({ daten, quelle }: { daten: Rechte; quell
             <span>{r.text}</span><span className="ber-pille" data-art={art}><Symbol {...symbol} fill={art === "Fragt dich" ? "currentColor" : "none"} />{art}</span>
           </li>; })}</ul>
         </section><div className="ber-spalte"><section className="ber-karte"><h3>Gilt immer, in jeder Stufe</h3><ul className="ber-immer">{daten.giltImmer.map(text => <li key={text}><Lock {...symbol} /><span>{text}</span></li>)}</ul>
-          <p className="ber-feld">Diese Grenzen stehen in den Regeln des Projekts und lassen sich hier nicht lockern.</p><ul className="ber-immer ber-auch"><li><FileText {...symbol} /><span>Jede Freigabe steht mit Uhrzeit im Protokoll.</span></li><li><OctagonPause {...symbol} /><span>„Alle anhalten“ wirkt sofort.</span></li></ul>
+          <p className="ber-feld">Diese Grenzen stehen in den Regeln des Projekts und lassen sich hier nicht lockern.</p><ul className="ber-immer ber-auch"><li><FileText {...symbol} /><span>Jede Freigabe steht mit Uhrzeit im Protokoll.</span></li><li><OctagonPause {...symbol} /><span>„Alles anhalten“ wirkt sofort.</span></li></ul>
         </section><section className="ber-karte"><div className="ber-kartenkopf"><h3>Technisch</h3><span className="ber-chip">{wahl}</span></div><div className="ber-feld ber-technik">{technik[index].split(" · ").map(zeile => <code key={zeile}>{zeile}</code>)}</div></section></div></div>
       </div>
       <div className="ber-fuss">{new URLSearchParams(globalThis.location?.search).has("beispielFehler") && <label className="ber-probe"><input type="checkbox" checked={probe} onChange={e => setProbe(e.target.checked)} />Nächstes Übernehmen schlägt fehl</label>}

@@ -10,6 +10,7 @@ import { TeamBoard, TeamZeitstrahl, spur, teamAngehalten } from "./TeamAnsichten
 import type { Datenstand, Agent } from "../daten/typen";
 import "./Team.css";
 import { TeamDetails, mitBeleg } from "./TeamDetails";
+import { allesAnhalten, AnhalteHinweis, AnhalteMarke, useAnhalten } from "./anhalten";
 
 const status = { Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fertig", Problem: "problem" } as const;
 const jetzt = orchestratorBeispiel.laufzeitSekunden;
@@ -23,9 +24,13 @@ export function anhalten(daten: Datenstand, id?: string): Datenstand {
     ? { ...a, vorPause: { zustand: a.zustand, liveZeile: a.liveZeile }, zustand: "Wartet auf dich", liveZeile: "Angehalten. Weiter mit Fortsetzen." } : a) };
 }
 
-type Props = { daten: Datenstand; auswahl: string | null; waehlen: (id: string | null) => void; aendern: (daten: Datenstand) => void; ansicht?: string; umschalten?: (wert: string) => void };
-export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karten", umschalten = () => {} }: Props) {
+type Props = { daten: Datenstand; auswahl: string | null; waehlen: (id: string | null) => void; aendern: (daten: Datenstand) => void; ansicht?: string; umschalten?: (wert: string) => void; pause?: boolean; allesStoppen?: () => void };
+export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karten", umschalten = () => {}, pause = false, allesStoppen }: Props) {
   const original = daten;
+  if (pause) {
+    daten = anhalten(daten);
+    daten = { ...daten, agenten: daten.agenten.map(a => a.liveZeile.startsWith("Angehalten.") ? { ...a, liveZeile: "Angehalten." } : a) };
+  }
   daten = mitBeleg(daten);
   const agenten = daten.agenten.slice(0, 3).sort((a, b) => Number(a.zustand === "Fertig") - Number(b.zustand === "Fertig"));
   const details = auswahl === "orchestrator" ? { id: "orchestrator", name: "Orchestrator", liveZeile: `Koordiniert ${agenten.length} Agenten`, anbieter: "Claude", modell: daten.chats[0]?.modell, zustand: teamAngehalten(agenten) ? "Wartet auf dich" : "Arbeitet", tokens: orchestratorBeispiel.tokens, laufzeitSekunden: jetzt, dateien: [], phasen: [], arbeitskopie: "", effort: "Hoch", fortschritt: 0, letzteZeilen: [], tests: null, schaetzung: null } as Agent : agenten.find(a => a.id === auswahl);
@@ -36,10 +41,11 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
   return <section className="team-bereich" aria-labelledby="team">
     <header className="team-kopf"><h2 id="team">Team</h2><span className="team-chip">{agenten.length} Agenten</span>
       <Umschalter className="team-ansichten" moeglichkeiten={["Karten", "Board", "Zeitstrahl"]} wert={ansicht} beschriftung="Team-Ansicht" onChange={umschalten} symbole={[LayoutGrid, Kanban, ChartGantt].map((Symbol, i) => <Symbol key={i} size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />)} />
-      <Knopf text="Alle anhalten" vorsatz={<OctagonPause size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="gefaehrlich" onClick={() => aendern(anhalten(original))} /></header>
+      {!pause && <Knopf text="Alles anhalten" symbol={OctagonPause} onClick={() => allesStoppen ? allesStoppen() : aendern(anhalten(original))} />}</header>
+    <AnhalteHinweis pause={pause} />
     {ansicht !== "Karten" && <div className="team-wechsel" key={ansicht}>
       <div className="team-summe"><span>Aufgaben <b>{fertig} / {daten.plan.schritte.length}</b></span><span>Tests grün <b>{tests.gruen} / {tests.gesamt}</b></span><span>Tokens <b>{tokens(gesamtTokens)}</b></span><span>Laufzeit <b>{dauer(jetzt)} min</b></span></div>
-      {ansicht === "Board" ? <TeamBoard daten={daten} agenten={agenten} waehlen={waehlen} auswahl={auswahl} /> : <TeamZeitstrahl daten={daten} agenten={agenten} waehlen={waehlen} auswahl={auswahl} />}
+      {ansicht === "Board" ? <TeamBoard daten={daten} agenten={agenten} waehlen={waehlen} auswahl={auswahl} pause={pause} /> : <TeamZeitstrahl daten={daten} agenten={agenten} waehlen={waehlen} auswahl={auswahl} pause={pause} />}
     </div>}
     <div className="team-standard" hidden={ansicht !== "Karten"}>
     <div className="team-kacheln">
@@ -54,25 +60,26 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
     <div className="team-liste" aria-label="Agenten">
       <div className="team-achse"><span className="team-jetzt">Jetzt 14:37</span><div><span>14:30</span><span>14:32</span><span>14:34</span><span>14:36</span><span>14:38</span><span>14:40</span></div></div>
       <div className="team-orchestrator" data-agent="orchestrator"><Agentenkarte name="Orchestrator" modell={`${daten.chats[0]?.modell ?? "–"} · Koordiniert ${agenten.length} Agenten`}
-        zustand={alleAngehalten ? "wartet" : "arbeitet"} zeile={alleAngehalten ? "Angehalten" : `Koordiniert ${agenten.length} Agenten`} tokens={tokens(orchestratorBeispiel.tokens)} laufzeit={dauer(jetzt)}
-        zeitspur={{ jetzt, phasen: orchestratorBeispiel.phasen.map(p => ({ ...p, laufend: p.art === "koordiniert" && !alleAngehalten })), zustand: alleAngehalten ? "wartet" : "arbeitet" }}
+        zustand={pause ? "offen" : alleAngehalten ? "wartet" : "arbeitet"} statusmarke={pause ? <AnhalteMarke /> : undefined} zeile={alleAngehalten ? "Angehalten." : `Koordiniert ${agenten.length} Agenten`} tokens={tokens(orchestratorBeispiel.tokens)} laufzeit={dauer(jetzt)}
+        zeitspur={{ jetzt, phasen: orchestratorBeispiel.phasen.map(p => ({ ...p, laufend: p.art === "koordiniert" && !alleAngehalten })), zustand: alleAngehalten ? "wartet" : "arbeitet", angehalten: pause }}
         onDetails={() => waehlen(auswahl === "orchestrator" ? null : "orchestrator")} gewaehlt={auswahl === "orchestrator"} avatar={<Users size={20} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} /></div>
       {agenten.map(a => <div key={a.id} data-agent={a.id}>
-        <Agentenkarte name={a.name} modell={`${a.anbieter} · ${a.modell}`} zustand={status[a.zustand]} fortschritt={a.fortschritt}
-          zeitspur={spur(a)} zeile={a.liveZeile} tokens={tokens(a.tokens)} laufzeit={dauer(a.laufzeitSekunden)}
+        <Agentenkarte name={a.name} modell={`${a.anbieter} · ${a.modell}`} zustand={pause && a.zustand !== "Fertig" ? "offen" : status[a.zustand]} statusmarke={pause && a.zustand !== "Fertig" ? <AnhalteMarke /> : undefined} fortschritt={a.fortschritt}
+          zeitspur={{ ...spur(a), angehalten: pause && a.zustand !== "Fertig" }} zeile={a.liveZeile} tokens={tokens(a.tokens)} laufzeit={dauer(a.laufzeitSekunden)}
           gewaehlt={auswahl === a.id} onDetails={() => waehlen(auswahl === a.id ? null : a.id)}
-          aktion={a.zustand === "Fertig" ? undefined : a.liveZeile.startsWith("Angehalten.") ? "Fortsetzen" : "Anhalten"}
+          aktion={pause || a.zustand === "Fertig" ? undefined : a.liveZeile.startsWith("Angehalten.") ? "Fortsetzen" : "Anhalten"}
           onAktion={() => aendern(a.liveZeile.startsWith("Angehalten.") ? { ...original, agenten: original.agenten.map(agent => agent.id === a.id ? fortsetzen(agent) : agent) } : anhalten(original, a.id))} />
       </div>)}
     </div>
     </div>
-    {details && <TeamDetails agent={details} daten={daten} schliessen={() => waehlen(null)} />}
+    {details && <TeamDetails agent={details} daten={daten} angehalten={pause && details.zustand !== "Fertig"} schliessen={() => waehlen(null)} />}
   </section>;
 }
 
 export default function Team() {
+  const pause = useAnhalten();
   const [quelle] = useState(() => new BeispielQuelle());
   const [daten, setDaten] = useState(() => quelle.lesen()), [auswahl, waehlen] = useState<string | null>(null);
   const [ansicht, umschalten] = useState("Karten");
-  return <div className="team-spalte"><TeamAnsicht daten={daten} auswahl={auswahl} waehlen={waehlen} ansicht={ansicht} umschalten={wert => { umschalten(wert); waehlen(null); }} aendern={neu => { quelle.aktualisieren(neu); setDaten(quelle.lesen()); }} /></div>;
+  return <div className="team-spalte"><TeamAnsicht daten={daten} pause={pause} allesStoppen={() => allesAnhalten.setzen(true)} auswahl={auswahl} waehlen={waehlen} ansicht={ansicht} umschalten={wert => { umschalten(wert); waehlen(null); }} aendern={neu => { quelle.aktualisieren(neu); setDaten(quelle.lesen()); }} /></div>;
 }
