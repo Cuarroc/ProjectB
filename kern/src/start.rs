@@ -11,6 +11,32 @@ pub enum Effort {
     Niedrig,
     Mittel,
     Hoch,
+    SehrHoch,
+}
+
+impl Effort {
+    pub fn aus_text(text: &str) -> Option<Self> {
+        match text {
+            "Niedrig" => Some(Self::Niedrig),
+            "Mittel" => Some(Self::Mittel),
+            "Hoch" => Some(Self::Hoch),
+            "Sehr hoch" => Some(Self::SehrHoch),
+            _ => None,
+        }
+    }
+}
+
+// CLI-Hilfe geprüft (claude --help): Aliase oder volle Modellnamen. Die 5.5-IDs sind die offiziellen
+// Anthropic-Modell-IDs (claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5).
+// Codex: gpt-6.1-sol laut https://learn.chatgpt.com/docs/config-file/config-reference.
+pub fn modell(anzeige: &str) -> Option<(&'static str, &'static str)> {
+    match anzeige {
+        "Opus 5.5" => Some(("claude", "claude-opus-5-5")),
+        "Sonnet 5.5" => Some(("claude", "claude-sonnet-5-5")),
+        "Haiku 5.5" => Some(("claude", "claude-haiku-5-5")),
+        "gpt-6.1-sol" => Some(("codex", "gpt-6.1-sol")),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,10 +110,13 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
         args.extend(["--model".into(), modell.clone()]);
     }
     if let Some(effort) = wunsch.effort {
+        // CLI-Hilfe geprüft: claude --help: low, medium, high, xhigh, max.
+        // Codex exec --help: -c; Config Reference (Link oben): u. a. low, medium, high, xhigh.
         let wert = match effort {
             Effort::Niedrig => "low",
             Effort::Mittel => "medium",
             Effort::Hoch => "high",
+            Effort::SehrHoch => "xhigh",
         };
         match anbieter.name {
             "claude" => args.extend(["--effort".into(), wert.into()]),
