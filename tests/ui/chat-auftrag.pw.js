@@ -37,7 +37,7 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
   await page.evaluate(() => window.antwort("Die ersten Tests sind grün. Ich prüfe jetzt die Randfälle."));
   const letzte = page.getByRole("log").getByText("Die ersten Tests sind grün. Ich prüfe jetzt die Randfälle.");
   await expect(letzte).toBeVisible(); await letzte.scrollIntoViewIfNeeded(); await feld.fill("");
-  const path = testInfo.project.name === "1440x900" ? "/home/pa/wt/_auftraege/bilder/PR-p52e_chat_1440x900.png" : testInfo.outputPath("chat.png");
+  const path = testInfo.project.name === "1440x900" && process.env.BILD_ORDNER ? `${process.env.BILD_ORDNER}/PR-p52e_chat_1440x900.png` : testInfo.outputPath("chat.png");
   await page.screenshot({ path }); await testInfo.attach("Chat während des Laufs", { path, contentType: "image/png" });
   expect(await page.evaluate(() => window.listener.size)).toBe(1);
   await page.evaluate(() => window.beenden());
