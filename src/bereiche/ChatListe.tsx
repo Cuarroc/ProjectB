@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MessageSquare, PanelLeftClose, Plus } from "lucide-react";
 import { PostfachKnopf } from "./PostfachKnopf";
 import { BeispielQuelle } from "../daten/quelle";
-import { chatsVerbinden, neuerChat } from "../daten/chats";
+import { chatsVerbinden, chatAnlegen } from "../daten/chats";
 import { Fortschrittsring } from "../bausteine/Fortschrittsring";
 import { Knopf } from "../bausteine/Knopf";
 import "./ChatListe.css";
@@ -25,10 +25,7 @@ export default function ChatListe({ quelle, offen, umschalten }: Props) {
       <h2>Chats und Aufgaben</h2>
       <div className="rand-inhalt">
         <section className="rand-karte" aria-labelledby="chats"><h3 id="chats">Chats</h3>
-          <Knopf text="Neuer Chat" symbol={Plus} disabled={!daten.chats.length} onClick={() => {
-            const neu = quelle.lesen(), chat = neuerChat();
-            quelle.aktualisieren({ ...neu, chats: [...neu.chats, chat], aktiverChatId: chat.id });
-          }} />
+          <Knopf text="Neuer Chat" symbol={Plus} disabled={!daten.chats.length} onClick={() => chatAnlegen(quelle)} />
           {fehler && <p role="alert">{fehler}</p>}
           <ul>{daten.chats.map(chat => <li key={chat.id}><button type="button" className="rand-chat" aria-current={chat.id === daten.aktiverChatId ? "true" : undefined}
             onClick={() => aendern({ aktiverChatId: chat.id })}><MessageSquare size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /><span>{chat.titel}</span></button></li>)}</ul>
