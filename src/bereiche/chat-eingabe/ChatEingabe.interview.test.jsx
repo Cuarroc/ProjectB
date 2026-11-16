@@ -97,7 +97,8 @@ it.each([79, 80, 81])("zeigt bei %s Zeichen höchstens 80 Zeichen und behält de
 it.each([
   ["**Nur ich**", "Nur ich"], ["*Mein Team*", "Mein Team"], ["`CSV`", "CSV"],
   ["**Nur ich** mit *Team* und `CSV`", "Nur ich mit Team und CSV"],
-  ["2 * 3 * 4", "2  3  4"], ["src/**/*.ts", "src/*/.ts"],
+  ["2 * 3 * 4", "2 * 3 * 4"], ["src/**/*.ts", "src/*/.ts"],
+  ["** fett**", "** fett**"], ["*fett *", "*fett *"], ["` code`", "` code`"],
 ])("bereinigt nur Knopf und zugänglichen Namen und sendet den Originalpunkt: %s", async (markdown, klartext) => {
   await antwort(`Frage?\n- ${markdown}\n- Alle`);
   const n = chat().verlauf.at(-1);

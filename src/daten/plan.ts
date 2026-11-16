@@ -1,23 +1,33 @@
 import type { Plan } from "./typen";
 import type { PlanMarken } from "../bereiche/Planfenster";
 
-export function antwortPlan(text: string, id: string): Plan | undefined {
-  const schritte: Plan["schritte"] = [], punktMuster = /^[ \t]*[-*][ \t]+\[([ xX])\][ \t]+(\S.*)$/;
-  let codeZaun = "";
-  const zeilen = text.split(/\r?\n/).filter(zeile => {
+export function markdownKlartext(text: string) {
+  return text.replace(/(\*\*|\*|`)(.+?)\1/g, (ganz, _zeichen, innen: string) => innen.trim() === innen ? innen : ganz);
+}
+export function aufgabenListe(text: string) {
+  const zeilen: { zeile: string; punkt: RegExpMatchArray | null }[] = [];
+  let codeZaun = "", neueListe = false;
+  for (const zeile of text.split(/\r?\n/)) {
     const zaun = zeile.match(/^[ \t]*(`{3,}|~{3,})(.*)$/);
     if (codeZaun) {
       if (zaun && zaun[1][0] === codeZaun[0] && zaun[1].length >= codeZaun.length && !zaun[2].trim()) codeZaun = "";
-      return false;
+      continue;
     }
-    if (zaun) { codeZaun = zaun[1]; return false; }
-    return true;
-  });
-  const letzterPunkt = zeilen.reduce((letzter, zeile, i) => punktMuster.test(zeile) ? i : letzter, -1);
-  for (const [i, zeile] of zeilen.entries()) {
-    const punkt = zeile.match(punktMuster);
+    if (/^[ \t]*>/.test(zeile)) continue;
+    if (zaun) { codeZaun = zaun[1]; continue; }
+    const punkt = zeile.match(/^[ \t]*[-*][ \t]+\[([ xX])\][ \t]+(\S.*)$/);
+    if (punkt && neueListe) { zeilen.length = 0; neueListe = false; }
+    if (!punkt && /^\S/.test(zeile) && (/^#{1,6}(?:[ \t]|$)/.test(zeile) || zeile.trimEnd().endsWith(":"))) neueListe = true;
+    zeilen.push({ zeile, punkt });
+  }
+  return zeilen;
+}
+export function antwortPlan(text: string, id: string): Plan | undefined {
+  const schritte: Plan["schritte"] = [], zeilen = aufgabenListe(text);
+  const letzterPunkt = zeilen.reduce((letzter, { punkt }, i) => punkt ? i : letzter, -1);
+  for (const [i, { zeile, punkt }] of zeilen.entries()) {
     if (punkt) {
-      schritte.push({ id: `${id}-${schritte.length + 1}`, titel: punkt[2].trimEnd().replace(/(\*\*|\*|`)(.+?)\1/g, "$2"),
+      schritte.push({ id: `${id}-${schritte.length + 1}`, titel: markdownKlartext(punkt[2].trimEnd()),
         beschreibung: "", fertigWenn: [], agentId: null, zustand: "Offen", dauerMinuten: 0, kommentar: "", markierungen: [] });
       continue;
     }
@@ -37,5 +47,5 @@ export function planKommentare(plan: Plan, stil: string, marken: PlanMarken = {}
     return s.markierungen.length || s.kommentar.trim() || stellen.length ? [
       `- ${s.titel}: [${s.markierungen.join(", ")}] ${[s.kommentar.trim(), s.markierungen.includes("Ausarbeiten") ? "Bitte zerlege diesen Schritt in Teilschritte." : ""].filter(Boolean).join(" ")}`, ...stellen] : [];
   }),
-    `Gewünschte Fassung: ${stil}`].join("\n");
+    ...(stil ? [`Gewünschte Fassung: ${stil}`] : [])].join("\n");
 }

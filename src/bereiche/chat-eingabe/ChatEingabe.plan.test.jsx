@@ -118,3 +118,21 @@ it("speichert den echten Plan nur nach Erfolg und gibt Fenster-Kommentare direkt
   empfangen(chat().id, "- [ ] Fehlgeschlagen"); beenden({ sitzung: null, erfolg: false }); await zurueck;
   expect(chat().verlauf.at(-1).plan).toBeUndefined();
 });
+
+it.each([
+  ["", ""], ["Kommentare zum Plan:", ""],
+  ["Kommentare zum Plan:\n- Export: [Kommentar] Auch Umlaute.", "- Export: [Kommentar] Auch Umlaute."],
+  ["Kommentare zum Plan:\n- Export: [Simpler] ", "- Export: [Simpler] "],
+])("nimmt bei Freigabe nur vorhandene Kommentare mit: %j", async (kommentar, zeilen) => {
+  await plan(); const n = chat().verlauf.at(-1);
+  const lauf = ansicht().onAktion(n.id, "plan-freigeben", kommentar); await Promise.resolve();
+  const text = vi.mocked(auftragSenden).mock.lastCall[0].text;
+  expect(text.endsWith(zeilen ? `\n\nBeachte dabei:\n${zeilen}` : "\n\nMein Plan")).toBe(true);
+  beenden({ sitzung: null, erfolg: true }); await lauf;
+});
+it("meldet bei einer Aktion ohne Projekt denselben Fehler wie beim Senden", async () => {
+  await plan(); const n = chat().verlauf.at(-1), d = quelle.lesen(); d.kopf.geoeffnet = false; quelle.aktualisieren(d);
+  await ansicht().onAktion(n.id, "plan-freigeben");
+  expect(ansicht().fehler).toBe("Bitte zuerst oben ein Projekt öffnen.");
+  expect(chat().verlauf.at(-1).aktionen).toHaveLength(2);
+});
