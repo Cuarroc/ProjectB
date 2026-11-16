@@ -3,7 +3,7 @@ use std::{io, path::Path};
 
 const PLANEN_ROLLE: &str = "Erstelle nur einen Plan. Ändere keine Dateien. Höchstens 3 Teilaufgaben, \
     jede mit Abnahme-Kriterien (\"Fertig, wenn …\"). Frage am Ende, ob der Plan freigegeben \
-    oder mit Kommentaren zurückgegeben wird.";
+    oder mit Kommentaren zurückgegeben wird. Schreibe Teilaufgaben als Aufgabenliste (- [ ] …).";
 const INTERVIEW_ROLLE: &str = "Stelle genau eine Frage pro Antwort, wenn möglich mit 2–4 kurzen \
     Antwortvorschlägen als Liste. Frage weiter, bis du sicher bist. Fasse dann den Auftrag zusammen \
     und bitte um Bestätigung. Ändere keine Dateien.";
