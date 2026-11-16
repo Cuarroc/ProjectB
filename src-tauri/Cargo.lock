@@ -2332,6 +2332,7 @@ name = "projectb"
 version = "0.1.0"
 dependencies = [
  "projectb-kern",
+ "serde",
  "tauri",
  "tauri-build",
 ]
