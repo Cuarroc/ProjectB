@@ -15,7 +15,7 @@ export type Agent = {
 };
 export type Nachricht = {
   id: string; von: "Du" | "Orchestrator"; zeit: string; text: string;
-  aktionen: Aktion[]; planId?: string; frageId?: string;
+  aktionen: Aktion[]; planId?: string; plan?: Plan; frageId?: string;
 };
 export type Markierung = "Kommentar" | "Ausarbeiten" | "Simpler" | "Ausführlicher" | "Innovativer";
 export type Planschritt = {

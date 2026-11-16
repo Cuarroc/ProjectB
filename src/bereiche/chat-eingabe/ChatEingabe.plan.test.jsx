@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { BeispielQuelle } from "../../daten/quelle";
 import { auftragSenden, chatNachrichtenHoeren } from "../../daten/tauri";
 import { useChatEingabe } from "../ChatEingabe";
+import { antwortPlan } from "../../daten/plan";
 
 const h = vi.hoisted(() => ({ werte: [], refs: [], effekte: [], i: 0, r: 0 }));
 vi.mock("react", async original => ({ ...await original(),
@@ -25,6 +26,18 @@ beforeEach(() => {
   ansicht(); aufraeumen = h.effekte.map(fn => fn());
 });
 afterEach(() => { aufraeumen.forEach(fn => fn?.()); vi.resetAllMocks(); vi.unstubAllGlobals(); });
+it("speichert die Freigabe vor dem Senden und behält sie beim Neuladen", async () => {
+  const lauf = ansicht().senden("Plane"); await Promise.resolve();
+  empfangen(chat().id, "- [ ] Export"); beenden({ sitzung: null, erfolg: true }); await lauf;
+  const n = chat().verlauf.at(-1); let freigabeBeimSenden;
+  vi.mocked(auftragSenden).mockImplementationOnce(async () => {
+    freigabeBeimSenden = chat().verlauf.find(v => v.id === n.id).plan.freigabe; return { sitzung: null, erfolg: true };
+  });
+  await ansicht().onAktion(n.id, "plan-freigeben");
+  expect(freigabeBeimSenden).toBe("Freigegeben");
+  const geladen = new BeispielQuelle(quelle.lesen()).lesen().chats[0].verlauf.find(v => v.id === n.id);
+  expect(geladen.plan).toEqual({ ...antwortPlan(n.text, n.id), freigabe: "Freigegeben" });
+});
 it.each([["Planen", true, 2], ["Ausführen", true, 0], ["Interview", true, 0], ["Planen", false, 0], ["Planen", "Fehler", 0]])(
   "%s mit Ergebnis %s: nur die letzte Antwort dieses Laufs erhält %s Aktionen", async (modus, erfolg, anzahl) => {
     aendern({ modus }); const lauf = ansicht().senden("Auftrag"); await Promise.resolve();
@@ -94,4 +107,14 @@ it("sperrt Aktionen während eines Laufs und Freigabe ohne Projekt, auch bei gel
   await ansicht().onAktion(n.id, n.aktionen[1].id); await ansicht().onAktion(n.id, n.aktionen[0].id);
   expect(chat().verlauf.find(v => v.id === n.id).aktionen).toHaveLength(0); expect(auftragSenden).toHaveBeenCalledTimes(2);
   beenden({ sitzung: null, erfolg: false }); await lauf;
+});
+it("speichert den echten Plan nur nach Erfolg und gibt Fenster-Kommentare direkt über den Sendeweg zurück", async () => {
+  const lauf = ansicht().senden("Plane"); await Promise.resolve();
+  empfangen(chat().id, "- [ ] Export\n  Fertig, wenn CSV stimmt."); beenden({ sitzung: null, erfolg: true }); await lauf;
+  const n = chat().verlauf.at(-1); expect(n.plan).toMatchObject({ id: n.id, schritte: [{ titel: "Export" }] });
+  const zurueck = ansicht().onAktion(n.id, "plan-kommentieren", "Kommentare zum Plan:\n- Export: [Ausarbeiten] genauer\nGewünschte Fassung: Simpler");
+  await Promise.resolve(); expect(chat().modus).toBe("Planen"); expect(chat().verlauf.find(v => v.id === n.id).aktionen).toEqual([]);
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus: "Planen", text: expect.stringContaining("Gewünschte Fassung: Simpler") }));
+  empfangen(chat().id, "- [ ] Fehlgeschlagen"); beenden({ sitzung: null, erfolg: false }); await zurueck;
+  expect(chat().verlauf.at(-1).plan).toBeUndefined();
 });
