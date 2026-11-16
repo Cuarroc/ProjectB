@@ -29,7 +29,7 @@ test.beforeEach(async ({ page }) => {
         if (cmd === "team_anhalten") { window.stopps.push(args); return { ordner: [], lauffehler: [], fristUeberschritten: false }; }
         if (cmd === "team_starten") {
           window.starts.push(args); if (window.startFehler) throw "Teamstart fehlgeschlagen";
-          args.auftraege.forEach((a, i) => window.agentSenden({ ...a, id: a.name, zustand: window.sofortProblem && i === 0 ? "Problem" : "Arbeitet", liveZeile: "Bearbeitet den Plan", laufzeitSekunden: 12,
+          args.auftraege.forEach((a, i) => window.agentSenden({ ...a, id: window.ids?.[i] ?? a.name, zustand: window.sofortProblem && i === 0 ? "Problem" : "Arbeitet", liveZeile: "Bearbeitet den Plan", laufzeitSekunden: 12,
             tokens: 0, fortschritt: 0, arbeitskopie: `C:\\ProjectB\\.worktrees\\${a.name}`, phasen: [], dateien: [], letzteZeilen: [], tests: null, schaetzung: null }));
           return;
         }
@@ -116,6 +116,15 @@ test("Zweite Planfreigabe nach natürlichem Ende ersetzt alle alten Karten", asy
     window.agentSenden({ ...window.starts[1].auftraege[0], id: "neu", zustand: "Arbeitet", liveZeile: "Weiter", laufzeitSekunden: 2 }); });
   await expect(karten.first()).toContainText("Weiter");
   await expect(karten.locator(".ak-name b")).toHaveText(["neu", "zweiter", "dritter"]);
+  // Anderes Projekt: der Kern vergibt wieder die ids des vorletzten Laufs; der neue Start muss sie zeigen.
+  await page.evaluate(() => window.starts[1].auftraege.forEach(a => window.agentSenden({ ...a, id: a.name, zustand: "Fertig", liveZeile: "Fertig", laufzeitSekunden: 20 })));
+  await expect(karten.getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(0);
+  await page.evaluate(() => { window.ids = ["aenderung", "aenderung-2", "pruefen"]; });
+  await page.getByRole("radio", { name: "Planen", exact: true }).click();
+  await feld.fill("Plane den dritten Lauf"); await feld.press("Enter");
+  await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.starts.length)).toBe(3);
+  await expect(karten.getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(3);
 });
 test("Fehler beim Teamstart lässt Plan und Freigabeknöpfe stehen", async ({ page }) => {
   test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");

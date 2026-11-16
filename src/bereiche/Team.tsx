@@ -91,7 +91,8 @@ function TeamEcht() {
   useEffect(() => {
     let beendet = false, abmelden = () => {};
     teamAgentHoeren(agent => {
-      if (beendet || lauf.current.vorige.has(agent.id)) return;
+      // Alte ids nur außerhalb eines neuen Starts verwerfen: in einem anderen Projekt vergibt der Kern dieselben Ordnernamen.
+      if (beendet || (lauf.current.vorige.has(agent.id) && !teamLauf.neu)) return;
       if (!lauf.current.ids.has(agent.id) && (lauf.current.angehalten || teamLauf.neu)) {
         lauf.current.vorige = new Set(lauf.current.ids); lauf.current.ids.clear(); lauf.current.angehalten = false; teamLauf.neu = false;
         setzen([]); waehlen(null); setPause(false); setAngehalten(new Set()); allesAnhalten.setzen(false);
