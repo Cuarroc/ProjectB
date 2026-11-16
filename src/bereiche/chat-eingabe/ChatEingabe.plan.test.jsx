@@ -43,13 +43,45 @@ it("gibt frei, setzt die Sitzung über denselben Sendeweg fort und verhindert Do
   const lauf = aktion(n.id, n.aktionen[0].id); await aktion(n.id, n.aktionen[0].id); await Promise.resolve();
   expect(chat().modus).toBe("Ausführen"); expect(chat().verlauf.find(v => v.id === n.id).aktionen).toEqual([]);
   expect(auftragSenden).toHaveBeenCalledTimes(2);
-  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus: "Ausführen", text: "Der Plan ist freigegeben. Setze ihn jetzt um.", sitzung: { id: "s-plan", anbieter: "Claude", pfad: quelle.lesen().kopf.pfad } }));
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus: "Ausführen", text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nMein Plan", sitzung: { id: "s-plan", anbieter: "Claude", pfad: quelle.lesen().kopf.pfad } }));
   beenden({ sitzung: null, erfolg: true }); await lauf;
 });
-it("setzt Kommentare und Fokus, leert beide Knöpfe und bleibt in Planen", async () => {
+it("entfernt bei einem neuen Auftrag alle alten Aktionen nur in diesem Chat", async () => {
+  await plan(); const a = chat().verlauf.at(-1), d = quelle.lesen();
+  d.chats.push({ ...structuredClone(d.chats[0]), id: "anderer" }); quelle.aktualisieren(d);
+  const lauf = ansicht().senden("Bitte stattdessen Plan B"); await Promise.resolve();
+  expect(chat().verlauf.every(n => n.aktionen.length === 0)).toBe(true);
+  expect(quelle.lesen().chats[1].verlauf.at(-1).aktionen).toHaveLength(2);
+  empfangen(chat().id, "Plan B"); beenden({ sitzung: null, erfolg: true }); await lauf;
+  expect(chat().verlauf.find(n => n.id === a.id).aktionen).toEqual([]);
+  expect(chat().verlauf.at(-1).aktionen).toHaveLength(2);
+  await ansicht().onAktion(a.id, "plan-freigeben"); expect(auftragSenden).toHaveBeenCalledTimes(2);
+});
+it("leert bei einer Freigabe auch die Aktionen anderer alter Nachrichten", async () => {
+  await plan(); const d = quelle.lesen();
+  d.chats[0].verlauf.push({ ...d.chats[0].verlauf.at(-1), id: "plan-b", text: "Plan B" }); quelle.aktualisieren(d);
+  const lauf = ansicht().onAktion("plan-b", "plan-freigeben"); await Promise.resolve();
+  expect(chat().verlauf.every(n => n.aktionen.length === 0)).toBe(true);
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nPlan B" }));
+  beenden({ sitzung: null, erfolg: true }); await lauf;
+});
+it("sendet nach Anbieterwechsel den Plan auch ohne fortsetzbare Sitzung", async () => {
+  await plan(); aendern({ modell: "gpt-6.1-sol", sitzung: null }); // Der Kern verwirft die Claude-Sitzung beim Anbieterwechsel.
+  const n = chat().verlauf.at(-1), lauf = ansicht().onAktion(n.id, "plan-freigeben"); await Promise.resolve();
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modell: "gpt-6.1-sol", sitzung: null,
+    text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nMein Plan" }));
+  expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nMein Plan" });
+  beenden({ sitzung: null, erfolg: true }); await lauf;
+});
+it.each([
+  ["", "Kommentare zum Plan: "],
+  ["Bitte Umlaute", "Kommentare zum Plan: Bitte Umlaute"],
+  ["Kommentare zum Plan: Bitte Umlaute", "Kommentare zum Plan: Bitte Umlaute"],
+])("setzt Kommentare und Fokus für %j, leert beide Knöpfe und bleibt in Planen", async (text, erwartet) => {
   await plan(); const n = chat().verlauf.at(-1), focus = vi.fn(); vi.stubGlobal("document", { getElementById: () => ({ focus }) });
+  ansicht().schreiben(text);
   await ansicht().onAktion(n.id, n.aktionen[1].id);
-  expect(chat().modus).toBe("Planen"); expect(ansicht().text).toBe("Kommentare zum Plan: "); expect(focus).toHaveBeenCalledOnce();
+  expect(chat().modus).toBe("Planen"); expect(ansicht().text).toBe(erwartet); expect(focus).toHaveBeenCalledOnce();
   expect(chat().verlauf.at(-1).aktionen).toEqual([]); expect(auftragSenden).toHaveBeenCalledOnce();
 });
 it("sperrt Aktionen während eines Laufs und Freigabe ohne Projekt, auch bei geladenen Knöpfen", async () => {
@@ -59,6 +91,6 @@ it("sperrt Aktionen während eines Laufs und Freigabe ohne Projekt, auch bei gel
   expect(chat().modus).toBe("Planen"); d.kopf.geoeffnet = true; quelle.aktualisieren(d);
   const lauf = ansicht().senden("Weitere Frage"); await Promise.resolve();
   await ansicht().onAktion(n.id, n.aktionen[1].id); await ansicht().onAktion(n.id, n.aktionen[0].id);
-  expect(chat().verlauf.find(v => v.id === n.id).aktionen).toHaveLength(2); expect(auftragSenden).toHaveBeenCalledTimes(2);
+  expect(chat().verlauf.find(v => v.id === n.id).aktionen).toHaveLength(0); expect(auftragSenden).toHaveBeenCalledTimes(2);
   beenden({ sitzung: null, erfolg: false }); await lauf;
 });

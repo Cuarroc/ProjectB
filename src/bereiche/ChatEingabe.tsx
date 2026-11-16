@@ -16,6 +16,7 @@ const planAktionen = [
 export function nachrichtAblegen(quelle: BeispielQuelle, text: string) {
   const daten = quelle.lesen(), chat = daten.chats.find(c => c.id === daten.aktiverChatId);
   if (!chat) throw new Error("Kein Chat ausgewählt.");
+  chat.verlauf.forEach(n => { n.aktionen = []; });
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Du", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
   quelle.aktualisieren(daten);
 }
@@ -104,10 +105,10 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     const neu = quelle.lesen(), ziel = neu.chats.find(c => c.id === chat.id);
     const nachricht = ziel?.verlauf.find(n => n.id === nachrichtId);
     if (!ziel || !nachricht?.aktionen.some(a => a.id === aktionId)) return;
-    if (aktionId === "plan-freigeben") return senden("Der Plan ist freigegeben. Setze ihn jetzt um.", nachrichtId);
+    if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId);
     if (aktionId !== "plan-kommentieren") return;
     nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);
-    schreiben("Kommentare zum Plan: "); document.getElementById("chat-nachricht")?.focus();
+    schreiben(text.startsWith("Kommentare zum Plan: ") ? text : `Kommentare zum Plan: ${text}`); document.getElementById("chat-nachricht")?.focus();
   };
   return { chat, modelle: ["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"],
     text, fehler, laeuft: laufende.current.has(chat.id), aendern, schreiben, senden, onAktion };
