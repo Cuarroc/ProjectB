@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 test("Todo-Liste aus Antworten bleibt je Chat beim Neuladen erhalten", async ({ page }, testInfo) => {
+  test.skip(process.env.UI_BASELINE === "1", "Todo-Liste wird am Kandidaten geprüft.");
   await page.addInitScript(() => {
     window.isTauri = true; window.callbacks = {}; window.listener = new Set();
     let id = 0;
