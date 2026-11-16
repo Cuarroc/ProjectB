@@ -19,10 +19,14 @@ function interviewAktionen(text: string) {
     if (!zeile.trim()) continue;
     const punkt = zeile.match(/^[ \t]*(?:[-*]|\d+\.)[ \t]+(\S.*)$/);
     if (!punkt) break;
-    punkte.unshift(punkt[1].trimEnd());
+    punkte.unshift(punkt[1].trimEnd().replace(/(\*\*|\*|`)(.+?)\1/g, "$2"));
   }
   return punkte.length >= 2 && punkte.length <= 4
-    ? punkte.map((antwort, i) => ({ id: `antwort-${i}`, text: Array.from(antwort).slice(0, 80).join(""), antwort })) : [];
+    ? punkte.map((antwort, i) => {
+      const zeichen = Array.from(antwort);
+      // Ganze Wörter erhalten, damit sichtbarer Text und zugänglicher Name übereinstimmen.
+      return { id: `antwort-${i}`, text: zeichen.length > 80 ? zeichen.slice(0, 79).join("").replace(/\s+\S*$/, "") + "…" : antwort, antwort };
+    }) : [];
 }
 function textMitVerlauf(chat: Chat, pfad: string, text: string) {
   const anbieter = chat.modell === "gpt-6.1-sol" ? "codex" : "claude";
@@ -131,7 +135,10 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     const nachricht = ziel?.verlauf.find(n => n.id === nachrichtId);
     const aktion = nachricht?.aktionen.find(a => a.id === aktionId);
     if (!ziel || !nachricht || !aktion) return;
-    if (aktionId.startsWith("antwort-") && aktion.antwort !== undefined) return senden(aktion.antwort);
+    if (aktionId.startsWith("antwort-") && aktion.antwort !== undefined) {
+      ziel.modus = "Interview"; quelle.aktualisieren(neu);
+      return senden(aktion.antwort);
+    }
     if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId, "Plan freigegeben.");
     if (aktionId !== "plan-kommentieren") return;
     nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);

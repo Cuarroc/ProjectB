@@ -2,6 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { BeispielQuelle } from "../../daten/quelle";
 import { auftragSenden, chatNachrichtenHoeren } from "../../daten/tauri";
 import { useChatEingabe } from "../ChatEingabe";
+import { renderToStaticMarkup } from "react-dom/server";
+import ChatVerlauf from "../ChatVerlauf";
 
 const h = vi.hoisted(() => ({ werte: [], refs: [], effekte: [], i: 0, r: 0 }));
 vi.mock("react", async original => ({ ...await original(),
@@ -63,7 +65,7 @@ it("wartet auf den erfolgreichen Abschluss und ignoriert alte Listen ohne neue A
 it("kürzt nur den Knopf auf 80 Zeichen und sendet beim Doppelklick den vollen Punkt einmal im Interview", async () => {
   const punkt = "Ein vollständiger Vorschlag mit Umlauten: " + "Ä".repeat(90);
   await antwort(`Frage?\n- ${punkt}\n- Kurz`);
-  const n = chat().verlauf.at(-1); expect(n.aktionen[0]).toMatchObject({ id: "antwort-0", text: punkt.slice(0, 80) });
+  const n = chat().verlauf.at(-1); expect(n.aktionen[0]).toMatchObject({ id: "antwort-0", text: "Ein vollständiger Vorschlag mit Umlauten:…" });
   const aktion = ansicht().onAktion, lauf = aktion(n.id, "antwort-0"); await aktion(n.id, "antwort-0"); await Promise.resolve();
   expect(auftragSenden).toHaveBeenCalledTimes(2);
   expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus: "Interview", text: punkt, sitzung: sitzung() }));
@@ -71,4 +73,36 @@ it("kürzt nur den Knopf auf 80 Zeichen und sendet beim Doppelklick den vollen P
   expect(chat().verlauf.every(n => n.aktionen.length === 0)).toBe(true);
   beenden({ sitzung: sitzung(), erfolg: true }); await lauf;
   await ansicht().onAktion(n.id, "antwort-0"); expect(auftragSenden).toHaveBeenCalledTimes(2);
+});
+it("setzt nach einem Wechsel zu Ausführen vor der Interview-Antwort den Modus zurück", async () => {
+  await antwort("Frage?\n- Nur ich\n- Mein Team");
+  const n = chat().verlauf.at(-1), d = quelle.lesen();
+  d.chats[0].modus = "Ausführen"; quelle.aktualisieren(d);
+  const lauf = ansicht().onAktion(n.id, "antwort-0"); await Promise.resolve();
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus: "Interview", text: "Nur ich" }));
+  expect(chat().modus).toBe("Interview");
+  beenden({ sitzung: sitzung(), erfolg: true }); await lauf;
+});
+it.each([79, 80, 81])("zeigt bei %s Zeichen höchstens 80 Zeichen und behält den vollen zugänglichen Namen", async anzahl => {
+  const punkt = "🙂".repeat(anzahl);
+  await antwort(`Frage?\n- ${punkt}\n- Kurz`);
+  const aktion = chat().verlauf.at(-1).aktionen[0];
+  expect(aktion.text).toBe(anzahl > 80 ? "🙂".repeat(79) + "…" : punkt);
+  expect(Array.from(aktion.text).length).toBeLessThanOrEqual(80);
+  h.werte = []; h.i = 0;
+  const html = renderToStaticMarkup(<ChatVerlauf quelle={quelle} onAktion={() => {}} />);
+  expect(html).toContain(`aria-label="${punkt}"`);
+  expect(html).toContain(aktion.text);
+});
+it.each([
+  ["**Nur ich**", "Nur ich"], ["*Mein Team*", "Mein Team"], ["`CSV`", "CSV"],
+  ["**Nur ich** mit *Team* und `CSV`", "Nur ich mit Team und CSV"],
+])("entfernt Inline-Markdown aus Knopf und gesendeter Antwort: %s", async (markdown, klartext) => {
+  await antwort(`Frage?\n- ${markdown}\n- Alle`);
+  const n = chat().verlauf.at(-1);
+  expect(n.aktionen[0]).toMatchObject({ text: klartext, antwort: klartext });
+  const lauf = ansicht().onAktion(n.id, "antwort-0"); await Promise.resolve();
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ text: klartext }));
+  expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: klartext });
+  beenden({ sitzung: sitzung(), erfolg: true }); await lauf;
 });
