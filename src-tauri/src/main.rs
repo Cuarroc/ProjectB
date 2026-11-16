@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_handler(tauri::generate_handler![
             team::team_starten,
             team::team_anhalten,
+            team::team_datei_ansehen,
             chat::auftrag_senden,
             chats::chats_laden,
             chats::chats_speichern,

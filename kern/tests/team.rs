@@ -384,3 +384,96 @@ fn vorhandener_branch_oder_ordner_wird_uebersprungen() {
         }
     }
 }
+
+#[test]
+fn unterschied_getrackter_datei_bleibt_nach_anhalten_erhalten() {
+    let repo = Repo::neu();
+    fs::write(repo.0.join("alt.txt"), "alte Zeile\n").unwrap();
+    fs::write(repo.0.join("bild"), b"\0alt").unwrap();
+    git(&repo.0, &["add", "."]);
+    git(&repo.0, &["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Basis"]);
+    let mut team = haengendes_team(&repo, &["eins", "zwei"], |_| {});
+    fs::remove_file(team.ordner()[0].join("bild")).unwrap();
+    assert_eq!(team.unterschied("eins", "bild").unwrap(), "Binärdatei, keine Vorschau.");
+    fs::write(team.ordner()[0].join("alt.txt"), "neue Zeile\n").unwrap();
+    assert!(team.unterschied("eins", "alt.txt").unwrap().contains("+neue Zeile"));
+    assert_eq!(team.unterschied("zwei", "alt.txt").unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+    assert!(team.anhalten(None, Duration::from_secs(30)).unwrap().alles_gesichert());
+    assert!(team.unterschied("eins", "alt.txt").unwrap().contains("+neue Zeile"));
+    fs::remove_file(team.ordner()[0].join("alt.txt")).unwrap();
+    assert!(team.unterschied("eins", "alt.txt").unwrap().contains("-alte Zeile"));
+    fs::write(team.ordner()[0].join("alt.txt"), b"\0neu").unwrap();
+    assert_eq!(team.unterschied("eins", "alt.txt").unwrap(), "Binärdatei, keine Vorschau.");
+}
+
+#[test]
+fn unterschied_neuer_datei_und_ungueltige_pfade() {
+    let repo = Repo::neu();
+    fs::write(repo.0.join("unveraendert.txt"), "gleich\n").unwrap();
+    git(&repo.0, &["add", "."]);
+    git(&repo.0, &["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Basis"]);
+    let mut team = haengendes_team(&repo, &["startfehler", "eins"], |_| {});
+    let ordner = &team.ordner()[1];
+    fs::write(ordner.join("neu ü[1].txt"), "neuer Inhalt\n").unwrap();
+    assert!(team.unterschied("eins", "neu ü[1].txt").unwrap().contains("+neuer Inhalt"));
+    let absolut = ordner.join("arbeit.txt").to_string_lossy().into_owned();
+    for pfad in ["../x", "Cargo.toml", "unveraendert.txt", &absolut] {
+        let fehler = team.unterschied("eins", pfad).unwrap_err();
+        assert_eq!(fehler.kind(), std::io::ErrorKind::InvalidInput);
+        assert_eq!(fehler.to_string(), "Datei gehört nicht zu diesem Agenten");
+    }
+    assert_eq!(team.unterschied("unbekannt", "arbeit.txt").unwrap_err().kind(), std::io::ErrorKind::NotFound);
+    team.anhalten(None, Duration::from_secs(30)).unwrap();
+}
+
+#[test]
+fn unterschied_behandelt_getrackte_pfade_woertlich() {
+    let repo = Repo::neu();
+    for name in ["alt[1].txt", "alt1.txt"] {
+        fs::write(repo.0.join(name), "alt\n").unwrap();
+    }
+    git(&repo.0, &["add", "."]);
+    git(&repo.0, &["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Basis"]);
+    let mut team = haengendes_team(&repo, &["eins"], |_| {});
+    fs::write(team.ordner()[0].join("alt[1].txt"), "gefragt\n").unwrap();
+    fs::write(team.ordner()[0].join("alt1.txt"), "fremd\n").unwrap();
+    let diff = team.unterschied("eins", "alt[1].txt").unwrap();
+    assert!(diff.contains("+gefragt") && !diff.contains("fremd"));
+    team.anhalten(None, Duration::from_secs(30)).unwrap();
+}
+
+#[test]
+fn unterschied_binaer_und_lange_ausgabe() {
+    let repo = Repo::neu();
+    let mut team = haengendes_team(&repo, &["eins"], |_| {});
+    let ordner = &team.ordner()[0];
+    fs::write(ordner.join("bild"), [vec![b'x'; 7999], vec![0]].concat()).unwrap();
+    assert_eq!(team.unterschied("eins", "bild").unwrap(), "Binärdatei, keine Vorschau.");
+    fs::write(ordner.join("lang"), "ü\n".repeat(100_000)).unwrap();
+    let diff = team.unterschied("eins", "lang").unwrap();
+    assert!(diff.ends_with("\n… gekürzt"));
+    assert!(diff.len() <= 200_000 + "\n… gekürzt".len());
+    assert!(!diff.contains('\u{fffd}'));
+    team.anhalten(None, Duration::from_secs(30)).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn unterschied_folgt_keinen_symlinks() {
+    let repo = Repo::neu();
+    fs::create_dir(repo.0.join("unter")).unwrap();
+    fs::write(repo.0.join("unter/datei"), "alt\n").unwrap();
+    git(&repo.0, &["add", "."]);
+    git(&repo.0, &["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Basis"]);
+    let mut team = haengendes_team(&repo, &["eins"], |_| {});
+    let ordner = &team.ordner()[0];
+    std::os::unix::fs::symlink(&repo.0, ordner.join("link")).unwrap();
+    fs::remove_dir_all(ordner.join("unter")).unwrap();
+    std::os::unix::fs::symlink(&repo.0, ordner.join("unter")).unwrap();
+    for pfad in ["link", "unter/datei"] {
+        assert_eq!(team.unterschied("eins", pfad).unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+    }
+    fs::remove_file(ordner.join("link")).unwrap();
+    fs::remove_file(ordner.join("unter")).unwrap();
+    team.anhalten(None, Duration::from_secs(30)).unwrap();
+}
