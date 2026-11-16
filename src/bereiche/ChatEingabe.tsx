@@ -9,9 +9,14 @@ import "./chat-eingabe/ChatEingabe.css";
 import { Einstellungen } from "./chat-eingabe/Einstellungen";
 
 export const chatEingabeQuelle = new BeispielQuelle();
+const planAktionen = [
+  { id: "plan-freigeben", text: "Freigeben und bauen" },
+  { id: "plan-kommentieren", text: "Mit Kommentaren zurückgeben" },
+];
 export function nachrichtAblegen(quelle: BeispielQuelle, text: string) {
   const daten = quelle.lesen(), chat = daten.chats.find(c => c.id === daten.aktiverChatId);
   if (!chat) throw new Error("Kein Chat ausgewählt.");
+  chat.verlauf.forEach(n => { n.aktionen = []; });
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Du", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
   quelle.aktualisieren(daten);
 }
@@ -44,6 +49,10 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false
   </footer>;
 }
 export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: BeispielQuelle }) {
+  const eingabe = useChatEingabe(quelle);
+  return eingabe ? <ChatEingabeAnsicht {...eingabe} /> : null;
+}
+export function useChatEingabe(quelle = chatEingabeQuelle) {
   const [daten, setDaten] = useState(() => quelle.lesen()), [text, schreiben] = useState(""), [fehler, setFehler] = useState("");
   const laufende = useRef(new Set<string>()), empfang = useRef<Promise<() => void>>(Promise.resolve(() => {}));
   useEffect(() => { const lesen = () => setDaten(quelle.lesen()); const ab = quelle.abonnieren(lesen); lesen(); return ab; }, [quelle]);
@@ -63,22 +72,44 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
     if (werte.kontextfenster && !Object.hasOwn(werte, "kontextProzent")) werte.kontextProzent = ziel.kontextProzent * ziel.kontextfenster / werte.kontextfenster;
     Object.assign(ziel, werte); quelle.aktualisieren(neu);
   };
-  return <ChatEingabeAnsicht chat={chat} modelle={["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"]}
-    text={text} fehler={fehler} laeuft={laufende.current.has(chat.id)} aendern={aendern} schreiben={schreiben} senden={async inhalt => {
-      if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
-      if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
-      try { nachrichtAblegen(quelle, inhalt); schreiben(""); setFehler(""); }
-      catch { setFehler("Nicht gesendet. Dein Text bleibt stehen."); return; }
-      if (!isTauri()) return;
-      laufende.current.add(chat.id);
-      aendern({ gestartetUm: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) });
-      const aktuell = quelle.lesen(), ziel = aktuell.chats.find(c => c.id === chat.id)!;
-      const pfad = aktuell.kopf.pfad, sitzung = ziel.sitzung ?? null;
-      try {
-        await empfang.current;
-        const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus: ziel.modus, sitzung, text: inhalt });
-        aendern({ sitzung: antwort.sitzung });
-      } catch (e) { orchestratorNachricht(quelle, chat.id, `Problem: ${e instanceof Error ? e.message : String(e)}`); }
-      finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
-    }} />;
+  const senden = async (inhalt: string, freigabe?: string) => {
+    if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
+    if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
+    if (freigabe) {
+      const neu = quelle.lesen(), ziel = neu.chats.find(c => c.id === chat.id);
+      const nachricht = ziel?.verlauf.find(n => n.id === freigabe);
+      if (!ziel || !nachricht?.aktionen.some(a => a.id === "plan-freigeben")) return;
+      nachricht.aktionen = []; ziel.modus = "Ausführen"; quelle.aktualisieren(neu);
+    }
+    try { nachrichtAblegen(quelle, inhalt); schreiben(""); setFehler(""); }
+    catch { setFehler("Nicht gesendet. Dein Text bleibt stehen."); return; }
+    if (!isTauri()) return;
+    laufende.current.add(chat.id);
+    aendern({ gestartetUm: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) });
+    const aktuell = quelle.lesen(), ziel = aktuell.chats.find(c => c.id === chat.id)!;
+    const pfad = aktuell.kopf.pfad, sitzung = ziel.sitzung ?? null;
+    const modus = ziel.modus, anfang = ziel.verlauf.length;
+    try {
+      await empfang.current;
+      const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus: ziel.modus, sitzung, text: inhalt });
+      aendern({ sitzung: antwort.sitzung });
+      if (modus === "Planen" && antwort.erfolg) {
+        const neu = quelle.lesen(), letzter = neu.chats.find(c => c.id === chat.id)?.verlauf.slice(anfang).reverse().find(n => n.von === "Orchestrator");
+        if (letzter) { letzter.aktionen = planAktionen; quelle.aktualisieren(neu); }
+      }
+    } catch (e) { orchestratorNachricht(quelle, chat.id, `Problem: ${e instanceof Error ? e.message : String(e)}`); }
+    finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
+  };
+  const onAktion = (nachrichtId: string, aktionId: string) => {
+    if (laufende.current.has(chat.id)) return;
+    const neu = quelle.lesen(), ziel = neu.chats.find(c => c.id === chat.id);
+    const nachricht = ziel?.verlauf.find(n => n.id === nachrichtId);
+    if (!ziel || !nachricht?.aktionen.some(a => a.id === aktionId)) return;
+    if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId);
+    if (aktionId !== "plan-kommentieren") return;
+    nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);
+    schreiben(text.startsWith("Kommentare zum Plan: ") ? text : `Kommentare zum Plan: ${text}`); document.getElementById("chat-nachricht")?.focus();
+  };
+  return { chat, modelle: ["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"],
+    text, fehler, laeuft: laufende.current.has(chat.id), aendern, schreiben, senden, onAktion };
 }
