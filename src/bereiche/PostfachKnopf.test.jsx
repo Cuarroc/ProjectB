@@ -29,6 +29,30 @@ it("liefert Plan und Interview mit Chat-Titel als Einträge", () => {
     { chatId: "frage", nachrichtId: "f", titel: "Format klären", text: "Frage wartet auf Antwort" },
   ]);
 });
+it.each(["Was möchtest du ändern?", "Ist das richtig?"])("zeigt die freie Interview-Frage: %s", text => {
+  const d = quelle.lesen(); const chat = d.chats[1];
+  chat.modus = "Interview"; chat.gestartetUm = null;
+  chat.verlauf = [nachricht("alt", []), { ...nachricht("frei", []), text }];
+  expect(postfach(d)).toEqual({ zahl: 2, eintraege: [
+    { chatId: "plan", nachrichtId: "p", titel: "Export planen", text: "Plan wartet auf Freigabe" },
+    { chatId: "frage", nachrichtId: "frei", titel: "Format klären", text: "Frage wartet auf Antwort" }] });
+});
+it("zählt eine wartende Interview-Frage mit Aktionen nur einmal", () => {
+  const d = quelle.lesen(); d.chats[1].modus = "Interview"; d.chats[1].gestartetUm = null;
+  expect(postfach(d).eintraege.map(e => e.nachrichtId)).toEqual(["p", "f"]);
+});
+it.each([
+  ["Interview", "12:00", [nachricht("läuft", [])]],
+  ["Planen", null, [nachricht("plan", [])]],
+  ["Ausführen", null, [nachricht("ausführen", [])]],
+  ["Interview", null, [nachricht("frage", []), nachricht("antwort", [], "Du")]],
+  ["Interview", null, []],
+  ["Interview", null, [{ ...nachricht("fehler", []), text: "Problem: Verbindung fehlt" }]],
+  ["Interview", null, [{ ...nachricht("fehler", [{ id: "antwort-0" }]), text: "Problem: Verbindung fehlt" }]],
+])("ignoriert nicht wartende Fragen und Probleme (%s, %s, %j)", (modus, gestartetUm, verlauf) => {
+  const d = quelle.lesen(); Object.assign(d.chats[1], { modus, gestartetUm, verlauf });
+  expect(postfach(d).eintraege.map(e => e.nachrichtId)).toEqual(["p"]);
+});
 it("ignoriert Nachrichten ohne Aktionen und Nachrichten von dir", () => {
   const d = quelle.lesen(); d.chats[0].verlauf = [nachricht("leer", []), nachricht("du", [{ id: "antwort-0" }], "Du")];
   expect(postfach(d).zahl).toBe(1);
