@@ -11,7 +11,8 @@ test("Echten Plan öffnen, kommentieren und freigeben", async ({ page }, testInf
     window.__TAURI_INTERNALS__ = {
       transformCallback: cb => { window.callbacks[++id] = cb; return id; },
       invoke: async (cmd, args) => {
-        if (cmd === "plugin:event|listen") { window.listener.add(args.handler); return args.handler; }
+        // Die Chat-Attrappe stellt nur Chat-Ereignisse zu; Team hört separat.
+        if (cmd === "plugin:event|listen") { if (args.event === "chat-nachricht") window.listener.add(args.handler); return args.handler; }
         if (cmd === "plugin:event|unlisten") { window.listener.delete(args.eventId); return; }
         if (cmd === "projekte_zuletzt") return ["C:\\ProjectB"];
         if (cmd === "projekt_pruefen") return { projekt: "ProjectB", pfad: args.pfad, zweig: "main" };

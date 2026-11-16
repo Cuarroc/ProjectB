@@ -33,3 +33,5 @@
 @media(width < 80em){.team-kacheln .ka{padding:var(--abstand-2)}.team-kacheln .ka-unter{overflow-wrap:normal}.team-reihen>span{flex-wrap:wrap}.team-reihen b{flex-basis:100%;text-align:right}.team-diagramm-zeiten{flex-wrap:wrap;gap:var(--abstand-1)}.team-diagramm-zeiten>span{white-space:nowrap}.team-bereich:has(.team-details) .ka>:not(.ka-kopf,.ka-zahl),.team-bereich:has(.team-details) .ka-kopf .team-chip{display:none}}
 
 .team-liste .ak-meta{display:inline-flex;align-items:center;gap:var(--abstand-1)}
+
+.team-echt .team-kopf .team-chip{display:inline}

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { OctagonPause, Play } from "lucide-react";
 import { Knopf } from "../bausteine/Knopf";
 import "./anhalten.css";
@@ -13,9 +14,10 @@ export const allesAnhalten = {
 export const useAnhalten = () => useSyncExternalStore(allesAnhalten.abonnieren, allesAnhalten.lesen, allesAnhalten.lesen);
 export function AnhalteMarke() { return <span className="mk pause-marke"><OctagonPause size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />Angehalten</span>; }
 export function AnhalteKnopf({ pause }: { pause: boolean }) {
+  if (pause && isTauri()) return null;
   return <Knopf text={pause ? "Weitermachen" : "Alles anhalten"} symbol={pause ? Play : OctagonPause}
     aria-pressed={pause} onClick={() => allesAnhalten.setzen(!pause)} />;
 }
-export function AnhalteHinweis({ pause }: { pause: boolean }) {
-  return pause ? <div className="anhalte-hinweis" role="status"><AnhalteMarke /><AnhalteKnopf pause /></div> : null;
+export function AnhalteHinweis({ pause, fortsetzen = true }: { pause: boolean; fortsetzen?: boolean }) {
+  return pause ? <div className="anhalte-hinweis" role="status"><AnhalteMarke />{fortsetzen && <AnhalteKnopf pause />}</div> : null;
 }
