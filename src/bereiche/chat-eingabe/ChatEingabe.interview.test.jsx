@@ -97,12 +97,17 @@ it.each([79, 80, 81])("zeigt bei %s Zeichen höchstens 80 Zeichen und behält de
 it.each([
   ["**Nur ich**", "Nur ich"], ["*Mein Team*", "Mein Team"], ["`CSV`", "CSV"],
   ["**Nur ich** mit *Team* und `CSV`", "Nur ich mit Team und CSV"],
-])("entfernt Inline-Markdown aus Knopf und gesendeter Antwort: %s", async (markdown, klartext) => {
+  ["2 * 3 * 4", "2  3  4"], ["src/**/*.ts", "src/*/.ts"],
+])("bereinigt nur Knopf und zugänglichen Namen und sendet den Originalpunkt: %s", async (markdown, klartext) => {
   await antwort(`Frage?\n- ${markdown}\n- Alle`);
   const n = chat().verlauf.at(-1);
-  expect(n.aktionen[0]).toMatchObject({ text: klartext, antwort: klartext });
+  expect(n.aktionen[0]).toMatchObject({ text: klartext, antwort: markdown });
+  h.werte = []; h.i = 0;
+  const html = renderToStaticMarkup(<ChatVerlauf quelle={quelle} onAktion={() => {}} />);
+  expect(html).toContain(`aria-label="${klartext}"`);
+  h.werte = []; h.i = 0;
   const lauf = ansicht().onAktion(n.id, "antwort-0"); await Promise.resolve();
-  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ text: klartext }));
-  expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: klartext });
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ text: markdown }));
+  expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: markdown });
   beenden({ sitzung: sitzung(), erfolg: true }); await lauf;
 });

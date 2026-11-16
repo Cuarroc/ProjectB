@@ -38,13 +38,13 @@ function interviewAktionen(text: string) {
     if (!zeile.trim()) continue;
     const punkt = zeile.match(/^[ \t]*(?:[-*]|\d+\.)[ \t]+(\S.*)$/);
     if (!punkt) break;
-    punkte.unshift(punkt[1].trimEnd().replace(/(\*\*|\*|`)(.+?)\1/g, "$2"));
+    punkte.unshift(punkt[1].trimEnd());
   }
   return punkte.length >= 2 && punkte.length <= 4
     ? punkte.map((antwort, i) => {
-      const zeichen = Array.from(antwort);
+      const klartext = antwort.replace(/(\*\*|\*|`)(.+?)\1/g, "$2"), zeichen = Array.from(klartext);
       // Ganze Wörter erhalten, damit sichtbarer Text und zugänglicher Name übereinstimmen.
-      return { id: `antwort-${i}`, text: zeichen.length > 80 ? zeichen.slice(0, 79).join("").replace(/\s+\S*$/, "") + "…" : antwort, antwort };
+      return { id: `antwort-${i}`, text: zeichen.length > 80 ? zeichen.slice(0, 79).join("").replace(/\s+\S*$/, "") + "…" : klartext, antwort };
     }) : [];
 }
 function textMitVerlauf(chat: Chat, pfad: string, text: string) {
@@ -68,6 +68,8 @@ function orchestratorNachricht(quelle: BeispielQuelle, id: string, text: string,
   if (!chat) return;
   if (todos) {
     const eigene = (chat.todos ?? []).filter(t => t.von === "Du");
+    const erledigt = new Set((chat.todos ?? []).filter(t => t.von !== "Du" && t.fertig).map(t => t.text.trim().toLowerCase()));
+    todos.forEach(t => { if (erledigt.has(t.text.trim().toLowerCase())) t.fertig = true; });
     chat.todos = [...todos.slice(0, Math.max(0, 20 - eigene.length)), ...eigene];
   }
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Orchestrator", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });

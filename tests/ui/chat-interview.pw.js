@@ -74,7 +74,7 @@ test("Interview-Vorschläge: Tastatur, voller Antworttext und freies Feld", asyn
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await nurIch.click();
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(4);
-  expect(await page.evaluate(() => window.auftraege[3])).toMatchObject({ modus: "Interview", text: "Nur ich" });
-  await expect(page.locator(".r-du .r-msg-text").last()).toHaveText("Nur ich");
+  expect(await page.evaluate(() => window.auftraege[3])).toMatchObject({ modus: "Interview", text: "**Nur ich**" });
+  await expect(page.locator(".r-du .r-msg-text").last()).toHaveText("**Nur ich**");
   await page.evaluate(() => window.beenden());
 });
