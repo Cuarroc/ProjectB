@@ -327,7 +327,7 @@ fn alles_anhalten_sichert_arbeit_und_neustart_erhaelt_alten_branch() {
     let (mut neu, rx) = starten(&repo, &["x"]);
     assert!(neu.ordner()[0].ends_with(".worktrees/x-2"));
     let meldungen = bis_fertig(&rx, neu.ordner(), 1);
-    assert!(meldungen.iter().all(|v| v["id"] == "x" && v["name"] == "x"));
+    assert!(meldungen.iter().all(|v| v["id"] == "x-2" && v["name"] == "x"));
     neu.laeufe_mut()[0].warten().unwrap();
     assert!(!neu.laeuft());
     assert_eq!(git(&repo.0, &["rev-parse", "agent/x"]), sha);

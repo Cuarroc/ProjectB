@@ -159,7 +159,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       if (isTauri() && nachricht.plan?.schritte.length) {
         laufende.current.add(chat.id); setFehler("");
         try {
-          const auftraege = teamAuftraege(nachricht.plan, ziel, hinweise);
+          const auftraege = teamAuftraege(nachricht.plan, ziel, nachricht.text, hinweise);
           await teamStarten(neu.kopf.pfad, auftraege);
           const aktuell = quelle.lesen(), zielChat = aktuell.chats.find(c => c.id === chat.id);
           const plan = zielChat?.verlauf.find(n => n.id === nachrichtId)?.plan;

@@ -8,8 +8,12 @@ export type AnhalteBericht = {
   ordner: { ordner: string; status: "gesichert" | "sauber" | "fehler"; sha?: string; meldung?: string }[];
   lauffehler: { pid: number; meldung: string }[]; fristUeberschritten: boolean;
 };
+export const teamLauf = { neu: false };
 export async function teamStarten(pfad: string, auftraege: TeamAuftrag[]): Promise<void> {
-  if (isTauri()) await invoke("team_starten", { pfad, auftraege });
+  if (!isTauri()) return;
+  teamLauf.neu = true;
+  try { await invoke("team_starten", { pfad, auftraege }); }
+  catch (e) { teamLauf.neu = false; throw e; }
 }
 export async function teamAnhalten(name?: string): Promise<AnhalteBericht | undefined> {
   if (isTauri()) return invoke<AnhalteBericht>("team_anhalten", name === undefined ? {} : { name });

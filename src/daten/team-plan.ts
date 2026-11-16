@@ -1,6 +1,6 @@
 import type { Agent, Chat, Plan } from "./typen";
 
-export function teamAuftraege(plan: Plan, chat: Pick<Chat, "modell" | "effort">, hinweise?: string) {
+export function teamAuftraege(plan: Plan, chat: Pick<Chat, "modell" | "effort">, plantext: string, hinweise?: string) {
   const namen = new Set<string>();
   const anbieter: Agent["anbieter"] = chat.modell === "gpt-6.1-sol" ? "Codex" : "Claude";
   return plan.schritte.slice(0, 3).map((erster, i) => {
@@ -14,6 +14,6 @@ export function teamAuftraege(plan: Plan, chat: Pick<Chat, "modell" | "effort">,
     const schritte = plan.schritte.filter((_, j) => j % 3 === i).map(s =>
       `${s.titel}\n${s.beschreibung}\n${s.fertigWenn.map(k => `Fertig, wenn ${k.text}`).join("\n")}`).join("\n\n");
     return { name, anbieter, modell: chat.modell, effort: chat.effort,
-      text: `Plan: ${plan.titel}\n\n${schritte}${hinweise ? `\n\nBeachte dabei:\n${hinweise}` : ""}\n\nArbeite nur in deiner Arbeitskopie. Committe am Ende mit einer kurzen Nachricht.` };
+      text: `Freigegebener Plan (ganz):\n${plantext}\n\nDeine Schritte:\n${schritte}${hinweise ? `\n\nBeachte dabei:\n${hinweise}` : ""}\n\nArbeite nur in deiner Arbeitskopie. Committe am Ende mit einer kurzen Nachricht.` };
   });
 }

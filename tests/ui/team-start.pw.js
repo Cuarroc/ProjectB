@@ -29,11 +29,15 @@ test.beforeEach(async ({ page }) => {
         if (cmd === "team_anhalten") { window.stopps.push(args); return { ordner: [], lauffehler: [], fristUeberschritten: false }; }
         if (cmd === "team_starten") {
           window.starts.push(args); if (window.startFehler) throw "Teamstart fehlgeschlagen";
-          args.auftraege.forEach(a => window.agentSenden({ ...a, id: a.name, zustand: "Arbeitet", liveZeile: "Bearbeitet den Plan", laufzeitSekunden: 12,
+          args.auftraege.forEach((a, i) => window.agentSenden({ ...a, id: a.name, zustand: window.sofortProblem && i === 0 ? "Problem" : "Arbeitet", liveZeile: "Bearbeitet den Plan", laufzeitSekunden: 12,
             tokens: 0, fortschritt: 0, arbeitskopie: `C:\\ProjectB\\.worktrees\\${a.name}`, phasen: [], dateien: [], letzteZeilen: [], tests: null, schaetzung: null }));
           return;
         }
-        if (cmd === "auftrag_senden") { window.chatStarts++; throw "Unerwarteter Orchestrator-Lauf"; }
+        if (cmd === "auftrag_senden") {
+          window.chatStarts++; window.listener.forEach((event, id) => {
+            if (event === "chat-nachricht") window.callbacks[id]({ event, id, payload: { chat: args.chat, text: "- [ ] Neu\n- [ ] Zweiter\n- [ ] Dritter" } });
+          }); return { sitzung: null, erfolg: true };
+        }
         throw new Error(`Unerwarteter Command: ${cmd}`);
       },
     };
@@ -54,13 +58,14 @@ for (const [modell, anbieter] of [["gpt-6.1-sol", "Codex"], ["Sonnet 5.5", "Clau
     expect(await page.evaluate(() => window.chatStarts)).toBe(0);
     expect(starts).toHaveLength(1); expect(starts[0].pfad).toBe("C:\\ProjectB");
     expect(starts[0].auftraege.map(a => a.name)).toEqual(["aenderung", "aenderung-2", "pruefen"]);
+    const plantext = await page.evaluate(() => JSON.parse(localStorage.planChats).chats[0].verlauf[0].text);
     starts[0].auftraege.forEach((a, i) => {
       expect(a).toMatchObject({ modell, anbieter, effort: "Sehr hoch" });
-      expect(a.text).toContain("Dein Plan"); expect(a.text).toContain("Beachte dabei:\n- Änderung: [Kommentar] Bitte Umlaute prüfen.");
+      expect(a.text.startsWith(`Freigegebener Plan (ganz):\n${plantext}\n\nDeine Schritte:\n`)).toBe(true); expect(a.text).toContain("Beachte dabei:\n- Änderung: [Kommentar] Bitte Umlaute prüfen.");
       expect(a.text).toContain("Arbeite nur in deiner Arbeitskopie. Committe am Ende mit einer kurzen Nachricht.");
       for (let j = 0; j < 4; j++) {
-        expect(a.text.includes(`Beschreibung ${j + 1}`)).toBe(j % 3 === i);
-        expect(a.text.includes(`Fertig, wenn Kriterium ${j + 1}`)).toBe(j % 3 === i);
+        expect(a.text.split("Deine Schritte:\n")[1].includes(`Beschreibung ${j + 1}`)).toBe(j % 3 === i);
+        expect(a.text.split("Deine Schritte:\n")[1].includes(`Fertig, wenn Kriterium ${j + 1}`)).toBe(j % 3 === i);
       }
     });
     await expect(page.getByRole("button", { name: /^(Freigeben und bauen|Mit Kommentaren zurückgeben)$/ })).toHaveCount(0);
@@ -76,12 +81,42 @@ for (const [modell, anbieter] of [["gpt-6.1-sol", "Codex"], ["Sonnet 5.5", "Clau
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53e_team_start_1440x900.png`, animations: "disabled" });
     }
-    for (const a of starts[0].auftraege.slice(1)) await page.evaluate(a => window.agentSenden({ ...a, id: a.name, zustand: "Fertig", liveZeile: "Fertig", laufzeitSekunden: 20 }), a);
-    await page.evaluate(a => window.agentSenden({ ...a, id: "neu", name: "neu", zustand: "Arbeitet", liveZeile: "Neu", laufzeitSekunden: 1 }), starts[0].auftraege[0]);
-    await expect(karten.locator(".ak-name b")).toHaveText(["neu"]);
-    await expect(karten.first().getByRole("button", { name: "Anhalten", exact: true })).toBeVisible();
   });
 }
+for (const sofortProblem of [true, false]) {
+  test(sofortProblem ? "Frühes Problem erhält alle drei Karten desselben Starts" : "Unbekannte id nach natürlichem Ende hängt ohne Start an", async ({ page }) => {
+    test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");
+    await page.addInitScript(wert => { window.sofortProblem = wert; }, sofortProblem); await page.goto("/");
+    await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+    const karten = page.locator(".team-echt [data-agent]"); await expect(karten).toHaveCount(3);
+    if (sofortProblem) { await expect(karten.first().locator(".mk")).toHaveText("Problem"); return; }
+    await page.evaluate(() => {
+      window.starts[0].auftraege.forEach(a => window.agentSenden({ ...a, id: a.name, zustand: "Fertig", liveZeile: "Fertig", laufzeitSekunden: 20 }));
+    });
+    await expect(karten.getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(0);
+    await page.evaluate(() => window.agentSenden({ ...window.starts[0].auftraege[0], id: "spaet", name: "spaet", zustand: "Arbeitet", liveZeile: "Spät", laufzeitSekunden: 1 }));
+    await expect(karten.locator(".ak-name b")).toHaveText(["aenderung", "aenderung-2", "pruefen", "spaet"]);
+  });
+}
+test("Zweite Planfreigabe nach natürlichem Ende ersetzt alle alten Karten", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");
+  await page.goto("/"); await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  const karten = page.locator(".team-echt [data-agent]"); await expect(karten).toHaveCount(3);
+  await page.evaluate(() => window.starts[0].auftraege.forEach(a => window.agentSenden({ ...a, id: a.name, zustand: "Fertig", liveZeile: "Fertig", laufzeitSekunden: 20 })));
+  await expect(karten.getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(0);
+  await page.getByRole("radio", { name: "Planen", exact: true }).click();
+  const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" });
+  await feld.fill("Plane den zweiten Lauf"); await feld.press("Enter");
+  await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.starts.length)).toBe(2);
+  await expect(karten.locator(".ak-name b")).toHaveText(["neu", "zweiter", "dritter"]);
+  await expect(karten.getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(3);
+  // Ein spätes Ereignis des alten Laufs erzeugt keine Geisterkarte; das folgende neue Ereignis zeigt, dass es verarbeitet wurde.
+  await page.evaluate(() => { window.agentSenden({ ...window.starts[0].auftraege[0], id: "aenderung", zustand: "Fertig", liveZeile: "Spät", laufzeitSekunden: 30 });
+    window.agentSenden({ ...window.starts[1].auftraege[0], id: "neu", zustand: "Arbeitet", liveZeile: "Weiter", laufzeitSekunden: 2 }); });
+  await expect(karten.first()).toContainText("Weiter");
+  await expect(karten.locator(".ak-name b")).toHaveText(["neu", "zweiter", "dritter"]);
+});
 test("Fehler beim Teamstart lässt Plan und Freigabeknöpfe stehen", async ({ page }) => {
   test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");
   await page.addInitScript(() => { window.startFehler = true; }); await page.goto("/");

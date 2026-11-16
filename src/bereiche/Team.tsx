@@ -12,7 +12,7 @@ import type { Datenstand, Agent } from "../daten/typen";
 import "./Team.css";
 import { TeamDetails, mitBeleg } from "./TeamDetails";
 import { allesAnhalten, AnhalteHinweis, AnhalteMarke, useAnhalten } from "./anhalten";
-import { teamAgentHoeren, teamAnhalten } from "../daten/tauri";
+import { teamAgentHoeren, teamAnhalten, teamLauf } from "../daten/tauri";
 import { Leerzustand } from "../bausteine/Leerzustand";
 import { Toast, ToastSpeicher } from "../bausteine/Toast";
 
@@ -83,7 +83,7 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
 function TeamEcht() {
   const [agenten, setzen] = useState<Agent[]>([]), [auswahl, waehlen] = useState<string | null>(null);
   const [pause, setPause] = useState(false), [stoppt, setStoppt] = useState(false);
-  const lauf = useRef({ ids: new Set<string>(), offen: new Set<string>(), angehalten: false });
+  const lauf = useRef({ ids: new Set<string>(), vorige: new Set<string>(), angehalten: false });
   const [angehalten, setAngehalten] = useState(() => new Set<string>());
   const angefordert = useAnhalten();
   const [meldungen] = useState(() => new ToastSpeicher());
@@ -91,14 +91,12 @@ function TeamEcht() {
   useEffect(() => {
     let beendet = false, abmelden = () => {};
     teamAgentHoeren(agent => {
-      if (beendet) return;
-      // Unbekannte id nach Stopp oder nach Ende aller Agenten = neuer Teamlauf.
-      if (!lauf.current.ids.has(agent.id) && (lauf.current.angehalten || (lauf.current.ids.size > 0 && !lauf.current.offen.size))) {
-        lauf.current.ids.clear(); lauf.current.angehalten = false;
+      if (beendet || lauf.current.vorige.has(agent.id)) return;
+      if (!lauf.current.ids.has(agent.id) && (lauf.current.angehalten || teamLauf.neu)) {
+        lauf.current.vorige = new Set(lauf.current.ids); lauf.current.ids.clear(); lauf.current.angehalten = false; teamLauf.neu = false;
         setzen([]); waehlen(null); setPause(false); setAngehalten(new Set()); allesAnhalten.setzen(false);
       }
       lauf.current.ids.add(agent.id);
-      if (agent.zustand === "Fertig" || agent.zustand === "Problem") lauf.current.offen.delete(agent.id); else lauf.current.offen.add(agent.id);
       setzen(alt => alt.some(a => a.id === agent.id) ? alt.map(a => a.id === agent.id ? agent : a) : [...alt, agent]);
     }).then(ab => { if (beendet) ab(); else abmelden = ab; }, e => { if (!beendet) fehler(String(e)); });
     return () => { beendet = true; abmelden(); };
