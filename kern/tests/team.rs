@@ -245,3 +245,126 @@ fn team_kontingent_wird_wie_im_chat_gespeichert() {
         Some(&projectb_kern::verbrauch::Stand { prozent: 8, endet: 4_000_000_000 })
     );
 }
+
+fn git(pfad: &std::path::Path, args: &[&str]) -> String {
+    let ausgabe = Command::new("git").arg("-C").arg(pfad).args(args).output().unwrap();
+    assert!(ausgabe.status.success(), "{}", String::from_utf8_lossy(&ausgabe.stderr));
+    String::from_utf8(ausgabe.stdout).unwrap().trim().into()
+}
+
+fn haengendes_team(repo: &Repo, namen: &[&str]) -> Team {
+    git(&repo.0, &["config", "user.name", "Test"]);
+    git(&repo.0, &["config", "user.email", "test@example.invalid"]);
+    git(&repo.0, &["config", "commit.gpgSign", "false"]);
+    let team = Team::starten_mit(
+        &repo.0,
+        namen.iter().map(|n| auftrag(n)).collect(),
+        |_| {},
+        |a, w, pfad| {
+            if pfad.ends_with("startfehler") {
+                return Err(std::io::Error::other("Start fehlgeschlagen"));
+            }
+            start::starten(
+                &Anbieter {
+                    programm: env!("CARGO_BIN_EXE_test_agent"),
+                    argumente: &["--team-arbeit", "--haengen"],
+                    ..*a
+                },
+                w,
+                pfad,
+            )
+        },
+    )
+    .unwrap();
+    let frist = std::time::Instant::now() + Duration::from_secs(5);
+    for pfad in team.ordner().iter().filter(|p| !p.ends_with("startfehler")) {
+        while fs::read_to_string(pfad.join("arbeit.txt")).ok().as_deref() != Some("Agentenarbeit") {
+            assert!(std::time::Instant::now() < frist, "Agent hat nicht geschrieben");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    team
+}
+
+#[test]
+fn alles_anhalten_sichert_arbeit_und_neustart_erhaelt_alten_branch() {
+    let repo = Repo::neu();
+    let mut team = haengendes_team(&repo, &["x", "y"]);
+    assert!(team.laeuft());
+    let bericht = team.anhalten(None, Duration::from_secs(30)).unwrap();
+    assert!(!team.laeuft());
+    assert!(!team.laeufe_mut()[0].warten().unwrap().success());
+    assert!(bericht.lauffehler.is_empty());
+    assert!(!bericht.frist_ueberschritten);
+    assert_eq!(bericht.ordner.len(), 2);
+    assert!(bericht.ordner.iter().all(|o| matches!(o.status, projectb_kern::anhalten::Ordnerstatus::Gesichert { .. })));
+    let sha = git(&repo.0, &["rev-parse", "agent/x"]);
+    assert_eq!(bericht.ordner[0].status, projectb_kern::anhalten::Ordnerstatus::Gesichert { sha: sha.clone() });
+    assert_eq!(git(&repo.0, &["show", "agent/x:arbeit.txt"]), "Agentenarbeit");
+    assert!(git(&repo.0, &["log", "-1", "--format=%s", "agent/x"]).starts_with("WIP:"));
+    let (mut neu, rx) = starten(&repo, &["x"]);
+    assert!(neu.ordner()[0].ends_with(".worktrees/x-2"));
+    let meldungen = bis_fertig(&rx, neu.ordner(), 1);
+    assert!(meldungen.iter().all(|v| v["id"] == "x" && v["name"] == "x"));
+    neu.laeufe_mut()[0].warten().unwrap();
+    assert!(!neu.laeuft());
+    assert_eq!(git(&repo.0, &["rev-parse", "agent/x"]), sha);
+}
+
+#[test]
+fn einzeln_anhalten_trifft_nur_den_benannten_agenten() {
+    let repo = Repo::neu();
+    let mut team = haengendes_team(&repo, &["eins", "zwei"]);
+    assert_eq!(team.anhalten(Some("unbekannt"), Duration::ZERO).unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+    let bericht = team.anhalten(Some("eins"), Duration::from_secs(30)).unwrap();
+    assert_eq!(bericht.ordner.len(), 1);
+    assert_eq!(bericht.ordner[0].ordner, team.ordner()[0]);
+    assert!(matches!(bericht.ordner[0].status, projectb_kern::anhalten::Ordnerstatus::Gesichert { .. }));
+    assert!(team.laeufe_mut()[0].beendet());
+    assert!(!team.laeufe_mut()[1].beendet());
+    assert!(team.laeuft());
+    team.anhalten(None, Duration::from_secs(30)).unwrap();
+    assert!(!team.laeuft());
+}
+
+#[test]
+fn startfehler_verschiebt_die_zuordnung_nicht() {
+    let repo = Repo::neu();
+    let mut team = haengendes_team(&repo, &["startfehler", "gut"]);
+    let bericht = team.anhalten(Some("startfehler"), Duration::from_secs(30)).unwrap();
+    assert_eq!(bericht.ordner[0].ordner, team.ordner()[0]);
+    assert!(team.laeuft());
+    let bericht = team.anhalten(Some("gut"), Duration::from_secs(30)).unwrap();
+    assert_eq!(bericht.ordner[0].ordner, team.ordner()[1]);
+    assert!(!team.laeuft());
+}
+
+#[test]
+fn leere_auftragsliste_wird_abgelehnt() {
+    let repo = Repo::neu();
+    let fehler = Team::starten(&repo.0, vec![], |_| panic!("kein Start")).err().unwrap();
+    assert_eq!(fehler.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(fehler.to_string().contains("Mindestens ein Auftrag"));
+}
+
+#[test]
+fn vorhandener_branch_oder_ordner_wird_uebersprungen() {
+    for branch in [true, false] {
+        let repo = Repo::neu();
+        let vorher = git(&repo.0, &["rev-parse", "HEAD"]);
+        if branch {
+            git(&repo.0, &["branch", "agent/x"]);
+        } else {
+            fs::create_dir_all(repo.0.join(".worktrees/x")).unwrap();
+        }
+        fs::create_dir_all(repo.0.join(".worktrees/x-2")).unwrap();
+        let team = Team::starten_mit(&repo.0, vec![auftrag("x")], |_| {}, |_, _, _| Err(std::io::Error::other("Test")))
+            .unwrap();
+        assert_eq!(team.ordner().len(), 1);
+        assert!(team.ordner()[0].ends_with(".worktrees/x-3"));
+        assert_eq!(git(team.ordner().first().unwrap(), &["branch", "--show-current"]), "agent/x-3");
+        if branch {
+            assert_eq!(git(&repo.0, &["rev-parse", "agent/x"]), vorher);
+        }
+    }
+}

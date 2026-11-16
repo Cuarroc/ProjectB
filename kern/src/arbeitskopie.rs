@@ -62,10 +62,23 @@ pub fn anlegen_in(repo: &Path, name: &str, ordner: &Path) -> io::Result<Arbeitsk
     if name.is_empty() || name.contains("..") || name.contains(['/', '\\']) || name.starts_with('-') {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "Ungültiger Name der Arbeitskopie"));
     }
-    let branch = format!("agent/{name}");
+    let mut branch = format!("agent/{name}");
     ausfuehren(git(repo).args(["check-ref-format", &format!("refs/heads/{branch}")]))
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Ungültiger Branchname"))?;
-    let pfad = std::fs::canonicalize(repo)?.join(ordner).join(name);
+    let basis = std::fs::canonicalize(repo)?.join(ordner);
+    let mut pfad = basis.join(name);
+    let mut nummer = 2;
+    loop {
+        let status = git(repo).args(["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")]).status()?;
+        match status.code() {
+            Some(1) if !pfad.try_exists()? => break,
+            Some(0 | 1) => {}
+            _ => return Err(io::Error::other(format!("Git-Branchprüfung fehlgeschlagen: {status}"))),
+        }
+        branch = format!("agent/{name}-{nummer}");
+        pfad = basis.join(format!("{name}-{nummer}"));
+        nummer += 1;
+    }
     ausfuehren(git(repo).args(["worktree", "add", "-b", &branch]).arg(git_pfad(&pfad)).arg("HEAD"))?;
     Ok(Arbeitskopie { pfad: std::fs::canonicalize(pfad)?, branch: Some(branch) })
 }

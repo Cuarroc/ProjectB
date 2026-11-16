@@ -38,11 +38,15 @@ fn main() {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
     }
+||||||| parent of d953822 (P-5-3c: Team einzeln oder ganz anhalten mit WIP-Sicherung (Funktion 3, Paket 3))
+    if hat("--team-arbeit") {
+        std::fs::write("arbeit.txt", "Agentenarbeit").unwrap();
+    }
     let text = if hat("--argumente") {
-        std::env::args().skip(1).collect::<Vec<_>>().join(" ")
-    } else {
-        format!("Auftrag: {}", auftrag.trim())
-    };
+    std::env::args().skip(1).collect::<Vec<_>>().join(" ")
+} else {
+    format!("Auftrag: {}", auftrag.trim())
+};
     let antwort = serde_json::json!({"type":"assistant","message":{"content":[
         {"type":"text","text":text},{"type":"tool_use","name":"Read"}]}});
     if hat("--codex") {
