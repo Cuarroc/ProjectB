@@ -1,4 +1,4 @@
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -8,7 +8,7 @@ pub struct Arbeitskopie {
     pub branch: Option<String>,
 }
 
-/// Änderungen gegen HEAD samt neuen Dateien; bei Fehlern keinen Teilstand liefern.
+/// Änderungen gegen HEAD samt neuen Dateien; unlesbare Einträge mit 0/0.
 pub fn geaenderte_dateien(repo: &Path) -> io::Result<Vec<serde_json::Value>> {
     let diff = ausfuehren(git(repo).args(["diff", "--numstat", "-z", "HEAD", "--"]))?;
     let neue = ausfuehren(git(repo).args(["ls-files", "--others", "--exclude-standard", "-z"]))?;
@@ -32,11 +32,24 @@ pub fn geaenderte_dateien(repo: &Path) -> io::Result<Vec<serde_json::Value>> {
         dateien.push(serde_json::json!({"pfad":pfad, "hinzugefuegt":hinzugefuegt, "entfernt":entfernt}));
     }
     for pfad in neue.split('\0').filter(|s| !s.is_empty()).take(50 - dateien.len()) {
-        let datei = std::io::BufReader::new(std::fs::File::open(repo.join(pfad))?);
-        let zeilen = datei.split(b'\n').try_fold(0u64, |n, zeile| zeile.map(|_| n + 1))?;
+        let zeilen = zeilen_neuer_datei(&repo.join(pfad)).unwrap_or(0);
         dateien.push(serde_json::json!({"pfad":pfad, "hinzugefuegt":zeilen, "entfernt":0}));
     }
     Ok(dateien)
+}
+
+fn zeilen_neuer_datei(pfad: &Path) -> io::Result<u64> {
+    if !std::fs::symlink_metadata(pfad)?.is_file() {
+        return Ok(0);
+    }
+    let mut datei = std::fs::File::open(pfad)?;
+    let mut anfang = Vec::new();
+    datei.by_ref().take(8000).read_to_end(&mut anfang)?;
+    if anfang.contains(&0) {
+        return Ok(0);
+    }
+    let datei = io::BufReader::new(io::Cursor::new(anfang).chain(datei));
+    datei.split(b'\n').try_fold(0u64, |n, zeile| zeile.map(|_| n + 1))
 }
 
 /// Legt eine Arbeitskopie von HEAD unter `<repo>/.worktrees/<name>` an.
@@ -148,7 +161,11 @@ mod tests {
             fs::create_dir_all(&pfad).unwrap();
             let repo = Self(fs::canonicalize(pfad).unwrap());
             repo.git(&["init"]);
-            repo.git(&[
+            repo.commit();
+            repo
+        }
+        fn commit(&self) {
+            self.git(&[
                 "-c",
                 "user.name=Test",
                 "-c",
@@ -158,7 +175,6 @@ mod tests {
                 "-m",
                 "Start",
             ]);
-            repo
         }
         fn git(&self, args: &[&str]) -> String {
             let ausgabe = Command::new("git").arg("-C").arg(&self.0).args(args).output().unwrap();
@@ -171,42 +187,58 @@ mod tests {
             fs::remove_dir_all(&self.0).unwrap();
         }
     }
-
+    fn e(pfad: &str, plus: u64, minus: u64) -> serde_json::Value {
+        serde_json::json!({"pfad":pfad, "hinzugefuegt":plus, "entfernt":minus})
+    }
     #[test]
     fn geaenderte_und_neue_dateien_mit_zeilenzahlen() {
         let repo = TempRepo::neu();
         fs::write(repo.0.join("alt.txt"), "eins\nzwei\n").unwrap();
         repo.git(&["add", "alt.txt"]);
-        repo.git(&["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Datei"]);
+        repo.commit();
         fs::write(repo.0.join("alt.txt"), "eins\ndrei\nvier\n").unwrap();
         let neuer_pfad = if cfg!(windows) { "neu ü.txt" } else { "neu ü\t.txt" };
         fs::write(repo.0.join(neuer_pfad), "a\nb").unwrap();
-        assert_eq!(
-            geaenderte_dateien(&repo.0).unwrap(),
-            vec![
-                serde_json::json!({"pfad":"alt.txt", "hinzugefuegt":2, "entfernt":1}),
-                serde_json::json!({"pfad":neuer_pfad, "hinzugefuegt":2, "entfernt":0})
-            ]
-        );
+        assert_eq!(geaenderte_dateien(&repo.0).unwrap(), vec![e("alt.txt", 2, 1), e(neuer_pfad, 2, 0)]);
         for nr in 0..55 {
             fs::write(repo.0.join(format!("neu-{nr}")), "").unwrap();
         }
         assert_eq!(geaenderte_dateien(&repo.0).unwrap().len(), 50);
         assert!(geaenderte_dateien(&repo.0.join("fehlt")).is_err());
-    }
-
-    #[test]
-    fn umbenennungen_und_binaerdateien() {
+        let repo = TempRepo::neu();
+        fs::write(repo.0.join("bild"), b"eins\n\0zwei\n").unwrap();
+        fs::write(repo.0.join("rand"), [vec![b'x'; 7999], vec![0]].concat()).unwrap();
+        let mut text = b"a\n".repeat(20_000);
+        text[8000] = 0;
+        fs::write(repo.0.join("text"), text).unwrap();
+        assert_eq!(geaenderte_dateien(&repo.0).unwrap(), vec![e("bild", 0, 0), e("rand", 0, 0), e("text", 20_000, 0)]);
         let repo = TempRepo::neu();
         fs::write(repo.0.join("alt"), "Inhalt\n").unwrap();
         fs::write(repo.0.join("bild"), b"\0alt").unwrap();
         repo.git(&["add", "."]);
-        repo.git(&["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Dateien"]);
+        repo.commit();
         repo.git(&["mv", "alt", "neu ü"]);
         fs::write(repo.0.join("bild"), b"\0neu").unwrap();
         let dateien = geaenderte_dateien(&repo.0).unwrap();
-        assert!(dateien.contains(&serde_json::json!({"pfad":"neu ü", "hinzugefuegt":0, "entfernt":0})));
-        assert!(dateien.contains(&serde_json::json!({"pfad":"bild", "hinzugefuegt":0, "entfernt":0})));
+        assert!(dateien.contains(&e("neu ü", 0, 0)) && dateien.contains(&e("bild", 0, 0)));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn neue_symlinks_und_unlesbare_dateien() {
+        let repo = TempRepo::neu();
+        fs::write(repo.0.join("text"), "eins\nzwei\n").unwrap();
+        std::os::unix::fs::symlink("text", repo.0.join("link")).unwrap();
+        std::os::unix::fs::symlink("fehlt", repo.0.join("kaputt")).unwrap();
+        assert_eq!(geaenderte_dateien(&repo.0).unwrap(), vec![e("kaputt", 0, 0), e("link", 0, 0), e("text", 2, 0)]);
+        use std::os::unix::fs::PermissionsExt;
+        let repo = TempRepo::neu();
+        let gesperrt = repo.0.join("gesperrt");
+        fs::write(&gesperrt, "geheim\n").unwrap();
+        fs::set_permissions(&gesperrt, fs::Permissions::from_mode(0o000)).unwrap();
+        assert!(fs::File::open(&gesperrt).is_err());
+        fs::write(repo.0.join("text"), "eins\n").unwrap();
+        assert_eq!(geaenderte_dateien(&repo.0).unwrap(), vec![e("gesperrt", 0, 0), e("text", 1, 0)]);
     }
 
     #[test]

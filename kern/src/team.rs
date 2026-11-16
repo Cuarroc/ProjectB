@@ -95,21 +95,22 @@ impl Team {
                         melden(zuletzt.to_string());
                         loop {
                             let mut beendet = false;
-                            match ereignisse.recv_timeout(Duration::from_secs(2)) {
+                            let dateien_aktualisieren = match ereignisse.recv_timeout(Duration::from_secs(2)) {
                                 Ok(ereignis) => {
                                     if let (Ereignis::Kontingent(stand), Some(datei)) = (&ereignis, &kontingent) {
                                         let _ = verbrauch::merken(datei, &auftrag.anbieter.to_ascii_lowercase(), stand);
                                     }
                                     beendet = matches!(ereignis, Ereignis::Beendet { .. });
                                     zustand.anwenden(&ereignis);
-                                    if beendet || matches!(ereignis, Ereignis::Werkzeug(_)) {
-                                        if let Ok(dateien) = arbeitskopie::geaenderte_dateien(&arbeitskopie) {
-                                            zustand.dateien_setzen(dateien);
-                                        }
-                                    }
+                                    beendet || matches!(ereignis, Ereignis::Werkzeug(_))
                                 }
-                                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                                Err(mpsc::RecvTimeoutError::Timeout) => true,
                                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                            };
+                            if dateien_aktualisieren {
+                                if let Ok(dateien) = arbeitskopie::geaenderte_dateien(&arbeitskopie) {
+                                    zustand.dateien_setzen(dateien);
+                                }
                             }
                             let json = zustand.als_json();
                             if json != zuletzt {
