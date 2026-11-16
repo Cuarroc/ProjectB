@@ -126,3 +126,49 @@ fn ungueltiger_name_stoert_den_anderen_agenten_nicht() {
     assert_eq!(team.ordner().len(), 1);
     assert!(team.laeufe_mut()[0].warten().unwrap().success());
 }
+
+#[test]
+fn doppelte_namen_starten_nichts() {
+    let repo = Repo::neu();
+    let starts = std::cell::Cell::new(0);
+    let ergebnis = Team::starten_mit(
+        &repo.0,
+        ["gut", "doppelt", "doppelt"].map(auftrag).into(),
+        |_| {},
+        |_, _, _| {
+            starts.set(starts.get() + 1);
+            Err(std::io::Error::other("kein echter Prozess"))
+        },
+    );
+    assert_eq!(starts.get(), 0);
+    assert_eq!(ergebnis.err().unwrap().kind(), std::io::ErrorKind::InvalidInput);
+    assert!(!repo.0.join(".worktrees").exists());
+    assert_eq!(projectb_kern::arbeitskopie::liste(&repo.0).unwrap().len(), 1);
+}
+
+#[test]
+fn team_kontingent_wird_wie_im_chat_gespeichert() {
+    let repo = Repo::neu();
+    let datei = repo.0.join("kontingent.json");
+    let (tx, rx) = mpsc::channel();
+    let mut team = Team::starten_mit_kontingent(
+        &repo.0,
+        vec![auftrag("eins")],
+        Some(&datei),
+        move |json| tx.send(json).unwrap(),
+        |a, w, pfad| {
+            start::starten(
+                &Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &["--kontingent"], ..*a },
+                w,
+                pfad,
+            )
+        },
+    )
+    .unwrap();
+    bis_fertig(&rx, team.ordner(), 1);
+    assert!(team.laeufe_mut()[0].warten().unwrap().success());
+    assert_eq!(
+        projectb_kern::verbrauch::laden(&datei).get("claude"),
+        Some(&projectb_kern::verbrauch::Stand { prozent: 8, endet: 4_000_000_000 })
+    );
+}

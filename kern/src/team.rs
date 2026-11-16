@@ -1,5 +1,5 @@
 use crate::{
-    arbeitskopie, chat, start,
+    arbeitskopie, chat, start, verbrauch,
     zustand::{AgentZustand, Stammdaten},
     Anbieter, Ereignis, Lauf,
 };
@@ -10,7 +10,6 @@ use std::{
     thread,
 };
 
-#[derive(serde::Deserialize)]
 pub struct TeamAuftrag {
     pub name: String,
     pub anbieter: String,
@@ -40,8 +39,23 @@ impl Team {
         melden: impl Fn(String) + Send + Sync + 'static,
         starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf>,
     ) -> io::Result<Self> {
+        Self::starten_mit_kontingent(projekt, auftraege, None, melden, starten)
+    }
+
+    pub fn starten_mit_kontingent(
+        projekt: &Path,
+        auftraege: Vec<TeamAuftrag>,
+        kontingent: Option<&Path>,
+        melden: impl Fn(String) + Send + Sync + 'static,
+        starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf>,
+    ) -> io::Result<Self> {
         if auftraege.len() > 3 {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "Höchstens 3 Agenten pro Team"));
+        }
+        for (i, auftrag) in auftraege.iter().enumerate() {
+            if auftraege[..i].iter().any(|vorher| vorher.name == auftrag.name) {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, "Agentennamen müssen eindeutig sein"));
+            }
         }
         let melden = Arc::new(melden);
         let mut team = Self { laeufe: Vec::new(), ordner: Vec::new() };
@@ -73,10 +87,14 @@ impl Team {
                     let ereignisse = std::mem::replace(&mut lauf.ereignisse, mpsc::channel().1);
                     team.laeufe.push(lauf);
                     let melden = Arc::clone(&melden);
+                    let kontingent = kontingent.map(Path::to_path_buf);
                     thread::spawn(move || {
                         let mut zuletzt = zustand.als_json();
                         melden(zuletzt.to_string());
                         for ereignis in ereignisse {
+                            if let (Ereignis::Kontingent(stand), Some(datei)) = (&ereignis, &kontingent) {
+                                let _ = verbrauch::merken(datei, &auftrag.anbieter.to_ascii_lowercase(), stand);
+                            }
                             zustand.anwenden(&ereignis);
                             let json = zustand.als_json();
                             if json != zuletzt {
