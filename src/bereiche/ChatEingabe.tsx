@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { auftragSenden, chatNachrichtenHoeren } from "../daten/tauri";
+import { auftragSenden, chatNachrichtenHoeren, teamStarten } from "../daten/tauri";
+import { teamAuftraege } from "../daten/team-plan";
 import { antwortPlan, aufgabenListe, markdownKlartext } from "../daten/plan";
 import { BeispielQuelle } from "../daten/quelle";
 import type { Chat, Todo } from "../daten/typen";
@@ -142,7 +143,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     } catch (e) { orchestratorNachricht(quelle, chat.id, `Problem: ${e instanceof Error ? e.message : String(e)}`); }
     finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
   };
-  const onAktion = (nachrichtId: string, aktionId: string, kommentar?: string) => {
+  const onAktion = async (nachrichtId: string, aktionId: string, kommentar?: string) => {
     if (laufende.current.has(chat.id)) return;
     if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
     const neu = quelle.lesen(), ziel = neu.chats.find(c => c.id === chat.id);
@@ -154,8 +155,24 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       return senden(aktion.antwort);
     }
     if (aktionId === "plan-freigeben") {
-      if (nachricht.plan) { nachricht.plan.freigabe = "Freigegeben"; quelle.aktualisieren(neu); }
       const hinweise = kommentar?.split("\n").slice(1).join("\n");
+      if (isTauri() && nachricht.plan?.schritte.length) {
+        laufende.current.add(chat.id); setFehler("");
+        try {
+          const auftraege = teamAuftraege(nachricht.plan, ziel, hinweise);
+          await teamStarten(neu.kopf.pfad, auftraege);
+          const aktuell = quelle.lesen(), zielChat = aktuell.chats.find(c => c.id === chat.id);
+          const plan = zielChat?.verlauf.find(n => n.id === nachrichtId)?.plan;
+          if (zielChat && plan) {
+            plan.freigabe = "Freigegeben"; zielChat.modus = "Ausführen";
+            zielChat.verlauf.forEach(n => { if (n.id === nachrichtId) n.aktionen = []; }); quelle.aktualisieren(aktuell);
+            orchestratorNachricht(quelle, chat.id, `Plan freigegeben. Team mit ${auftraege.length} Agenten gestartet.`);
+          }
+        } catch (e) { setFehler(e instanceof Error ? e.message : String(e)); }
+        finally { laufende.current.delete(chat.id); aendern({}); }
+        return;
+      }
+      if (nachricht.plan) { nachricht.plan.freigabe = "Freigegeben"; quelle.aktualisieren(neu); }
       return senden(`Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${nachricht.text}${hinweise ? `\n\nBeachte dabei:\n${hinweise}` : ""}`, nachrichtId, "Plan freigegeben.");
     }
     if (aktionId !== "plan-kommentieren") return;
