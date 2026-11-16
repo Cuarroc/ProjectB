@@ -95,9 +95,7 @@ pub async fn team_anhalten(
             .ok_or("Es läuft kein Team")?
             .anhalten(name.as_deref(), STANDARD_FRIST)
             .map_err(|e| e.to_string())?;
-        if name.is_none() && bericht.alles_gesichert() {
-            *team = None;
-        }
+        // Das gesicherte Team bleibt für „Ansehen“ erhalten; team_starten ersetzt es, sobald es ersetzbar ist.
         let ordner: Vec<_> = bericht
             .ordner
             .into_iter()
