@@ -61,7 +61,12 @@ test("Plan freigeben oder kommentieren, auch nach Neustart", async ({ page }, te
   await freigeben.focus(); await page.keyboard.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(1);
   expect(await page.evaluate(() => window.auftraege[0])).toMatchObject({ modus: "Ausführen", text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nDer ergänzte Plan berücksichtigt Umlaute.", sitzung: { id: "s-plan", anbieter: "Claude", pfad: "C:\\ProjectB" } });
+  await expect(page.locator(".r-du .r-msg-text").last()).toHaveText("Plan freigegeben.");
   await expect(page.getByRole("radio", { name: "Ausführen", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(freigeben).toHaveCount(0); await expect(zurueck).toHaveCount(0);
   await page.evaluate(() => window.beenden());
+  if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+    await page.locator(".r-du .r-msg-text").last().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p52n_planfreigabe_1440x900.png`, animations: "disabled" });
+  }
 });
