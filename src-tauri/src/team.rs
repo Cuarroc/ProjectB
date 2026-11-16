@@ -63,6 +63,25 @@ pub async fn team_starten(
 }
 
 #[tauri::command]
+pub async fn team_datei_ansehen(
+    app: tauri::AppHandle,
+    _state: tauri::State<'_, Mutex<Option<Team>>>,
+    name: String,
+    pfad: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Mutex<Option<Team>>>();
+        let team = state.lock().map_err(|_| "Team-Zustand gesperrt")?;
+        team.as_ref()
+            .ok_or("Es läuft kein Team.")?
+            .unterschied(&name, &pfad)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub async fn team_anhalten(
     app: tauri::AppHandle,
     _state: tauri::State<'_, Mutex<Option<Team>>>,
