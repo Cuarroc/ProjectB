@@ -294,12 +294,12 @@ fn indexsperre_erlaubt_erneute_sicherung_und_dateiliste_bleibt_erhalten() {
     let bericht = team.anhalten(None, Duration::from_secs(30)).unwrap();
     assert!(bericht.lauffehler.is_empty());
     assert!(matches!(bericht.ordner[0].status, Ordnerstatus::Fehler { .. }));
-    assert!(!bericht.alles_gesichert());
+    assert!(!bericht.alles_gesichert() && !team.ersetzbar());
     fs::remove_file(sperrdatei).unwrap();
     let mut bericht = team.anhalten(None, Duration::ZERO).unwrap();
     assert!(matches!(bericht.ordner[0].status, Ordnerstatus::Gesichert { .. }));
     assert!(bericht.frist_ueberschritten);
-    assert!(bericht.alles_gesichert());
+    assert!(bericht.alles_gesichert() && team.ersetzbar());
     bericht.lauffehler.push((0, "Anhalten fehlgeschlagen".into()));
     assert!(!bericht.alles_gesichert());
     drop(pause);

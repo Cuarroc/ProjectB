@@ -18,23 +18,15 @@ pub struct TeamAuftrag {
 #[tauri::command]
 pub async fn team_starten(
     app: tauri::AppHandle,
-    team: tauri::State<'_, Mutex<Option<Team>>>,
+    _team: tauri::State<'_, Mutex<Option<Team>>>,
     pfad: String,
     auftraege: Vec<TeamAuftrag>,
 ) -> Result<(), String> {
-    if team
-        .lock()
-        .map_err(|_| "Team-Zustand gesperrt")?
-        .as_ref()
-        .is_some_and(Team::laeuft)
-    {
-        return Err("Es läuft schon ein Team".into());
-    }
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<Mutex<Option<Team>>>();
         let mut team = state.lock().map_err(|_| "Team-Zustand gesperrt")?;
-        if team.as_ref().is_some_and(Team::laeuft) {
-            return Err("Es läuft schon ein Team".into());
+        if team.as_ref().is_some_and(|t| !t.ersetzbar()) {
+            return Err("Das letzte Team läuft noch oder ist nicht gesichert.".into());
         }
         let daten = app.path().app_data_dir().map_err(|e| e.to_string())?;
         fs::create_dir_all(&daten).map_err(|e| e.to_string())?;

@@ -23,6 +23,7 @@ pub struct Team {
     laeufe: Vec<(String, Lauf)>,
     ordner: Vec<PathBuf>,
     ordnernamen: Vec<String>,
+    ungesichert: bool,
 }
 
 impl Team {
@@ -63,7 +64,7 @@ impl Team {
             }
         }
         let melden = Arc::new(melden);
-        let mut team = Self { laeufe: vec![], ordner: vec![], ordnernamen: vec![] };
+        let mut team = Self { laeufe: vec![], ordner: vec![], ordnernamen: vec![], ungesichert: false };
         for auftrag in auftraege {
             let mut stammdaten = Stammdaten {
                 id: auftrag.name.clone(),
@@ -149,6 +150,10 @@ impl Team {
         self.laeufe.iter().any(|(_, lauf)| !lauf.beendet())
     }
 
+    pub fn ersetzbar(&self) -> bool {
+        !self.laeuft() && !self.ungesichert
+    }
+
     pub fn anhalten(&mut self, name: Option<&str>, frist: Duration) -> io::Result<anhalten::Bericht> {
         if name.is_some_and(|name| !self.ordnernamen.iter().any(|n| n == name)) {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "Unbekannter Agentenname"));
@@ -157,10 +162,12 @@ impl Team {
             .ordner
             .iter()
             .zip(&self.ordnernamen)
-            .filter_map(|(pfad, n)| name.is_none_or(|name| name == n).then(|| pfad.clone()))
+            .filter_map(|(pfad, n)| name.is_none_or(|name| name == n).then_some(pfad.clone()))
             .collect();
         let laeufe =
             self.laeufe.iter_mut().filter_map(|(n, lauf)| name.is_none_or(|name| name == n).then_some(lauf)).collect();
-        Ok(anhalten::alles_anhalten(laeufe, &ordner, frist))
+        let bericht = anhalten::alles_anhalten(laeufe, &ordner, frist);
+        self.ungesichert = !bericht.alles_gesichert() || (name.is_some() && self.ungesichert);
+        Ok(bericht)
     }
 }
