@@ -96,7 +96,7 @@ fn datei_team(repo: &Repo, n: &str, args: &'static [&str], f: fn(&std::path::Pat
     (team, rx)
 }
 #[test]
-fn dateien_live_ohne_ereignis_und_bei_gitfehlern_sowie_laufzeit() {
+fn dateien_werden_live_gemeldet_und_laufzeit_tickert() {
     let repo = Repo::neu();
     let (mut team, rx) = starten(&repo, &["eins"]);
     let mut tick = false;
@@ -115,6 +115,10 @@ fn dateien_live_ohne_ereignis_und_bei_gitfehlern_sowie_laufzeit() {
     }
     assert!(team.laeufe_mut()[0].warten().unwrap().success());
     assert!(matches!(rx.recv_timeout(Duration::from_secs(3)), Err(mpsc::RecvTimeoutError::Disconnected)));
+}
+
+#[test]
+fn dateien_ohne_folgendes_ereignis_werden_live_gemeldet() {
     let repo = Repo::neu();
     let (mut team, rx) = datei_team(&repo, "still", &["--datei-ohne-ereignis"], |_| {});
     let frist = std::time::Instant::now() + Duration::from_secs(5);
@@ -132,6 +136,10 @@ fn dateien_live_ohne_ereignis_und_bei_gitfehlern_sowie_laufzeit() {
     bis_fertig(&rx, team.ordner(), 1);
     assert!(team.laeufe_mut()[0].warten().unwrap().success());
     assert!(gefunden, "Keine Dateimeldung innerhalb von fünf Sekunden");
+}
+
+#[test]
+fn gitfehler_erhalten_den_letzten_stand() {
     let repo = Repo::neu();
     let (mut team, rx) = datei_team(&repo, "eins", &["--chat-live"], |pfad| {
         fs::write(pfad.join("vorher"), "eins\n").unwrap();

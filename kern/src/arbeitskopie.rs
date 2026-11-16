@@ -205,6 +205,10 @@ mod tests {
         }
         assert_eq!(geaenderte_dateien(&repo.0).unwrap().len(), 50);
         assert!(geaenderte_dateien(&repo.0.join("fehlt")).is_err());
+    }
+
+    #[test]
+    fn neue_binaerdateien_pruefen_nur_die_ersten_8000_bytes() {
         let repo = TempRepo::neu();
         fs::write(repo.0.join("bild"), b"eins\n\0zwei\n").unwrap();
         fs::write(repo.0.join("rand"), [vec![b'x'; 7999], vec![0]].concat()).unwrap();
@@ -212,6 +216,10 @@ mod tests {
         text[8000] = 0;
         fs::write(repo.0.join("text"), text).unwrap();
         assert_eq!(geaenderte_dateien(&repo.0).unwrap(), vec![e("bild", 0, 0), e("rand", 0, 0), e("text", 20_000, 0)]);
+    }
+
+    #[test]
+    fn umbenennungen_und_binaerdateien() {
         let repo = TempRepo::neu();
         fs::write(repo.0.join("alt"), "Inhalt\n").unwrap();
         fs::write(repo.0.join("bild"), b"\0alt").unwrap();
