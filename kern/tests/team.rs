@@ -85,7 +85,16 @@ fn bis_fertig(rx: &mpsc::Receiver<String>, ordner: &[PathBuf], anzahl: usize) ->
     }
     meldungen
 }
-
+fn datei_team(repo: &Repo, n: &str, args: &'static [&str], f: fn(&std::path::Path)) -> (Team, mpsc::Receiver<String>) {
+    let (tx, rx) = mpsc::channel();
+    let starten = |a: &Anbieter, w: &_, pfad: &std::path::Path| {
+        f(pfad);
+        let a = Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: args, ..*a };
+        start::starten(&a, w, pfad)
+    };
+    let team = Team::starten_mit(&repo.0, vec![auftrag(n)], move |json| tx.send(json).unwrap(), starten).unwrap();
+    (team, rx)
+}
 #[test]
 fn dateien_werden_live_gemeldet_und_laufzeit_tickert() {
     let repo = Repo::neu();
@@ -109,23 +118,32 @@ fn dateien_werden_live_gemeldet_und_laufzeit_tickert() {
 }
 
 #[test]
-fn werkzeug_meldet_dateien_und_gitfehler_erhalten_den_letzten_stand() {
+fn dateien_ohne_folgendes_ereignis_werden_live_gemeldet() {
     let repo = Repo::neu();
-    let (tx, rx) = mpsc::channel();
-    let mut team = Team::starten_mit(
-        &repo.0,
-        vec![auftrag("eins")],
-        move |json| tx.send(json).unwrap(),
-        |a, w, pfad| {
-            fs::write(pfad.join("vorher"), "eins\n").unwrap();
-            start::starten(
-                &Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &["--chat-live"], ..*a },
-                w,
-                pfad,
-            )
-        },
-    )
-    .unwrap();
+    let (mut team, rx) = datei_team(&repo, "still", &["--datei-ohne-ereignis"], |_| {});
+    let frist = std::time::Instant::now() + Duration::from_secs(5);
+    let gefunden = loop {
+        let Ok(json) = rx.recv_timeout(frist.saturating_duration_since(std::time::Instant::now())) else {
+            break false;
+        };
+        let v: Value = serde_json::from_str(&json).unwrap();
+        if v["dateien"] == serde_json::json!([{"pfad":"still.txt", "hinzugefuegt":2, "entfernt":0}]) {
+            assert_eq!(v["zustand"], "Arbeitet");
+            break true;
+        }
+    };
+    fs::write(team.ordner()[0].join("weiter"), "weiter").unwrap();
+    bis_fertig(&rx, team.ordner(), 1);
+    assert!(team.laeufe_mut()[0].warten().unwrap().success());
+    assert!(gefunden, "Keine Dateimeldung innerhalb von fünf Sekunden");
+}
+
+#[test]
+fn gitfehler_erhalten_den_letzten_stand() {
+    let repo = Repo::neu();
+    let (mut team, rx) = datei_team(&repo, "eins", &["--chat-live"], |pfad| {
+        fs::write(pfad.join("vorher"), "eins\n").unwrap();
+    });
     let erwartet = serde_json::json!([{"pfad":"vorher", "hinzugefuegt":1, "entfernt":0}]);
     loop {
         let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
