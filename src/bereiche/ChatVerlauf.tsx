@@ -6,10 +6,11 @@ import { Knopf } from "../bausteine/Knopf";
 import { Fortschrittsring } from "../bausteine/Fortschrittsring";
 import { Statusmarke, zustaende as statusDefinitionen, type Zustand } from "../bausteine/Statusmarke";
 import { tokenMs } from "../bausteine/Tooltip";
-import type { Planschritt } from "../daten/typen";
+import type { Plan, Planschritt } from "../daten/typen";
 import "./ChatVerlauf.css";
 import "../bausteine/bausteine2.css";
 import Planfenster, { type PlanMarken } from "./Planfenster";
+import { planKommentare } from "../daten/plan";
 import Interview, { type InterviewZustand } from "./Interview";
 import { AnhalteHinweis, useAnhalten } from "./anhalten";
 
@@ -22,7 +23,7 @@ type Props = {
   quelle?: BeispielQuelle;
   onPlanOeffnen?: (planId: string) => void;
   onAntwort?: (frageId: string, antwortId: string) => void;
-  onAktion?: (nachrichtId: string, aktionId: string) => void;
+  onAktion?: (nachrichtId: string, aktionId: string, kommentar?: string) => void;
 };
 
 export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, onAntwort, onAktion }: Props) {
@@ -31,7 +32,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
   const [interviews, setInterviews] = useState<Record<string, InterviewZustand>>({});
   const [antworten, setAntworten] = useState<Record<string, string>>({});
   const [meldung, setMeldung] = useState("");
-  const [planOffen, setPlanOffen] = useState(false);
+  const [planOffen, setPlanOffen] = useState<{ plan: Plan; echt: boolean } | null>(null);
   const [planFreigabe, setPlanFreigabe] = useState("");
   const [planMarken, setPlanMarken] = useState<Record<string, PlanMarken>>({});
   useEffect(() => {
@@ -109,7 +110,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
                 </details>
                 {risiko.map(s => <p className="r-plan-risiko" key={s.id}>Risiko: {s.beschreibung}</p>)}
                 {planFreigabe && <p role="status">{planFreigabe}</p>}
-                <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen(true); onPlanOeffnen?.(plan.id); }} />
+                <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen({ plan, echt: false }); onPlanOeffnen?.(plan.id); }} />
               </section>}
               {frage && <section className="r-innen r-frage" aria-label={n.text} aria-live="assertive">
                 <div className="r-frage-kopf"><MessageCircleQuestion size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /><strong>{n.text}</strong></div>
@@ -117,14 +118,17 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
                 <div className="r-antworten">{frage.antwortknoepfe.map(a => <Knopf key={a.id} text={a.text} variante="antwort" aria-pressed={antworten[frage.id] === a.id}
                   onClick={() => { setAntworten(v => ({ ...v, [frage.id]: a.id })); onAntwort?.(frage.id, a.id); }} />)}</div>
               </section>}
-              {n.aktionen.length > 0 && <div className="r-aktionen">{n.aktionen.map(a => <Knopf key={a.id} text={a.text} aria-label={a.antwort?.replace(/(\*\*|\*|`)(.+?)\1/g, "$2")} variante={a.id === "plan-freigeben" ? "haupt" : a.id.startsWith("antwort-") ? "antwort" : "zweit"} disabled={!onAktion || !!chat.gestartetUm} onClick={() => onAktion?.(n.id, a.id)} />)}</div>}
+              {(n.aktionen.length > 0 || n.plan) && <div className="r-aktionen">{n.aktionen.map(a => <Knopf key={a.id} text={a.text} aria-label={a.antwort?.replace(/(\*\*|\*|`)(.+?)\1/g, "$2")} variante={a.id === "plan-freigeben" ? "haupt" : a.id.startsWith("antwort-") ? "antwort" : "zweit"} disabled={!onAktion || !!chat.gestartetUm} onClick={() => onAktion?.(n.id, a.id)} />)}
+                {n.plan && <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen({ plan: n.plan!, echt: true }); onPlanOeffnen?.(n.plan!.id); }} />}
+              </div>}
             </article>
           </li>;
         })}
       </ol>
     </div>
     <div className="chat-meldung" role="status">{meldung}</div>
-    {planOffen && <Planfenster daten={daten} gespeicherteMarken={planMarken[daten.plan.id] ?? {}} onSchliessen={() => setPlanOffen(false)} onEntscheiden={(plan, marken) => {
+    {planOffen && <Planfenster daten={daten} plan={planOffen.echt ? planOffen.plan : undefined} entscheidbar={!planOffen.echt || (!!onAktion && !chat?.gestartetUm && !!chat?.verlauf.find(n => n.id === planOffen.plan.id)?.aktionen.length)} gespeicherteMarken={planMarken[planOffen.plan.id] ?? {}} onSchliessen={() => setPlanOffen(null)} onEntscheiden={(plan, marken, stil) => {
+      if (planOffen.echt) { onAktion?.(plan.id, plan.freigabe === "Freigegeben" ? "plan-freigeben" : "plan-kommentieren", planKommentare(plan, stil, marken)); return; }
       if (quelle instanceof BeispielQuelle) quelle.aktualisieren({ ...quelle.lesen(), plan });
       else setDaten(d => ({ ...d, plan }));
       setPlanMarken(m => ({ ...m, [plan.id]: marken })); setPlanFreigabe(plan.freigabe === "Freigegeben" ? "Freigegeben" : "Zurückgegeben");
