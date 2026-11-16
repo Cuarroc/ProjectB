@@ -9,6 +9,7 @@ pub mod projekt;
 pub mod regeln;
 
 pub mod start;
+pub mod team;
 
 pub mod pr;
 
