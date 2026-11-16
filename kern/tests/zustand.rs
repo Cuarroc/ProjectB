@@ -13,6 +13,39 @@ fn neu() -> AgentZustand {
     })
 }
 
+#[test]
+fn laufzeit_tickert_und_bleibt_nach_beendet_stehen() {
+    use std::time::{Duration, Instant};
+    for erstes in [Ereignis::Gestartet { modell: None }, Ereignis::Text("Los".into())] {
+        let mut zustand = neu();
+        let start = Instant::now();
+        assert_eq!(zustand.als_json_um(start)["laufzeitSekunden"], 0);
+        zustand.anwenden_um(&erstes, start);
+        let ende = start + Duration::from_millis(2900);
+        assert_eq!(zustand.als_json_um(ende)["laufzeitSekunden"], 2);
+        zustand.anwenden_um(&Ereignis::Text("Weiter".into()), start + Duration::from_secs(1));
+        zustand.anwenden_um(&Ereignis::Beendet { code: Some(0), erfolg: true }, ende);
+        assert_eq!(zustand.als_json_um(start + Duration::from_secs(20))["laufzeitSekunden"], 2);
+    }
+}
+
+#[test]
+fn erfolgreiche_frage_wartet_auf_dich() {
+    for zusammenfassung in ["", "Soll ich fortfahren? \n\n", "Erledigt."] {
+        let mut zustand = neu();
+        zustand.anwenden(&Ereignis::Text("Alles geprüft.\nFortfahren?".into()));
+        zustand.anwenden(&Ereignis::Werkzeug("Read".into()));
+        zustand.anwenden(&Ereignis::Meldung("Hinweis".into()));
+        zustand.anwenden(&Ereignis::Fertig { erfolg: true, zusammenfassung: zusammenfassung.into() });
+        assert_eq!(zustand.als_json()["zustand"], "Arbeitet");
+        zustand.anwenden(&Ereignis::Beendet { code: Some(0), erfolg: true });
+        assert_eq!(
+            zustand.als_json()["zustand"],
+            if zusammenfassung == "Erledigt." { "Fertig" } else { "Wartet auf dich" }
+        );
+    }
+}
+
 // Anbieter-JSONL; der Prozessabschluss kommt separat vom Lauf-Wächter.
 const CLAUDE: &str = r#"{"type":"system","subtype":"init","model":"claude-opus-4-1"}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read"},{"type":"text","text":"Tests grün"}]}}
