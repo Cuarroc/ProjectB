@@ -21,6 +21,12 @@
 .rand-form input::placeholder { color: var(--text-3); }
 .rand-zaehler { margin-left: auto; padding-inline: var(--abstand-2); border-radius: var(--rund-voll); color: var(--status-wartet-text); background: var(--status-wartet-grund); font-variant-numeric: tabular-nums; }
 .rand-karte p { font: var(--schrift-klein); color: var(--text-2); margin-bottom: 0; }
+.postfach-inhalt { margin-top: var(--abstand-2); font: var(--schrift-klein); }
+.postfach-inhalt p { margin: 0; }
+.postfach-eintraege { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--abstand-2); }
+.postfach-eintrag { display: grid; gap: var(--abstand-1); width: 100%; border: 0; padding: var(--abstand-2); border-radius: var(--rund-knopf); background: var(--flaeche-3); color: var(--text-1); font: var(--schrift-klein); text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.postfach-eintrag > span:last-child { color: var(--text-2); }
+.postfach-eintrag:hover { background: var(--flaeche-4); }
 .chat-rand :focus-visible, .team-rand-schalter:focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: 1px; }
 @media (hover: hover) and (pointer: fine) { .rand-schalter:hover, .rand-chat:hover, .rand-postfach:hover { background: var(--flaeche-3); color: var(--text-1); } }
 .app-rahmen:has(.chat-rand[data-offen=false]) { --chats-breite: var(--leiste-breite); }

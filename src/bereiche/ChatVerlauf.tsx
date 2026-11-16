@@ -79,7 +79,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
           const frage = daten.fragen.find(f => f.id === n.frageId);
           const plan = n.planId === daten.plan.id ? daten.plan : null;
           return <li key={n.id} className={n.von === "Du" ? "r-du" : undefined}>
-            <article className={`r-karte r-msg${n.von === "Du" ? " r-du-blase" : ""}`} aria-label={`${n.von}, ${n.zeit}`}>
+            <article id={`nachricht-${n.id}`} tabIndex={-1} className={`r-karte r-msg${n.von === "Du" ? " r-du-blase" : ""}`} aria-label={`${n.von}, ${n.zeit}`}>
               <header className="r-msg-kopf">
                 {n.von === "Orchestrator" && <span className="r-avatar"><Users size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /></span>}
                 <span className="r-msg-name">{n.von}</span><time className="r-msg-zeit">{n.zeit}</time>
