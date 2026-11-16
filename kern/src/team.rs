@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{mpsc, Arc},
     thread,
+    time::Duration,
 };
 
 pub struct TeamAuftrag {
@@ -80,6 +81,7 @@ impl Team {
                 team.ordner.push(kopie.pfad.clone());
                 starten(anbieter, &wunsch, &kopie.pfad)
             })();
+            let arbeitskopie = PathBuf::from(&stammdaten.arbeitskopie);
             let mut zustand = AgentZustand::neu(stammdaten);
             match lauf {
                 Ok(mut lauf) => {
@@ -91,15 +93,31 @@ impl Team {
                     thread::spawn(move || {
                         let mut zuletzt = zustand.als_json();
                         melden(zuletzt.to_string());
-                        for ereignis in ereignisse {
-                            if let (Ereignis::Kontingent(stand), Some(datei)) = (&ereignis, &kontingent) {
-                                let _ = verbrauch::merken(datei, &auftrag.anbieter.to_ascii_lowercase(), stand);
+                        loop {
+                            let mut beendet = false;
+                            match ereignisse.recv_timeout(Duration::from_secs(2)) {
+                                Ok(ereignis) => {
+                                    if let (Ereignis::Kontingent(stand), Some(datei)) = (&ereignis, &kontingent) {
+                                        let _ = verbrauch::merken(datei, &auftrag.anbieter.to_ascii_lowercase(), stand);
+                                    }
+                                    beendet = matches!(ereignis, Ereignis::Beendet { .. });
+                                    zustand.anwenden(&ereignis);
+                                    if beendet || matches!(ereignis, Ereignis::Werkzeug(_)) {
+                                        if let Ok(dateien) = arbeitskopie::geaenderte_dateien(&arbeitskopie) {
+                                            zustand.dateien_setzen(dateien);
+                                        }
+                                    }
+                                }
+                                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                                Err(mpsc::RecvTimeoutError::Disconnected) => break,
                             }
-                            zustand.anwenden(&ereignis);
                             let json = zustand.als_json();
                             if json != zuletzt {
                                 melden(json.to_string());
                                 zuletzt = json;
+                            }
+                            if beendet {
+                                break;
                             }
                         }
                     });

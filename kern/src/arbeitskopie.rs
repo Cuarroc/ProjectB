@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -6,6 +6,37 @@ use std::process::Command;
 pub struct Arbeitskopie {
     pub pfad: PathBuf,
     pub branch: Option<String>,
+}
+
+/// Änderungen gegen HEAD samt neuen Dateien; bei Fehlern keinen Teilstand liefern.
+pub fn geaenderte_dateien(repo: &Path) -> io::Result<Vec<serde_json::Value>> {
+    let diff = ausfuehren(git(repo).args(["diff", "--numstat", "-z", "HEAD", "--"]))?;
+    let neue = ausfuehren(git(repo).args(["ls-files", "--others", "--exclude-standard", "-z"]))?;
+    let diff = String::from_utf8(diff).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let neue = String::from_utf8(neue).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let mut dateien = Vec::new();
+    let mut eintraege = diff.split_terminator('\0');
+    while let Some(zeile) = eintraege.next() {
+        if dateien.len() == 50 {
+            break;
+        }
+        let mut felder = zeile.splitn(3, '\t');
+        // Git meldet bei Binärdateien statt Zeilenzahlen jeweils „-“.
+        let hinzugefuegt = felder.next().and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+        let entfernt = felder.next().and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+        let mut pfad = felder.next().ok_or_else(|| io::Error::other("Ungültiger Git-numstat"))?;
+        if pfad.is_empty() {
+            eintraege.next(); // Umbenennung mit -z: alter und neuer Pfad folgen als eigene Felder.
+            pfad = eintraege.next().ok_or_else(|| io::Error::other("Git-Zielpfad fehlt"))?;
+        }
+        dateien.push(serde_json::json!({"pfad":pfad, "hinzugefuegt":hinzugefuegt, "entfernt":entfernt}));
+    }
+    for pfad in neue.split('\0').filter(|s| !s.is_empty()).take(50 - dateien.len()) {
+        let datei = std::io::BufReader::new(std::fs::File::open(repo.join(pfad))?);
+        let zeilen = datei.split(b'\n').try_fold(0u64, |n, zeile| zeile.map(|_| n + 1))?;
+        dateien.push(serde_json::json!({"pfad":pfad, "hinzugefuegt":zeilen, "entfernt":0}));
+    }
+    Ok(dateien)
 }
 
 /// Legt eine Arbeitskopie von HEAD unter `<repo>/.worktrees/<name>` an.
@@ -139,6 +170,43 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+
+    #[test]
+    fn geaenderte_und_neue_dateien_mit_zeilenzahlen() {
+        let repo = TempRepo::neu();
+        fs::write(repo.0.join("alt.txt"), "eins\nzwei\n").unwrap();
+        repo.git(&["add", "alt.txt"]);
+        repo.git(&["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Datei"]);
+        fs::write(repo.0.join("alt.txt"), "eins\ndrei\nvier\n").unwrap();
+        let neuer_pfad = if cfg!(windows) { "neu ü.txt" } else { "neu ü\t.txt" };
+        fs::write(repo.0.join(neuer_pfad), "a\nb").unwrap();
+        assert_eq!(
+            geaenderte_dateien(&repo.0).unwrap(),
+            vec![
+                serde_json::json!({"pfad":"alt.txt", "hinzugefuegt":2, "entfernt":1}),
+                serde_json::json!({"pfad":neuer_pfad, "hinzugefuegt":2, "entfernt":0})
+            ]
+        );
+        for nr in 0..55 {
+            fs::write(repo.0.join(format!("neu-{nr}")), "").unwrap();
+        }
+        assert_eq!(geaenderte_dateien(&repo.0).unwrap().len(), 50);
+        assert!(geaenderte_dateien(&repo.0.join("fehlt")).is_err());
+    }
+
+    #[test]
+    fn umbenennungen_und_binaerdateien() {
+        let repo = TempRepo::neu();
+        fs::write(repo.0.join("alt"), "Inhalt\n").unwrap();
+        fs::write(repo.0.join("bild"), b"\0alt").unwrap();
+        repo.git(&["add", "."]);
+        repo.git(&["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Dateien"]);
+        repo.git(&["mv", "alt", "neu ü"]);
+        fs::write(repo.0.join("bild"), b"\0neu").unwrap();
+        let dateien = geaenderte_dateien(&repo.0).unwrap();
+        assert!(dateien.contains(&serde_json::json!({"pfad":"neu ü", "hinzugefuegt":0, "entfernt":0})));
+        assert!(dateien.contains(&serde_json::json!({"pfad":"bild", "hinzugefuegt":0, "entfernt":0})));
     }
 
     #[test]
