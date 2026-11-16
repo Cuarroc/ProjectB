@@ -3,7 +3,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beispiel } from "./beispiel";
 import { auftragSenden, chatNachrichtenHoeren, projektOeffnen, projektPruefen, projekteZuletzt } from "./tauri";
-import { teamStarten, teamAnhalten, teamAgentHoeren } from "./tauri";
+import { teamStarten, teamAnhalten, teamAgentHoeren, teamDateiAnsehen } from "./tauri";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: vi.fn(() => false) }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
@@ -89,4 +89,18 @@ it("lässt Teamfunktionen ohne Tauri harmlos", async () => {
   await expect(teamAnhalten()).resolves.toBeUndefined();
   (await teamAgentHoeren(vi.fn()))();
   expect(invoke).not.toHaveBeenCalled(); expect(listen).not.toHaveBeenCalled();
+});
+
+it("weist Ansehen ohne Tauri mit klarem Hinweis zurück", async () => {
+  await expect(teamDateiAnsehen("Kern", "src/csv.rs")).rejects.toThrow("Ansehen geht nur in der App.");
+  expect(invoke).not.toHaveBeenCalled();
+});
+it.each(["+neu\n-alt", "Binärdatei, keine Vorschau.", "+neu\n… gekürzt"])("reicht die Dateivorschau unverändert weiter: %s", async inhalt => {
+  vi.mocked(isTauri).mockReturnValue(true); vi.mocked(invoke).mockResolvedValueOnce(inhalt);
+  await expect(teamDateiAnsehen("CSV-Kern", "src/mit leerzeichen.rs")).resolves.toBe(inhalt);
+  expect(invoke).toHaveBeenCalledExactlyOnceWith("team_datei_ansehen", { name: "CSV-Kern", pfad: "src/mit leerzeichen.rs" });
+});
+it("reicht Kernfehler beim Ansehen unverändert weiter", async () => {
+  vi.mocked(isTauri).mockReturnValue(true); vi.mocked(invoke).mockRejectedValueOnce("Datei gehört nicht zu diesem Agenten");
+  await expect(teamDateiAnsehen("Kern", "fremd.rs")).rejects.toBe("Datei gehört nicht zu diesem Agenten");
 });

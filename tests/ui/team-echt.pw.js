@@ -88,3 +88,103 @@ test("zeigt echte Team-Ereignisse und hält Agenten über den Kern an", async ({
   await expect.soft(karten.getByRole("button", { name: "Anhalten", exact: true })).toBeVisible();
   expect(seitenfehler).toEqual([]);
 });
+
+const dateiAgent = { id: "datei-kern", name: "Datei-Kern", anbieter: "Codex", modell: "gpt-6.1-sol", effort: "Hoch",
+  zustand: "Arbeitet", liveZeile: "Ändert den Export", letzteZeilen: ["Export wird geprüft"], tokens: 0, laufzeitSekunden: 83,
+  fortschritt: 0, phasen: [], dateien: [{ pfad: "src/csv.rs", hinzugefuegt: 1, entfernt: 1 }, { pfad: "bild.png", hinzugefuegt: 0, entfernt: 0 }], tests: null, schaetzung: null };
+const dateiDiff = "diff --git a/src/csv.rs b/src/csv.rs\nindex 1234567..abcdef0 100644\n--- a/src/csv.rs\n+++ b/src/csv.rs\n@@ -1,2 +1,2 @@\n Kontext\n-alt\n+neu\n… gekürzt";
+
+test.describe("Echte Dateivorschau", () => {
+  test.beforeEach(async ({ page }) => {
+    test.skip(process.env.UI_BASELINE === "1", "Die Dateivorschau wird am Kandidaten geprüft.");
+    await page.addInitScript(() => {
+      window.isTauri = true; window.dateiAnfragen = []; window.callbacks = {}; window.listener = new Map(); let id = 0;
+      window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: (_event, id) => window.listener.delete(id) };
+      window.__TAURI_INTERNALS__ = {
+        transformCallback: cb => { window.callbacks[++id] = cb; return id; },
+        invoke: async (cmd, args) => {
+          if (cmd === "plugin:event|listen") { window.listener.set(args.handler, args.event); return args.handler; }
+          if (cmd === "plugin:event|unlisten") { window.listener.delete(args.eventId); return; }
+          if (cmd === "projekte_zuletzt") return [];
+          if (cmd === "kontingent") return { claude: null, codex: null };
+          if (cmd === "einstellungen_laden") return {};
+          if (cmd === "chats_laden") return { chats: [], aktiverChatId: null };
+          if (cmd === "chats_speichern") return;
+          if (cmd === "team_datei_ansehen") return new Promise((resolve, reject) => window.dateiAnfragen.push({ args, resolve, reject }));
+          throw new Error(`Unerwarteter Command: ${cmd}`);
+        },
+      };
+      window.agentSenden = agent => window.listener.forEach((event, id) => {
+        if (event === "team-agent") window.callbacks[id]({ event, id, payload: JSON.stringify(agent) });
+      });
+    });
+    await page.goto("/"); await page.evaluate(() => document.fonts.ready);
+    await expect.poll(() => page.evaluate(() => [...window.listener.values()].includes("team-agent"))).toBe(true);
+    await page.evaluate(a => window.agentSenden(a), dateiAgent);
+    await page.locator(`[data-agent="${dateiAgent.id}"] .ak-kopf`).click();
+  });
+
+  test("zeigt Diff, Binärhinweis und Fehler mit Fokus-Rückgabe", async ({ page }, testInfo) => {
+    const details = page.getByRole("complementary", { name: "Details: Datei-Kern" });
+    const knoepfe = details.getByRole("button", { name: "Ansehen", exact: true });
+    const vorschau = details.getByRole("region", { name: "Vorschau" });
+    await expect(knoepfe).toHaveCount(2); await knoepfe.first().click();
+    await expect(vorschau).toHaveAttribute("aria-busy", "true");
+    await expect(vorschau).toContainText("Lädt …"); await expect(vorschau).toBeFocused();
+    expect(await page.evaluate(() => window.dateiAnfragen.map(a => a.args))).toEqual([{ name: dateiAgent.name, pfad: "src/csv.rs" }]);
+    await page.evaluate(diff => window.dateiAnfragen[0].resolve(diff), dateiDiff);
+    await expect(vorschau).toHaveAttribute("aria-busy", "false");
+    await expect(vorschau.locator("code")).toHaveText("src/csv.rs");
+    await expect(vorschau.locator("pre")).toHaveText(dateiDiff);
+    await expect(vorschau.locator(".tm-diff-plus")).toHaveText("+neu");
+    await expect(vorschau.locator(".tm-diff-minus")).toHaveText("-alt");
+    await expect(vorschau.locator(".tm-diff-plus")).toBeInViewport();
+    expect(await vorschau.locator(".tm-diff-plus").evaluate(el => getComputedStyle(el).color))
+      .not.toBe(await vorschau.locator(".tm-diff-minus").evaluate(el => getComputedStyle(el).color));
+    await expect(vorschau.locator(".tm-diff-kopf")).toHaveCount(3);
+    await expect(vorschau.locator("pre span[class]").filter({ hasText: /^\+\+\+|^---/ })).toHaveCount(0);
+    expect((await new AxeBuilder({ page }).include(".team-spalte").analyze()).violations).toEqual([]);
+    if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53g_ansehen_1440x900.png`, animations: "disabled" });
+    }
+    await vorschau.getByRole("button", { name: "Vorschau schließen" }).click();
+    await expect(vorschau).toHaveCount(0); await expect(knoepfe.first()).toBeFocused();
+    await knoepfe.last().click();
+    expect(await page.evaluate(() => window.dateiAnfragen[1].args)).toEqual({ name: dateiAgent.name, pfad: "bild.png" });
+    await page.evaluate(() => window.dateiAnfragen[1].resolve("Binärdatei, keine Vorschau."));
+    await expect(vorschau.locator("code")).toHaveText("bild.png");
+    await expect(vorschau.locator("pre")).toHaveText("Binärdatei, keine Vorschau.");
+    await vorschau.getByRole("button", { name: "Vorschau schließen" }).click();
+    await expect(knoepfe.last()).toBeFocused();
+    for (const fehler of ["Es läuft kein Team.", "Datei gehört nicht zu diesem Agenten"]) {
+      await knoepfe.first().click();
+      await page.evaluate(text => window.dateiAnfragen.at(-1).reject(text), fehler);
+      await expect(vorschau).toHaveAttribute("aria-busy", "false");
+      await expect(vorschau.locator("pre")).toHaveText(fehler);
+      expect((await new AxeBuilder({ page }).include(".team-spalte").analyze()).violations).toEqual([]);
+      await vorschau.getByRole("button", { name: "Vorschau schließen" }).click();
+      await expect(knoepfe.first()).toBeFocused();
+    }
+  });
+
+  test("ignoriert verspätete Antworten nach Dateiwechsel und Schließen", async ({ page }) => {
+    const details = page.locator("#team-details"), knoepfe = details.getByRole("button", { name: "Ansehen", exact: true });
+    const vorschau = details.getByRole("region", { name: "Vorschau" });
+    await knoepfe.first().click(); await knoepfe.last().click();
+    await page.evaluate(() => { window.dateiAnfragen[1].resolve("Binärdatei, keine Vorschau."); window.dateiAnfragen[0].resolve("Alte Antwort"); });
+    await expect(vorschau.locator("pre")).toHaveText("Binärdatei, keine Vorschau.");
+    await expect(vorschau.locator("code")).toHaveText("bild.png");
+    await knoepfe.first().click();
+    await vorschau.getByRole("button", { name: "Vorschau schließen" }).click();
+    await page.evaluate(() => window.dateiAnfragen[2].resolve("Antwort nach Schließen"));
+    await expect(vorschau).toHaveCount(0); await expect(knoepfe.first()).toBeFocused();
+    await knoepfe.first().click(); await details.getByRole("button", { name: "Protokoll öffnen" }).click();
+    await page.evaluate(() => window.dateiAnfragen[3].reject("Später Fehler"));
+    await expect(vorschau.locator("pre")).toHaveText("Export wird geprüft");
+    await knoepfe.first().click(); await details.press("Escape");
+    await page.locator(`[data-agent="${dateiAgent.id}"] .ak-kopf`).click();
+    await page.evaluate(() => window.dateiAnfragen[4].resolve("Antwort nach Detailwechsel"));
+    await expect(vorschau).toHaveCount(0);
+  });
+});
