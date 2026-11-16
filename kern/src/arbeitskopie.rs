@@ -236,7 +236,9 @@ mod tests {
         let gesperrt = repo.0.join("gesperrt");
         fs::write(&gesperrt, "geheim\n").unwrap();
         fs::set_permissions(&gesperrt, fs::Permissions::from_mode(0o000)).unwrap();
-        assert!(fs::File::open(&gesperrt).is_err());
+        if fs::File::open(&gesperrt).is_ok() {
+            return; // Root liest trotz Modus 000: der Fall lässt sich hier nicht herstellen.
+        }
         fs::write(repo.0.join("text"), "eins\n").unwrap();
         assert_eq!(geaenderte_dateien(&repo.0).unwrap(), vec![e("gesperrt", 0, 0), e("text", 1, 0)]);
     }
