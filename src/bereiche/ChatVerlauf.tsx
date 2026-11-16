@@ -117,7 +117,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
                 <div className="r-antworten">{frage.antwortknoepfe.map(a => <Knopf key={a.id} text={a.text} variante="antwort" aria-pressed={antworten[frage.id] === a.id}
                   onClick={() => { setAntworten(v => ({ ...v, [frage.id]: a.id })); onAntwort?.(frage.id, a.id); }} />)}</div>
               </section>}
-              {n.aktionen.length > 0 && <div className="r-aktionen">{n.aktionen.map(a => <Knopf key={a.id} text={a.text} disabled={!onAktion} onClick={() => onAktion?.(n.id, a.id)} />)}</div>}
+              {n.aktionen.length > 0 && <div className="r-aktionen">{n.aktionen.map(a => <Knopf key={a.id} text={a.text} disabled={!onAktion || !!chat.gestartetUm} onClick={() => onAktion?.(n.id, a.id)} />)}</div>}
             </article>
           </li>;
         })}
