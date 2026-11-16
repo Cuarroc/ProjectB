@@ -52,6 +52,14 @@ it.each(["  ", "\t"])("behält Aufgaben vor einer eingerückten Folgezeile (%j)"
   await antwort(`- [ ] Export bauen\n${einzug}Fertig, wenn die CSV-Datei korrekt ist.\n- [ ] Export testen`);
   expect(chat().todos.map(todo => todo.text)).toEqual(["Export bauen", "Export testen"]);
 });
+it("behält Elias' Haken bei gleichem Text und übernimmt neue Orchestrator-Haken", async () => {
+  await antwort("- [ ] Export bauen\n- [ ] Export testen\n- [ ] Entfernen");
+  const d = quelle.lesen(); d.chats[0].todos[0].fertig = true; quelle.aktualisieren(d);
+  await antwort("- [ ]   EXPORT BAUEN  \n- [x] Export testen\n- [ ] Neu");
+  expect(chat().todos.map(t => [t.text, t.fertig])).toEqual([
+    ["EXPORT BAUEN", true], ["Export testen", true], ["Neu", false],
+  ]);
+});
 it.each(["```", "~~~"])("ignoriert Codeblöcke (%s), ohne die Liste zu beenden", async zaun => {
   await antwort(`- [ ] Export bauen\n${zaun}text\nKeine Aufgabe\n- [ ] Beispielaufgabe\n${zaun}\n- [ ] Export testen\n${zaun}\n- [ ] Weiteres Beispiel\n${zaun}`);
   expect(chat().todos.map(todo => todo.text)).toEqual(["Export bauen", "Export testen"]);
