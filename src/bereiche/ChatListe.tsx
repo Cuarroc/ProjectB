@@ -50,7 +50,7 @@ export default function ChatListe({ quelle, offen, umschalten }: Props) {
             <Knopf text="Aufgabe hinzufügen" nurSymbol symbol={Plus} type="submit" disabled={!chat || todos.length >= 20} />
           </form>
         </section>
-        <div className="rand-karte"><PostfachKnopf zahl={daten.kopf.postfach} /></div>
+        <div className="rand-karte"><PostfachKnopf daten={daten} quelle={quelle} /></div>
       </div>
     </div>
   </section>;

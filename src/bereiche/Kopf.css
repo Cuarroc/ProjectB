@@ -26,7 +26,7 @@
 .kopf-stufen i { width: calc(var(--abstand-1) / 2); background: var(--neutral-4); }
 .kopf-stufen i[data-an=true] { background: var(--akzent); }
 .kopf .rand-postfach { background: var(--flaeche-2); }
-.kopf-menue, .kopf .postfach-anker > p { position: absolute; z-index: var(--ebene-menue); top: calc(100% + var(--abstand-2)); left: 0; width: max-content; max-width: calc(100vw - 2 * var(--abstand-4)); box-sizing: border-box; margin: 0; padding: var(--abstand-5); border-radius: var(--rund-karte); background: var(--glas-grund); backdrop-filter: blur(var(--abstand-8)) saturate(1.5); box-shadow: var(--schatten-schwebend), inset 0 0 0 1px var(--neutral-4); color: var(--text-1); }
+.kopf-menue, .kopf .postfach-inhalt { position: absolute; z-index: var(--ebene-menue); top: calc(100% + var(--abstand-2)); left: 0; width: max-content; max-width: calc(100vw - 2 * var(--abstand-4)); box-sizing: border-box; margin: 0; padding: var(--abstand-5); border-radius: var(--rund-karte); background: var(--glas-grund); backdrop-filter: blur(var(--abstand-8)) saturate(1.5); box-shadow: var(--schatten-schwebend), inset 0 0 0 1px var(--neutral-4); color: var(--text-1); }
 .kopf-menue { display: flex; flex-direction: column; gap: var(--abstand-4); animation: kopf-auf var(--b-dauer-menue) var(--b-feder); transform-origin: top left; }
 .kopf h2 { margin: 0; font: var(--schrift-ueberschrift); }
 .kopf-logo .kopf-menue { width: calc(6 * var(--leiste-breite) + var(--abstand-2)); }
@@ -46,7 +46,7 @@
 .kopf-voll .kopf-probe > span { position: relative; background-size: 200% 100%; animation: kopf-verlauf var(--b-schleife-verlauf) ease-in-out infinite alternate; }
 .kopf-voll .kopf-probe > span::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(105deg, transparent 34%, color-mix(in srgb, var(--marke-soll) 50%, transparent) 50%, transparent 66%) no-repeat; background-size: 300% 100%; background-position: 100% 0; mix-blend-mode: overlay; animation: kopf-glanz var(--b-schleife-glanz) linear infinite; }
 .kopf-menue [aria-disabled=true] { cursor: default; }
-.kopf-rollen .kopf-menue, .kopf .postfach-anker > p { left: auto; right: 0; }
+.kopf-rollen .kopf-menue, .kopf .postfach-inhalt { left: auto; right: 0; }
 @keyframes kopf-auf { from { opacity: 0; transform: scale(var(--b-skala-menue)); } to { opacity: 1; transform: none; } }
 @keyframes kopf-blende { from { opacity: 0; } to { opacity: 1; } }
 @keyframes kopf-verlauf { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
@@ -68,3 +68,5 @@
 .kopf-pfad input::placeholder { color: var(--text-3); }
 .kopf-pfad .ein-meldung { overflow-wrap: anywhere; }
 .kopf-projekt > button > span, .kopf-zweig { max-width: calc(3 * var(--leiste-breite)); overflow: hidden; text-overflow: ellipsis; }
+
+.kopf .postfach-inhalt { max-height: calc(100dvh - 2 * var(--kopf-hoehe)); overflow-y: auto; }

@@ -138,7 +138,7 @@ export default function Kopf() {
       })}
     </div>
     <Berechtigungen daten={daten.berechtigungen} quelle={chatEingabeQuelle} />
-    <PostfachKnopf zahl={daten.kopf.postfach} />
+    <PostfachKnopf daten={daten} quelle={chatEingabeQuelle} />
     <span className="anhalte-kopf">{pause && <AnhalteMarke />}<AnhalteKnopf pause={pause} /></span>
     <KopfMenue name="Rollen" klasse="kopf-rollen" inhalt={<><IdCard {...symbol} /><span>Rollen</span></>}>
       <h2 role="presentation">Rollen</h2>{["Orchestrator", "Arbeiter Codex", "Prüfer Claude"].map(r => <button type="button" role="menuitem" aria-disabled="true" tabIndex={-1} key={r}>{r}</button>)}

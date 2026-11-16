@@ -13,6 +13,7 @@
 .chat-nachrichten > li { min-width: 0; }
 .r-karte { display: flex; flex-direction: column; background: var(--flaeche-2); border-radius: var(--rund-karte); box-shadow: var(--schatten-kante); }
 .r-msg { gap: var(--abstand-3); padding: var(--abstand-4) var(--abstand-6) var(--abstand-6); }
+.r-msg:focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: calc(var(--abstand-1) / 2); }
 .r-msg-kopf { display: flex; align-items: center; gap: var(--abstand-2); min-height: var(--abstand-8); }
 .r-msg-kopf > .knopf { margin-left: auto; }
 .r-avatar { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--abstand-8); height: var(--abstand-8); border-radius: var(--rund-voll); background: var(--reihe-orchestrator); color: var(--akzent-tinte); box-shadow: var(--schatten-kante); }

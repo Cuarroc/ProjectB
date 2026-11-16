@@ -47,8 +47,8 @@ test("Kopf: Soll-Bilder, Menüs, Bewegung und axe", async ({ page }, info) => {
   for (const knopf of await kopf.getByRole("button").all()) await grenzen(knopf);
   const rechte = kopf.getByRole("button", { name: /^Berechtigungen:/ }); await rechte.click();
   await expect(page.getByRole("dialog", { name: "Berechtigungen" })).toBeVisible(); await page.keyboard.press("Escape"); await expect(rechte).toBeFocused();
-  const post = kopf.getByRole("button", { name: "Postfach 3 warten auf dich" }); await post.click();
-  await expect(kopf.getByRole("status")).toHaveText("3 warten auf dich."); await grenzen(kopf.getByRole("status"));
+  const post = kopf.getByRole("button", { name: "Postfach", exact: true }); await post.click();
+  await expect(kopf.getByRole("status")).toHaveText("Nichts wartet auf dich."); await grenzen(kopf.getByRole("status"));
   await page.keyboard.press("Escape"); await expect(kopf.getByRole("status")).toHaveCount(0); await expect(post).toBeFocused();
 });
 
