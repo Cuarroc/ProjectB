@@ -28,3 +28,17 @@ it("zeigt bei fehlendem aktiven Chat keinen fremden Verlauf", () => {
   daten.aktiverChatId = null; quelle.aktualisieren(daten);
   expect(renderToStaticMarkup(<ChatVerlauf quelle={quelle} />)).not.toContain("Exportiere die Paketliste");
 });
+
+it("hebt die Planfreigabe hervor und erhält Kommentar- und Antwortvarianten", () => {
+  const quelle = new BeispielQuelle(), daten = quelle.lesen();
+  const chat = daten.chats.find(c => c.id === daten.aktiverChatId);
+  chat.verlauf = [{ id: "plan", von: "Orchestrator", zeit: "12:00", text: "Plan", aktionen: [
+    { id: "plan-freigeben", text: "Freigeben und bauen" },
+    { id: "plan-kommentieren", text: "Mit Kommentaren zurückgeben" },
+    { id: "antwort-0", text: "Ja", antwort: "Ja" },
+  ] }];
+  quelle.aktualisieren(daten);
+  const html = renderToStaticMarkup(<ChatVerlauf quelle={quelle} onAktion={() => {}} />);
+  for (const [text, variante] of [["Freigeben und bauen", "haupt"], ["Mit Kommentaren zurückgeben", "zweit"], ["Ja", "antwort"]])
+    expect(html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g).find(b => b.includes(`>${text}<`))).toContain(`data-variante="${variante}"`);
+});

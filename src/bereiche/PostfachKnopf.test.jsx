@@ -42,6 +42,14 @@ it("zählt eine wartende Interview-Frage mit Aktionen nur einmal", () => {
   expect(postfach(d).eintraege.map(e => e.nachrichtId)).toEqual(["p", "f"]);
 });
 it.each([
+  ["  Ist das richtig?  \n", true], ["Zusammenfassung: Ein CSV-Export.", false], ["Limit erreicht", false],
+])("zählt freie Interview-Texte nur mit abschließendem Fragezeichen: %s", (text, wartet) => {
+  const d = quelle.lesen(); Object.assign(d.chats[1], {
+    modus: "Interview", gestartetUm: null, verlauf: [{ ...nachricht("frei", []), text }],
+  });
+  expect(postfach(d).eintraege.map(e => e.nachrichtId)).toEqual(wartet ? ["p", "frei"] : ["p"]);
+});
+it.each([
   ["Interview", "12:00", [nachricht("läuft", [])]],
   ["Planen", null, [nachricht("plan", [])]],
   ["Ausführen", null, [nachricht("ausführen", [])]],
