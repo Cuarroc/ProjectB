@@ -46,6 +46,8 @@ test("Echten Plan öffnen, kommentieren und freigeben", async ({ page }, testInf
   for (const kriterium of ["Umlaute stimmen.", "Tests grün sind.", "Review fertig ist."]) await expect(dialog.getByText(kriterium, { exact: true })).toBeVisible();
   await expect(schritt.getByText("CSV ergänzen.", { exact: true })).toBeVisible();
   await expect(dialog.locator(".pl-chip")).toHaveCount(0);
+  await expect(dialog.locator('.pl-stilknopf[aria-pressed="true"]')).toHaveCount(0);
+  await expect(dialog.getByText(/^Nächste Fassung wird/)).toHaveCount(0);
   await schritt.getByRole("button", { name: "Ausarbeiten, Violett", exact: true }).click();
   await expect(dialog.getByText("Ausgearbeitet · Beispiel")).toHaveCount(0);
   await schritt.getByRole("button", { name: "Kommentar, Silbergrau", exact: true }).click();
@@ -69,13 +71,19 @@ test("Echten Plan öffnen, kommentieren und freigeben", async ({ page }, testInf
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(2);
   expect(await page.evaluate(() => window.auftraege[1])).toMatchObject({ modus: "Ausführen", text: `Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${plantext}` });
   await expect(page.locator(".r-aktionen").getByRole("button", { name: /^(Freigeben und bauen|Mit Kommentaren zurückgeben)$/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Plan öffnen", exact: true }).last().click();
+  await expect(dialog.locator(".pl-kopf .statusmarke")).toHaveAttribute("data-zustand", "arbeitet");
+  await dialog.getByRole("button", { name: "Plan schließen", exact: true }).click();
   await page.evaluate(() => window.beenden());
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.planChats).chats[0].verlauf.filter(n => n.plan).at(-1).plan.freigabe)).toBe("Freigegeben");
   for (const neuladen of [false, true]) {
     if (neuladen) await page.reload();
     await page.getByRole("button", { name: "Plan öffnen", exact: true }).last().click();
     await expect(dialog.locator(".pl-kopf .statusmarke")).toHaveAttribute("data-zustand", "fertig");
+    await expect(dialog.getByText("Freigegeben", { exact: true })).toBeVisible();
+    await expect(dialog.locator(".pl-aktionen button:enabled,.pl-stilknopf:enabled,textarea:enabled")).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Freigeben und bauen", exact: true })).toBeDisabled();
+    if (neuladen && testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p52u_feinschliff_1440x900.png`, animations: "disabled" });
     if (neuladen && testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p52t_freigegeben_1440x900.png`, animations: "disabled" });
     await dialog.getByRole("button", { name: "Plan schließen", exact: true }).click();
   }

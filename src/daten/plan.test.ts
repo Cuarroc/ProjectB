@@ -12,8 +12,8 @@ it("erkennt drei Schritte mit Beschreibung, Kriterien und leeren Arbeitsfeldern"
 it.each(["Kein Plan.", "```md\n- [ ] Beispiel\n```", "~~~md\n- [x] Beispiel\n~~~"])("erzeugt ohne echte Liste keinen Plan: %s", text => {
   expect(antwortPlan(text, "n")).toBeUndefined();
 });
-it("ignoriert Code und behält alle Aufgabenpunkte der Antwort", () => {
-  expect(antwortPlan("- [ ] Alt\nNeuer Plan:\n" + text + "\n```\n- [ ] Beispiel\n```", "n")?.schritte.map(s => s.titel)).toEqual(["Alt", "Export bauen", "Testen", "Prüfen"]);
+it("ignoriert Code und behält nur die letzte Aufgabenliste", () => {
+  expect(antwortPlan("- [ ] Alt\nNeuer Plan:\n" + text + "\n```\n- [ ] Beispiel\n```", "n")?.schritte.map(s => s.titel)).toEqual(["Export bauen", "Testen", "Prüfen"]);
 });
 it("ordnet Text zwischen Punkten zu und lässt die Schlussfrage weg", () => {
   const plan = antwortPlan("- [ ] A\nA erklärt.\nFertig, wenn A läuft.\n- [ ] B\nB erklärt.\n- [ ] C\nGibst du frei?\n```\n- [ ] Beispiel\n```\n  C erklärt.\nFertig, wenn C läuft.", "n")!;
@@ -32,4 +32,22 @@ it("baut Kommentare mit Markierungen, Ausarbeiten-Bitte und gewünschter Fassung
   plan.schritte[0].markierungen = ["Ausarbeiten", "Kommentar"]; plan.schritte[0].kommentar = "Auch Umlaute.";
   plan.schritte[1].kommentar = "Bitte genauer.";
   expect(planKommentare(plan, "Simpler")).toBe("Kommentare zum Plan:\n- Export bauen: [Ausarbeiten, Kommentar] Auch Umlaute. Bitte zerlege diesen Schritt in Teilschritte.\n- Testen: [] Bitte genauer.\nGewünschte Fassung: Simpler");
+});
+
+it.each(["Neuer Plan:", "# Neuer Plan"])("liest nur die letzte Liste nach %s, auch mit Fließtext", trenner => {
+  const plan = antwortPlan(`Stand:\n- [x] Alt\n${trenner}\n- [ ] A\nA erklärt.\n- [ ] B`, "n");
+  expect(plan?.schritte.map(s => s.titel)).toEqual(["A", "B"]);
+  expect(plan?.schritte[0].beschreibung).toBe("A erklärt.");
+});
+it("ignoriert Blockzitate samt Überschriften und Codezäunen", () => {
+  const plan = antwortPlan("- [ ] A\n> Neuer Plan:\n> - [x] Zitat\n> ```\n- [ ] B", "n");
+  expect(plan?.schritte.map(s => s.titel)).toEqual(["A", "B"]);
+  expect(plan?.schritte[0].beschreibung).toBe("");
+});
+it("lässt Rechenzeichen stehen und entfernt nur enges Markdown", () => {
+  const plan = antwortPlan("- [ ] 2 * 3 * 4 und **fett**", "n");
+  expect(plan?.schritte[0].titel).toBe("2 * 3 * 4 und fett");
+});
+it("sendet ohne Stilwunsch keine gewünschte Fassung", () => {
+  expect(planKommentare(antwortPlan("- [ ] A", "n")!, "")).toBe("Kommentare zum Plan:");
 });
