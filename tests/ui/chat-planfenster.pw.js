@@ -70,4 +70,13 @@ test("Echten Plan öffnen, kommentieren und freigeben", async ({ page }, testInf
   expect(await page.evaluate(() => window.auftraege[1])).toMatchObject({ modus: "Ausführen", text: `Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${plantext}` });
   await expect(page.locator(".r-aktionen").getByRole("button", { name: /^(Freigeben und bauen|Mit Kommentaren zurückgeben)$/ })).toHaveCount(0);
   await page.evaluate(() => window.beenden());
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.planChats).chats[0].verlauf.filter(n => n.plan).at(-1).plan.freigabe)).toBe("Freigegeben");
+  for (const neuladen of [false, true]) {
+    if (neuladen) await page.reload();
+    await page.getByRole("button", { name: "Plan öffnen", exact: true }).last().click();
+    await expect(dialog.locator(".pl-kopf .statusmarke")).toHaveAttribute("data-zustand", "fertig");
+    await expect(dialog.getByRole("button", { name: "Freigeben und bauen", exact: true })).toBeDisabled();
+    if (neuladen && testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p52t_freigegeben_1440x900.png`, animations: "disabled" });
+    await dialog.getByRole("button", { name: "Plan schließen", exact: true }).click();
+  }
 });

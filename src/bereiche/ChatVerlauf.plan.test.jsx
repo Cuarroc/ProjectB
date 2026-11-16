@@ -30,3 +30,11 @@ it("schickt auch einen reinen Stilwunsch aus dem echten Fenster zurück", () => 
   baum.find(n => n.props.text === "Neu schreiben lassen").props.onClick();
   expect(onEntscheiden).toHaveBeenCalledWith(plan, {}, "Ausführlicher");
 });
+it("reicht die Textmarken des echten Fensters an die Kommentar-Nachricht weiter", () => {
+  h.werte = []; const quelle = new BeispielQuelle(), daten = quelle.lesen(), onAktion = vi.fn(), plan = antwortPlan("- [ ] Export", "echt");
+  daten.chats[0].verlauf = [{ id: plan.id, von: "Orchestrator", text: "- [ ] Export", zeit: "12:00", plan, aktionen: [{ id: "plan-kommentieren", text: "Mit Kommentaren zurückgeben" }] }]; quelle.aktualisieren(daten);
+  const ansicht = () => { h.i = 0; return knoten(ChatVerlauf({ quelle, onAktion })); };
+  ansicht().find(n => n.props.text === "Plan öffnen").props.onClick();
+  ansicht().find(n => n.type === Planfenster).props.onEntscheiden(plan, { [`${plan.schritte[0].id}:titel`]: { name: "Simpler", start: 0, ende: 3 } }, "Simpler");
+  expect(onAktion).toHaveBeenCalledWith(plan.id, "plan-kommentieren", expect.stringContaining("  - „Exp“ (Titel): Simpler"));
+});

@@ -165,7 +165,10 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       ziel.modus = "Interview"; quelle.aktualisieren(neu);
       return senden(aktion.antwort);
     }
-    if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId, "Plan freigegeben.");
+    if (aktionId === "plan-freigeben") {
+      if (nachricht.plan) { nachricht.plan.freigabe = "Freigegeben"; quelle.aktualisieren(neu); }
+      return senden(`Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId, "Plan freigegeben.");
+    }
     if (aktionId !== "plan-kommentieren") return;
     nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);
     if (kommentar !== undefined) return senden(kommentar);

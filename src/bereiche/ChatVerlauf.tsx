@@ -128,7 +128,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
     </div>
     <div className="chat-meldung" role="status">{meldung}</div>
     {planOffen && <Planfenster daten={daten} plan={planOffen.echt ? planOffen.plan : undefined} entscheidbar={!planOffen.echt || (!!onAktion && !chat?.gestartetUm && !!chat?.verlauf.find(n => n.id === planOffen.plan.id)?.aktionen.length)} gespeicherteMarken={planMarken[planOffen.plan.id] ?? {}} onSchliessen={() => setPlanOffen(null)} onEntscheiden={(plan, marken, stil) => {
-      if (planOffen.echt) { onAktion?.(plan.id, plan.freigabe === "Freigegeben" ? "plan-freigeben" : "plan-kommentieren", planKommentare(plan, stil)); return; }
+      if (planOffen.echt) { onAktion?.(plan.id, plan.freigabe === "Freigegeben" ? "plan-freigeben" : "plan-kommentieren", planKommentare(plan, stil, marken)); return; }
       if (quelle instanceof BeispielQuelle) quelle.aktualisieren({ ...quelle.lesen(), plan });
       else setDaten(d => ({ ...d, plan }));
       setPlanMarken(m => ({ ...m, [plan.id]: marken })); setPlanFreigabe(plan.freigabe === "Freigegeben" ? "Freigegeben" : "Zurückgegeben");
