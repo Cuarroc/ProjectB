@@ -60,7 +60,7 @@ export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarke
     <section className="pl-links">
       <header className="pl-kopf"><span className="pl-kopf-symbol"><ListChecks size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /></span>
         <div className="pl-kopftext"><h2 id="plan-titel">Plan: {plan.titel}</h2><div className="pl-meta">Orchestrator{!echterPlan && " · 14:31"} <span>{plan.schritte.length} Schritte</span></div></div>
-        <Statusmarke zustand={plan.freigabe === "Freigegeben" ? (laeuft ? "arbeitet" : "fertig") : "wartet"} />{plan.freigabe === "Freigegeben" && !laeuft && <span className="pl-meta">Freigegeben</span>}<Knopf text="Plan schließen" symbol={X} nurSymbol variante="leise" onClick={onSchliessen} />
+        <Statusmarke zustand={plan.freigabe === "Freigegeben" ? (laeuft ? "arbeitet" : "fertig") : "wartet"} wort={plan.freigabe === "Freigegeben" && !laeuft ? "Freigegeben" : undefined} /><Knopf text="Plan schließen" symbol={X} nurSymbol variante="leise" onClick={onSchliessen} />
       </header>
       <ol className="pl-liste" tabIndex={0} aria-label="Planschritte">{plan.schritte.map((s, i) => {
         const agent = daten.agenten.find(a => a.id === s.agentId);

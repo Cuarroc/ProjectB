@@ -17,7 +17,7 @@ export function aufgabenListe(text: string) {
     if (zaun) { codeZaun = zaun[1]; continue; }
     const punkt = zeile.match(/^[ \t]*[-*][ \t]+\[([ xX])\][ \t]+(\S.*)$/);
     if (punkt && neueListe) { zeilen.length = 0; neueListe = false; }
-    if (!punkt && (/^[ \t]*#{1,6}(?:[ \t]|$)/.test(zeile) || zeile.trimEnd().endsWith(":"))) neueListe = true;
+    if (!punkt && /^\S/.test(zeile) && (/^#{1,6}(?:[ \t]|$)/.test(zeile) || zeile.trimEnd().endsWith(":"))) neueListe = true;
     zeilen.push({ zeile, punkt });
   }
   return zeilen;

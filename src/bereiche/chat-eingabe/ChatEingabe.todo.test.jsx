@@ -77,3 +77,7 @@ it("erhält Rechenzeichen in Aufgaben", async () => {
   await antwort("- [ ] 2 * 3 * 4 und **fett**");
   expect(chat().todos[0].text).toBe("2 * 3 * 4 und fett");
 });
+it.each(["  Betroffene Dateien:", "\tBetroffene Dateien:", "  ## Betroffene Dateien", "\t## Betroffene Dateien"])("behält beide Todos bei eingerücktem Text %j", async zeile => {
+  await antwort(`- [ ] Export bauen\n${zeile}\n  - src/export.ts\n- [ ] Export testen`);
+  expect(chat().todos.map(t => t.text)).toEqual(["Export bauen", "Export testen"]);
+});

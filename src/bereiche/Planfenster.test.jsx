@@ -38,3 +38,12 @@ it.each([false, true])("zeigt Freigabe mit laufendem Chat=%s passend an", laeuft
   expect(html).toContain(`data-zustand="${laeuft ? "arbeitet" : "fertig"}"`);
   expect(html).toContain(laeuft ? "Arbeitet</span>" : "Freigegeben</span>");
 });
+it.each([false, true])("zeigt genau eine Statusmarke im freigegebenen Plan, laufender Chat=%s", laeuft => {
+  const plan = { titel: "Export", freigabe: "Freigegeben", schritte: [] };
+  const html = renderToStaticMarkup(<Planfenster daten={{ agenten: [] }} plan={plan} laeuft={laeuft} gespeicherteMarken={{}} />);
+  const marken = html.match(/<span class="statusmarke\b.*?<\/span>([^<]+)<\/span>/g);
+  expect(marken).toHaveLength(1);
+  expect(marken[0]).toContain(laeuft ? "Arbeitet</span>" : "Freigegeben</span>");
+  expect(html.match(/Freigegeben/g) ?? []).toHaveLength(laeuft ? 0 : 1);
+  expect(html).not.toContain("Fertig</span>");
+});

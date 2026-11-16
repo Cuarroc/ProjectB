@@ -73,6 +73,7 @@ test("Echten Plan öffnen, kommentieren und freigeben", async ({ page }, testInf
   await expect(page.locator(".r-aktionen").getByRole("button", { name: /^(Freigeben und bauen|Mit Kommentaren zurückgeben)$/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Plan öffnen", exact: true }).last().click();
   await expect(dialog.locator(".pl-kopf .statusmarke")).toHaveAttribute("data-zustand", "arbeitet");
+  await expect(dialog.locator(".pl-kopf .statusmarke")).toHaveText("Arbeitet");
   await dialog.getByRole("button", { name: "Plan schließen", exact: true }).click();
   await page.evaluate(() => window.beenden());
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.planChats).chats[0].verlauf.filter(n => n.plan).at(-1).plan.freigabe)).toBe("Freigegeben");
@@ -83,6 +84,20 @@ test("Echten Plan öffnen, kommentieren und freigeben", async ({ page }, testInf
     await expect(dialog.getByText("Freigegeben", { exact: true })).toBeVisible();
     await expect(dialog.locator(".pl-aktionen button:enabled,.pl-stilknopf:enabled,textarea:enabled")).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Freigeben und bauen", exact: true })).toBeDisabled();
+    const gesperrt = await dialog.getByRole("button", { name: "Freigeben und bauen", exact: true }).evaluate(e => {
+      const s = getComputedStyle(e); return { color: s.color, cursor: s.cursor, backgroundColor: s.backgroundColor, boxShadow: s.boxShadow, transitionDuration: s.transitionDuration };
+    });
+    for (const knopf of await dialog.locator(".pl-aktionen button,.pl-stilknopf").all()) {
+      for (const hover of [false, true]) {
+        if (hover) await knopf.hover({ force: true });
+        const stil = await knopf.evaluate(e => {
+          const s = getComputedStyle(e); return { color: s.color, cursor: s.cursor, backgroundColor: s.backgroundColor, boxShadow: s.boxShadow, transitionDuration: s.transitionDuration };
+        });
+        expect(stil).toEqual(gesperrt);
+        if (await knopf.locator("svg").count()) expect(await knopf.locator("svg").evaluate(e => getComputedStyle(e).color)).toBe(gesperrt.color);
+      }
+    }
+    await page.mouse.move(0, 0);
     if (neuladen && testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p52u_feinschliff_1440x900.png`, animations: "disabled" });
     if (neuladen && testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p52t_freigegeben_1440x900.png`, animations: "disabled" });
     await dialog.getByRole("button", { name: "Plan schließen", exact: true }).click();

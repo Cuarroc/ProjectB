@@ -51,3 +51,8 @@ it("lässt Rechenzeichen stehen und entfernt nur enges Markdown", () => {
 it("sendet ohne Stilwunsch keine gewünschte Fassung", () => {
   expect(planKommentare(antwortPlan("- [ ] A", "n")!, "")).toBe("Kommentare zum Plan:");
 });
+it.each(["  Betroffene Dateien:", "\tBetroffene Dateien:", "  ## Betroffene Dateien", "\t## Betroffene Dateien"])("behält beide Planschritte bei eingerücktem Text %j", zeile => {
+  const plan = antwortPlan(`- [ ] Export bauen\n${zeile}\n  - src/export.ts\n- [ ] Export testen`, "n");
+  expect(plan?.schritte.map(s => s.titel)).toEqual(["Export bauen", "Export testen"]);
+  expect(plan?.schritte[0].beschreibung).toBe(`${zeile.trim()}\n- src/export.ts`);
+});

@@ -11,14 +11,14 @@ export const zustaende = {
 } as const;
 export type Zustand = keyof typeof zustaende;
 
-export function Statusmarke({ zustand, toastMeldet = false }: { zustand: Zustand; toastMeldet?: boolean }) {
+export function Statusmarke({ zustand, wort = zustaende[zustand].wort, toastMeldet = false }: { zustand: Zustand; wort?: string; toastMeldet?: boolean }) {
   const vorher = useRef(zustand);
   const [hinweis, setHinweis] = useState(false);
   useLayoutEffect(() => {
     setHinweis(vorher.current !== zustand && zustand === "wartet" && !toastMeldet);
     vorher.current = zustand;
   }, [zustand, toastMeldet]);
-  const { wort, Symbol } = zustaende[zustand];
+  const { Symbol } = zustaende[zustand];
   return <span className={`statusmarke mk mk-${zustand}${hinweis ? " hinweis" : ""}`} data-zustand={zustand} aria-live="polite" aria-atomic="true">
     <span key={zustand} className="mk-sym"><Symbol size={zustand === "wartet" ? 10 : 12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" fill={zustand === "wartet" ? "currentColor" : "none"} /></span>{wort}
   </span>;
