@@ -87,6 +87,61 @@ fn bis_fertig(rx: &mpsc::Receiver<String>, ordner: &[PathBuf], anzahl: usize) ->
 }
 
 #[test]
+fn dateien_werden_live_gemeldet_und_laufzeit_tickert() {
+    let repo = Repo::neu();
+    let (mut team, rx) = starten(&repo, &["eins"]);
+    let mut tick = false;
+    loop {
+        let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        if !tick && v["laufzeitSekunden"].as_u64().unwrap() >= 2 {
+            assert_eq!(v["zustand"], "Arbeitet");
+            fs::write(team.ordner()[0].join("weiter"), "live bestätigt").unwrap();
+            tick = true;
+        }
+        if v["zustand"] == "Fertig" {
+            assert!(tick);
+            assert_eq!(v["dateien"], serde_json::json!([{"pfad":"weiter", "hinzugefuegt":1, "entfernt":0}]));
+            break;
+        }
+    }
+    assert!(team.laeufe_mut()[0].warten().unwrap().success());
+    assert!(matches!(rx.recv_timeout(Duration::from_secs(3)), Err(mpsc::RecvTimeoutError::Disconnected)));
+}
+
+#[test]
+fn werkzeug_meldet_dateien_und_gitfehler_erhalten_den_letzten_stand() {
+    let repo = Repo::neu();
+    let (tx, rx) = mpsc::channel();
+    let mut team = Team::starten_mit(
+        &repo.0,
+        vec![auftrag("eins")],
+        move |json| tx.send(json).unwrap(),
+        |a, w, pfad| {
+            fs::write(pfad.join("vorher"), "eins\n").unwrap();
+            start::starten(
+                &Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &["--chat-live"], ..*a },
+                w,
+                pfad,
+            )
+        },
+    )
+    .unwrap();
+    let erwartet = serde_json::json!([{"pfad":"vorher", "hinzugefuegt":1, "entfernt":0}]);
+    loop {
+        let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        if v["dateien"] == erwartet {
+            assert_eq!(v["zustand"], "Arbeitet");
+            fs::write(team.ordner()[0].join(".git"), "ungültig").unwrap();
+            fs::write(team.ordner()[0].join("weiter"), "weiter").unwrap();
+            break;
+        }
+    }
+    let meldungen = bis_fertig(&rx, team.ordner(), 1);
+    assert_eq!(meldungen.last().unwrap()["dateien"], erwartet);
+    assert!(team.laeufe_mut()[0].warten().unwrap().success());
+}
+
+#[test]
 fn zwei_agenten_arbeiten_live_in_eigenen_worktrees() {
     let repo = Repo::neu();
     let (mut team, rx) = starten(&repo, &["eins", "zwei"]);
