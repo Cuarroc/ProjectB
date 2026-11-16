@@ -48,3 +48,11 @@ it("begrenzt auf 20 Einträge und behält eigene Aufgaben", async () => {
   await antwort(Array.from({ length: 25 }, (_, i) => `- [ ] Aufgabe ${i}`).join("\n"));
   expect(chat().todos).toHaveLength(20); expect(chat().todos.at(-1)).toEqual(d.chats[0].todos[0]);
 });
+it.each(["  ", "\t"])("behält Aufgaben vor einer eingerückten Folgezeile (%j)", async einzug => {
+  await antwort(`- [ ] Export bauen\n${einzug}Fertig, wenn die CSV-Datei korrekt ist.\n- [ ] Export testen`);
+  expect(chat().todos.map(todo => todo.text)).toEqual(["Export bauen", "Export testen"]);
+});
+it.each(["```", "~~~"])("ignoriert Codeblöcke (%s), ohne die Liste zu beenden", async zaun => {
+  await antwort(`- [ ] Export bauen\n${zaun}text\nKeine Aufgabe\n- [ ] Beispielaufgabe\n${zaun}\n- [ ] Export testen\n${zaun}\n- [ ] Weiteres Beispiel\n${zaun}`);
+  expect(chat().todos.map(todo => todo.text)).toEqual(["Export bauen", "Export testen"]);
+});

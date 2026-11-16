@@ -15,9 +15,16 @@ const planAktionen = [
 ];
 function antwortTodos(text: string) {
   let liste: Todo[] | undefined, inListe = false;
+  let codeZaun = "";
   for (const zeile of text.split(/\r?\n/)) {
+    const zaun = zeile.match(/^[ \t]*(`{3,}|~{3,})(.*)$/);
+    if (codeZaun) {
+      if (zaun && zaun[1][0] === codeZaun[0] && zaun[1].length >= codeZaun.length && !zaun[2].trim()) codeZaun = "";
+      continue;
+    }
+    if (zaun) { codeZaun = zaun[1]; continue; }
     const punkt = zeile.match(/^[ \t]*[-*][ \t]+\[([ xX])\][ \t]+(\S.*)$/);
-    if (!punkt) { if (zeile.trim()) inListe = false; continue; }
+    if (!punkt) { if (zeile.trim() && !/^[ \t]/.test(zeile)) inListe = false; continue; }
     if (!inListe || !liste) liste = [];
     inListe = true;
     if (liste.length < 20) liste.push({ id: crypto.randomUUID(),
