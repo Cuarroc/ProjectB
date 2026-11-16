@@ -30,12 +30,13 @@ export type Plan = {
 export type Frage = {
   id: string; agentId: string | null; text: string; antwortknoepfe: Aktion[];
 };
-export type Todo = { id: string; text: string; fertig: boolean };
+export type Todo = { id: string; text: string; fertig: boolean; von?: "Du" | "Orchestrator" };
 export type Ausgabe = { id: string; sitzungId: string; name: string; pfad: string };
 export type Beleg = { id: string; agentId: string; titel: string; prLink: string };
 export type Wert = { genutzt: number; soll: number };
 export type Kontingent = { claude: Wert | null; codex: Wert | null };
 export type Chat = {
+  todos?: Todo[];
   sitzung?: { id: string; anbieter: Anbieter; pfad: string } | null;
   id: string; titel: string; verlauf: Nachricht[]; gestartetUm: string | null;
   modus: "Ausführen" | "Planen" | "Interview";

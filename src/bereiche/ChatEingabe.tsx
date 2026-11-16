@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { auftragSenden, chatNachrichtenHoeren } from "../daten/tauri";
 import { BeispielQuelle } from "../daten/quelle";
-import type { Chat } from "../daten/typen";
+import type { Chat, Todo } from "../daten/typen";
 import { Eingabefeld } from "../bausteine/Eingabefeld";
 import { Modi, Auswahl, Kontext, EffortSymbol, efforts, erklaerungen, modi } from "./chat-eingabe/Auswahlen";
 import "./chat-eingabe/ChatEingabe.css";
@@ -13,6 +13,25 @@ const planAktionen = [
   { id: "plan-freigeben", text: "Freigeben und bauen" },
   { id: "plan-kommentieren", text: "Mit Kommentaren zurückgeben" },
 ];
+function antwortTodos(text: string) {
+  let liste: Todo[] | undefined, inListe = false;
+  let codeZaun = "";
+  for (const zeile of text.split(/\r?\n/)) {
+    const zaun = zeile.match(/^[ \t]*(`{3,}|~{3,})(.*)$/);
+    if (codeZaun) {
+      if (zaun && zaun[1][0] === codeZaun[0] && zaun[1].length >= codeZaun.length && !zaun[2].trim()) codeZaun = "";
+      continue;
+    }
+    if (zaun) { codeZaun = zaun[1]; continue; }
+    const punkt = zeile.match(/^[ \t]*[-*][ \t]+\[([ xX])\][ \t]+(\S.*)$/);
+    if (!punkt) { if (zeile.trim() && !/^[ \t]/.test(zeile)) inListe = false; continue; }
+    if (!inListe || !liste) liste = [];
+    inListe = true;
+    if (liste.length < 20) liste.push({ id: crypto.randomUUID(),
+      text: punkt[2].trimEnd().replace(/(\*\*|\*|`)(.+?)\1/g, "$2"), fertig: punkt[1] !== " ", von: "Orchestrator" });
+  }
+  return liste;
+}
 function interviewAktionen(text: string) {
   const punkte: string[] = [];
   for (const zeile of text.trimEnd().split(/\r?\n/).reverse()) {
@@ -44,9 +63,13 @@ export function nachrichtAblegen(quelle: BeispielQuelle, text: string) {
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Du", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
   quelle.aktualisieren(daten);
 }
-function orchestratorNachricht(quelle: BeispielQuelle, id: string, text: string) {
+function orchestratorNachricht(quelle: BeispielQuelle, id: string, text: string, todos?: Todo[]) {
   const daten = quelle.lesen(), chat = daten.chats.find(c => c.id === id);
   if (!chat) return;
+  if (todos) {
+    const eigene = (chat.todos ?? []).filter(t => t.von === "Du");
+    chat.todos = [...todos.slice(0, Math.max(0, 20 - eigene.length)), ...eigene];
+  }
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Orchestrator", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
   quelle.aktualisieren(daten);
 }
@@ -82,7 +105,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
   useEffect(() => { const lesen = () => setDaten(quelle.lesen()); const ab = quelle.abonnieren(lesen); lesen(); return ab; }, [quelle]);
   useEffect(() => {
     let beendet = false, abmelden = () => {};
-    empfang.current = chatNachrichtenHoeren((id, text) => { if (!beendet) orchestratorNachricht(quelle, id, text); });
+    empfang.current = chatNachrichtenHoeren((id, text) => { if (!beendet) orchestratorNachricht(quelle, id, text, antwortTodos(text)); });
     empfang.current.then(ab => { if (beendet) ab(); else abmelden = ab; }, e => {
       if (!beendet) setFehler(`Antworten nicht empfangbar: ${e instanceof Error ? e.message : String(e)}`);
     });
@@ -139,7 +162,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       ziel.modus = "Interview"; quelle.aktualisieren(neu);
       return senden(aktion.antwort);
     }
-    if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId, "Plan freigegeben.");
+    if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId, "Plan freigegeben.");
     if (aktionId !== "plan-kommentieren") return;
     nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);
     schreiben(text.startsWith("Kommentare zum Plan: ") ? text : `Kommentare zum Plan: ${text}`); document.getElementById("chat-nachricht")?.focus();

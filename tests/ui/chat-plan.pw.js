@@ -60,7 +60,7 @@ test("Plan freigeben oder kommentieren, auch nach Neustart", async ({ page }, te
   await page.reload(); await expect(freigeben).toBeEnabled();
   await freigeben.focus(); await page.keyboard.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(1);
-  expect(await page.evaluate(() => window.auftraege[0])).toMatchObject({ modus: "Ausführen", text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nDer ergänzte Plan berücksichtigt Umlaute.", sitzung: { id: "s-plan", anbieter: "Claude", pfad: "C:\\ProjectB" } });
+  expect(await page.evaluate(() => window.auftraege[0])).toMatchObject({ modus: "Ausführen", text: "Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\nDer ergänzte Plan berücksichtigt Umlaute.", sitzung: { id: "s-plan", anbieter: "Claude", pfad: "C:\\ProjectB" } });
   await expect(page.locator(".r-du .r-msg-text").last()).toHaveText("Plan freigegeben.");
   await expect(page.getByRole("radio", { name: "Ausführen", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(freigeben).toHaveCount(0); await expect(zurueck).toHaveCount(0);

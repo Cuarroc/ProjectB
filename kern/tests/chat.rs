@@ -232,8 +232,14 @@ fn planen_und_interview_sind_auch_beim_fortsetzen_nur_lesend() {
                 assert_eq!(w.prompt(), format!("{rolle}\n\nPrüfe den Export"));
                 assert!(rolle.contains("Ändere keine Dateien."));
                 for vorgabe in if modus == "Planen" {
-                    &["nur einen Plan", "Höchstens 3 Teilaufgaben", "Fertig, wenn", "freigegeben", "Kommentaren"]
-                        as &[_]
+                    &[
+                        "nur einen Plan",
+                        "Höchstens 3 Teilaufgaben",
+                        "Fertig, wenn",
+                        "freigegeben",
+                        "Kommentaren",
+                        "- [ ]",
+                    ] as &[_]
                 } else {
                     &["genau eine Frage pro Antwort", "2–4", "Liste", "bis du sicher bist", "zusammen", "Bestätigung"]
                         as &[_]

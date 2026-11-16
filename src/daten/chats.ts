@@ -6,7 +6,7 @@ import { chatsLaden, chatsSpeichern } from "./tauri";
 
 export function neuerChat(): Chat {
   return { ...beispiel.chats[0], id: crypto.randomUUID(), titel: "Neuer Chat", modus: "Ausführen",
-    verlauf: [], sitzung: null, gestartetUm: null, kontextProzent: 0 };
+    verlauf: [], todos: [], sitzung: null, gestartetUm: null, kontextProzent: 0 };
 }
 
 export function chatAnlegen(quelle: BeispielQuelle) {

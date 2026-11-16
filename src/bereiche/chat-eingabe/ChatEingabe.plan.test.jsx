@@ -43,7 +43,7 @@ it("gibt frei, setzt die Sitzung über denselben Sendeweg fort und verhindert Do
   const lauf = aktion(n.id, n.aktionen[0].id); await aktion(n.id, n.aktionen[0].id); await Promise.resolve();
   expect(chat().modus).toBe("Ausführen"); expect(chat().verlauf.find(v => v.id === n.id).aktionen).toEqual([]);
   expect(auftragSenden).toHaveBeenCalledTimes(2);
-  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus: "Ausführen", text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nMein Plan", sitzung: { id: "s-plan", anbieter: "Claude", pfad: quelle.lesen().kopf.pfad } }));
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus: "Ausführen", text: "Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\nMein Plan", sitzung: { id: "s-plan", anbieter: "Claude", pfad: quelle.lesen().kopf.pfad } }));
   expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Plan freigegeben." });
   beenden({ sitzung: null, erfolg: true }); await lauf;
 });
@@ -63,14 +63,14 @@ it("leert bei einer Freigabe auch die Aktionen anderer alter Nachrichten", async
   d.chats[0].verlauf.push({ ...d.chats[0].verlauf.at(-1), id: "plan-b", text: "Plan B" }); quelle.aktualisieren(d);
   const lauf = ansicht().onAktion("plan-b", "plan-freigeben"); await Promise.resolve();
   expect(chat().verlauf.every(n => n.aktionen.length === 0)).toBe(true);
-  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nPlan B" }));
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ text: "Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\nPlan B" }));
   beenden({ sitzung: null, erfolg: true }); await lauf;
 });
 it("sendet nach Anbieterwechsel den Plan auch ohne fortsetzbare Sitzung", async () => {
   await plan(); const vorher = chat().verlauf; aendern({ modell: "gpt-6.1-sol", sitzung: null });
   const n = chat().verlauf.at(-1), lauf = ansicht().onAktion(n.id, "plan-freigeben"); await Promise.resolve();
   expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modell: "gpt-6.1-sol", sitzung: null,
-    text: `Bisheriger Verlauf dieses Chats (zur Einordnung):\n\n${vorher.map(n => `${n.von}: ${n.text}`).join("\n\n")}\n\nNeue Nachricht:\nDer Plan ist freigegeben. Setze genau diesen Plan um:\n\nMein Plan` }));
+    text: `Bisheriger Verlauf dieses Chats (zur Einordnung):\n\n${vorher.map(n => `${n.von}: ${n.text}`).join("\n\n")}\n\nNeue Nachricht:\nDer Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\nMein Plan` }));
   expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Plan freigegeben." });
   beenden({ sitzung: null, erfolg: true }); await lauf;
 });
