@@ -1,7 +1,22 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beispiel, modusEinstellungen } from "./beispiel";
-import type { Chat, Datenstand, Kontingent, Kopf } from "./typen";
+import type { Agent, Chat, Datenstand, Kontingent, Kopf } from "./typen";
+
+type TeamAuftrag = Pick<Agent, "name" | "anbieter" | "modell" | "effort"> & { text: string };
+export type AnhalteBericht = {
+  ordner: { ordner: string; status: "gesichert" | "sauber" | "fehler"; sha?: string; meldung?: string }[];
+  lauffehler: { pid: number; meldung: string }[]; fristUeberschritten: boolean;
+};
+export async function teamStarten(pfad: string, auftraege: TeamAuftrag[]): Promise<void> {
+  if (isTauri()) await invoke("team_starten", { pfad, auftraege });
+}
+export async function teamAnhalten(name?: string): Promise<AnhalteBericht | undefined> {
+  if (isTauri()) return invoke<AnhalteBericht>("team_anhalten", name === undefined ? {} : { name });
+}
+export async function teamAgentHoeren(cb: (agent: Agent) => void): Promise<() => void> {
+  return isTauri() ? listen<string>("team-agent", ({ payload }) => cb(JSON.parse(payload))) : () => {};
+}
 
 export type Chats = Pick<Datenstand, "chats" | "aktiverChatId">;
 export async function chatsLaden(projekt: string): Promise<Chats | undefined> {

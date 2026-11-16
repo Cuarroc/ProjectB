@@ -13,16 +13,16 @@ import { AnhalteMarke } from "./anhalten";
 
 const status = { Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fertig", Problem: "problem" } as const;
 const dauer = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-export const belegFuer = (daten: Datenstand, id: string) => daten.belege.find(b => b.agentId === id && b.prLink.trim());
+export const belegFuer = (daten: Pick<Datenstand, "belege">, id: string) => daten.belege.find(b => b.agentId === id && b.prLink.trim());
 export const mitBeleg = (daten: Datenstand): Datenstand => ({ ...daten, agenten: daten.agenten.map(a => a.zustand === "Fertig" && !belegFuer(daten, a.id)
   ? { ...a, zustand: "Problem", liveZeile: "Beleg mit PR-Link fehlt" } : a) });
 
-export function TeamDetails({ agent, daten, schliessen, angehalten = false }: { agent: Agent; daten: Datenstand; schliessen: () => void; angehalten?: boolean }) {
+export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schliessen, angehalten = false, echt = false }: { agent: Agent; daten?: Pick<Datenstand, "ausgaben" | "belege">; schliessen: () => void; angehalten?: boolean; echt?: boolean }) {
   if (angehalten) agent = { ...agent, schaetzung: null };
   const bereich = useRef<HTMLElement>(null), [vorschau, zeige] = useState<string | null>(null);
   const vorschauBereich = useRef<HTMLElement>(null), vorschauKnopf = useRef<HTMLButtonElement>(null);
   const zustand = angehalten ? "offen" : status[agent.zustand], beleg = belegFuer(daten, agent.id);
-  const zeitspur = agent.id === "orchestrator" ? { jetzt: orchestratorBeispiel.laufzeitSekunden, phasen: [...orchestratorBeispiel.phasen] } : spur(agent);
+  const zeitspur = echt ? { jetzt: agent.laufzeitSekunden, phasen: [] } : agent.id === "orchestrator" ? { jetzt: orchestratorBeispiel.laufzeitSekunden, phasen: [...orchestratorBeispiel.phasen] } : spur(agent);
   const ausgaben = daten.ausgaben.filter(a => a.sitzungId === agent.id);
   const phase = agent.id === "orchestrator" ? "koordiniert" : zeitspur.phasen.find(p => "laufend" in p && p.laufend)?.art;
   const taetigkeit = phase && { lesen: "liest", koordiniert: "koordiniert", bauen: "baut", testen: "testet", review: "prüft" }[phase];
@@ -51,17 +51,17 @@ export function TeamDetails({ agent, daten, schliessen, angehalten = false }: { 
   return <aside id="team-details" ref={bereich} tabIndex={-1} className="team-details" aria-label={`Details: ${agent.name}`} style={{ "--detail-glanz": `var(--status-${zustand}-grund)` } as CSSProperties}
     onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); zu(); } }}>
     <div className="tm-det">
-      <header className="tm-det-kopf"><Fortschrittsring wert={agent.zustand === "Problem" || agent.id === "orchestrator" ? undefined : agent.fortschritt} zustand={zustand} beschriftung={angehalten ? "Angehalten" : undefined} />
+      <header className="tm-det-kopf"><Fortschrittsring wert={echt || agent.zustand === "Problem" || agent.id === "orchestrator" ? undefined : agent.fortschritt} zustand={zustand} beschriftung={angehalten ? "Angehalten" : undefined} />
         <div className="tm-det-titel"><h3>{agent.name}</h3><p>{agent.anbieter} · {agent.modell}{agent.arbeitskopie && <> · Arbeitskopie <span className="tm-arbeitskopie">{agent.arbeitskopie}</span></>}</p></div>
         <Knopf text="Schließen" symbol={X} nurSymbol variante="leise" onClick={zu} /></header>
       <div className="tm-det-leiste"><span className="tm-status">{angehalten ? <AnhalteMarke /> : <Statusmarke zustand={zustand} />}{!angehalten && agent.zustand === "Arbeitet" && taetigkeit && ` · ${taetigkeit}`}</span>
-        <div className="tm-det-knoepfe"><Knopf text="Protokoll öffnen" symbol={FileText} onClick={e => oeffnen(e, "Protokoll")} /><Knopf text="Agent fragen" symbol={MessageCircle} onClick={e => oeffnen(e, "Agent fragen")} /></div></div>
+        <div className="tm-det-knoepfe"><Knopf text="Protokoll öffnen" symbol={FileText} onClick={e => oeffnen(e, "Protokoll")} />{!echt && <Knopf text="Agent fragen" symbol={MessageCircle} onClick={e => oeffnen(e, "Agent fragen")} />}</div></div>
       <section className="tm-dkarte"><h4>Kennzahlen</h4><dl className="tm-zellen">{[
-        ["Fortschritt", agent.id === "orchestrator" ? "–" : `${agent.fortschritt} %`], ["Laufzeit", `${dauer(agent.laufzeitSekunden)} min`],
-        ["Tokens", `${(agent.tokens / 1000).toLocaleString("de-DE")}k`], ["Fertig um", agent.schaetzung ? `~${agent.schaetzung.fertigUm}` : "–"],
-      ].map(([titel, wert]) => <div key={titel}><dt>{titel}</dt><dd>{wert}{titel === "Fortschritt" && agent.id !== "orchestrator" && <progress value={agent.fortschritt} max={100} aria-label="Fortschritt" />}</dd></div>)}</dl></section>
+        ["Fortschritt", echt || agent.id === "orchestrator" ? "–" : `${agent.fortschritt} %`], ["Laufzeit", `${dauer(agent.laufzeitSekunden)} min`],
+        ["Tokens", echt ? "–" : `${(agent.tokens / 1000).toLocaleString("de-DE")}k`], ["Fertig um", agent.schaetzung ? `~${agent.schaetzung.fertigUm}` : "–"],
+      ].map(([titel, wert]) => <div key={titel}><dt>{titel}</dt><dd>{wert}{!echt && titel === "Fortschritt" && agent.id !== "orchestrator" && <progress value={agent.fortschritt} max={100} aria-label="Fortschritt" />}</dd></div>)}</dl></section>
       <div className="tm-det-raster">
-        <section className="tm-dkarte"><h4>Phasen <small>Dauer in min</small></h4><Zeitspur {...zeitspur} zustand={status[agent.zustand]} angehalten={angehalten} />
+        {!echt && <><section className="tm-dkarte"><h4>Phasen <small>Dauer in min</small></h4><Zeitspur {...zeitspur} zustand={status[agent.zustand]} angehalten={angehalten} />
           <div className="team-diagramm-zeiten"><span>{agent.phasen[0]?.start.slice(0, 5) ?? "14:30"}</span><span className="tm-jetzt">Jetzt</span><span>{agent.schaetzung ? `~${agent.schaetzung.fertigUm}` : agent.phasen.at(-1)?.ende?.slice(0, 5)}</span></div>
           <div className="tm-phasenlegende">{zeitspur.phasen.map((p, i) => <span key={i}><i style={{ background: `var(--phase-${p.art}-verlauf)` }} />{p.name} <b>{dauer(p.ende - p.start)} min</b></span>)}{agent.schaetzung && <span>Noch <b>~{agent.schaetzung.restMinuten} min</b></span>}</div></section>
         <section className="tm-dkarte"><h4>Tests{agent.tests?.gruenSeit && ` grün seit ${agent.tests.gruenSeit}`}<small>Anzahl Tests</small></h4>
@@ -72,9 +72,9 @@ export function TeamDetails({ agent, daten, schliessen, angehalten = false }: { 
               <path d="M215 5V65" className="tm-jetztlinie" /><circle cx="215" cy={65 - agent.tests.gruen / Math.max(1, agent.tests.gesamt) * 60} r="3" /></svg>
             <span>{agent.tests.gesamt}</span><span className="tm-null">0</span>{rot && <b className="tm-rot">{rot.rot} rot</b>}<b className="tm-gruen">{agent.tests.gruen} / {agent.tests.gesamt}</b></div>
             <div className="team-diagramm-zeiten"><span>{rot?.zeit ?? agent.tests.gruenSeit}</span><span className="tm-jetzt">Jetzt</span></div>
-            <p>{agent.tests.gruen} von {agent.tests.gesamt} grün{rot && ` · Um ${rot.zeit} waren ${rot.rot} rot, der Agent hat sie repariert`}</p></> : <p>Noch keine Tests</p>}</section>
-        <section className="tm-dkarte"><h4>Dateien</h4><ul className="tm-dateien">{agent.dateien.map(d => <li key={d.pfad}><span><code>{d.pfad}</code><small>+{d.hinzugefuegt} −{d.entfernt}</small></span><Knopf text="Ansehen" onClick={e => { vorschauKnopf.current = e.currentTarget; zeige(d.pfad); }} /></li>)}</ul>{!agent.dateien.length && <p>Noch keine Dateien</p>}</section>
-        <section className="tm-dkarte"><h4>Ausgaben</h4><ul className="tm-dateien">{ausgaben.map(a => <li key={a.id}><span>{a.name}<small>{a.pfad}</small></span><Knopf text="Ansehen" onClick={e => { vorschauKnopf.current = e.currentTarget; zeige(a.pfad); }} /></li>)}</ul>{!ausgaben.length && <p>Noch keine Ausgaben</p>}</section>
+            <p>{agent.tests.gruen} von {agent.tests.gesamt} grün{rot && ` · Um ${rot.zeit} waren ${rot.rot} rot, der Agent hat sie repariert`}</p></> : <p>Noch keine Tests</p>}</section></>}
+        <section className="tm-dkarte"><h4>Dateien</h4><ul className="tm-dateien">{agent.dateien.map(d => <li key={d.pfad}><span><code>{d.pfad}</code><small>+{d.hinzugefuegt} −{d.entfernt}</small></span>{!echt && <Knopf text="Ansehen" onClick={e => { vorschauKnopf.current = e.currentTarget; zeige(d.pfad); }} />}</li>)}</ul>{!agent.dateien.length && <p>Noch keine Dateien</p>}</section>
+        {!echt && <section className="tm-dkarte"><h4>Ausgaben</h4><ul className="tm-dateien">{ausgaben.map(a => <li key={a.id}><span>{a.name}<small>{a.pfad}</small></span><Knopf text="Ansehen" onClick={e => { vorschauKnopf.current = e.currentTarget; zeige(a.pfad); }} /></li>)}</ul>{!ausgaben.length && <p>Noch keine Ausgaben</p>}</section>}
         {beleg && agent.zustand === "Fertig" && <section className="tm-dkarte tm-breit"><h4>Beleg</h4><p>{beleg.titel}</p><a href={beleg.prLink} target="_blank" rel="noreferrer">PR ansehen</a></section>}
         {vorschau && <section ref={vorschauBereich} tabIndex={-1} className="tm-dkarte tm-breit" aria-label="Vorschau" aria-live="polite"><h4><FileText size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /> Vorschau</h4><code>{vorschau}</code>{vorschau === "Protokoll" ? <pre>{agent.letzteZeilen.join("\n") || "Noch keine Ausgabe"}</pre> : <p>{vorschau === "Agent fragen" ? "Nachrichten an Agenten sind in dieser Vorschau noch nicht verfügbar." : "Die Vorschau dieser Beispieldatei ist noch nicht verfügbar."}</p>}<Knopf text="Vorschau schließen" variante="leise" onClick={() => { zeige(null); vorschauKnopf.current?.focus(); }} /></section>}
       </div>

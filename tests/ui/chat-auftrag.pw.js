@@ -9,7 +9,8 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
     window.__TAURI_INTERNALS__ = {
       transformCallback: cb => { window.callbacks[++id] = cb; return id; },
       invoke: async (cmd, args) => {
-        if (cmd === "plugin:event|listen") { window.listener.add(args.handler); return args.handler; }
+        // Die Chat-Attrappe stellt nur Chat-Ereignisse zu; Team hört separat.
+        if (cmd === "plugin:event|listen") { if (args.event === "chat-nachricht") window.listener.add(args.handler); return args.handler; }
         if (cmd === "plugin:event|unlisten") { window.listener.delete(args.eventId); return; }
         if (cmd === "projekte_zuletzt") return ["C:\\ProjectB", "C:\\Anderes"];
         if (cmd === "projekt_oeffnen") { window.projektwechsel.push(args.pfad); return { projekt: "Anderes", pfad: args.pfad, zweig: "main" }; }
