@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { auftragSenden, chatNachrichtenHoeren } from "../daten/tauri";
+import { antwortPlan } from "../daten/plan";
 import { BeispielQuelle } from "../daten/quelle";
 import type { Chat, Todo } from "../daten/typen";
 import { Eingabefeld } from "../bausteine/Eingabefeld";
@@ -149,13 +150,13 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       aendern({ sitzung: antwort.sitzung });
       if ((modus === "Planen" || modus === "Interview") && antwort.erfolg) {
         const neu = quelle.lesen(), letzter = neu.chats.find(c => c.id === chat.id)?.verlauf.slice(anfang).reverse().find(n => n.von === "Orchestrator");
-        if (letzter) { letzter.aktionen = modus === "Planen" ? planAktionen : interviewAktionen(letzter.text); quelle.aktualisieren(neu); }
+        if (letzter) { if (modus === "Planen") letzter.plan = antwortPlan(letzter.text, letzter.id); letzter.aktionen = modus === "Planen" ? planAktionen : interviewAktionen(letzter.text); quelle.aktualisieren(neu); }
       }
     } catch (e) { orchestratorNachricht(quelle, chat.id, `Problem: ${e instanceof Error ? e.message : String(e)}`); }
     finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
   };
-  const onAktion = (nachrichtId: string, aktionId: string) => {
-    if (laufende.current.has(chat.id)) return;
+  const onAktion = (nachrichtId: string, aktionId: string, kommentar?: string) => {
+    if (laufende.current.has(chat.id) || (isTauri() && !quelle.lesen().kopf.geoeffnet)) return;
     const neu = quelle.lesen(), ziel = neu.chats.find(c => c.id === chat.id);
     const nachricht = ziel?.verlauf.find(n => n.id === nachrichtId);
     const aktion = nachricht?.aktionen.find(a => a.id === aktionId);
@@ -167,6 +168,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId, "Plan freigegeben.");
     if (aktionId !== "plan-kommentieren") return;
     nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);
+    if (kommentar !== undefined) return senden(kommentar);
     schreiben(text.startsWith("Kommentare zum Plan: ") ? text : `Kommentare zum Plan: ${text}`); document.getElementById("chat-nachricht")?.focus();
   };
   return { chat, modelle: ["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"],
