@@ -44,6 +44,7 @@ it("gibt frei, setzt die Sitzung über denselben Sendeweg fort und verhindert Do
   expect(chat().modus).toBe("Ausführen"); expect(chat().verlauf.find(v => v.id === n.id).aktionen).toEqual([]);
   expect(auftragSenden).toHaveBeenCalledTimes(2);
   expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus: "Ausführen", text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nMein Plan", sitzung: { id: "s-plan", anbieter: "Claude", pfad: quelle.lesen().kopf.pfad } }));
+  expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Plan freigegeben." });
   beenden({ sitzung: null, erfolg: true }); await lauf;
 });
 it("entfernt bei einem neuen Auftrag alle alten Aktionen nur in diesem Chat", async () => {
@@ -66,11 +67,11 @@ it("leert bei einer Freigabe auch die Aktionen anderer alter Nachrichten", async
   beenden({ sitzung: null, erfolg: true }); await lauf;
 });
 it("sendet nach Anbieterwechsel den Plan auch ohne fortsetzbare Sitzung", async () => {
-  await plan(); aendern({ modell: "gpt-6.1-sol", sitzung: null }); // Der Kern verwirft die Claude-Sitzung beim Anbieterwechsel.
+  await plan(); const vorher = chat().verlauf; aendern({ modell: "gpt-6.1-sol", sitzung: null });
   const n = chat().verlauf.at(-1), lauf = ansicht().onAktion(n.id, "plan-freigeben"); await Promise.resolve();
   expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modell: "gpt-6.1-sol", sitzung: null,
-    text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nMein Plan" }));
-  expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Der Plan ist freigegeben. Setze genau diesen Plan um:\n\nMein Plan" });
+    text: `Bisheriger Verlauf dieses Chats (zur Einordnung):\n\n${vorher.map(n => `${n.von}: ${n.text}`).join("\n\n")}\n\nNeue Nachricht:\nDer Plan ist freigegeben. Setze genau diesen Plan um:\n\nMein Plan` }));
+  expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Plan freigegeben." });
   beenden({ sitzung: null, erfolg: true }); await lauf;
 });
 it.each([

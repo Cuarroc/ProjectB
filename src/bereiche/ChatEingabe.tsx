@@ -13,6 +13,15 @@ const planAktionen = [
   { id: "plan-freigeben", text: "Freigeben und bauen" },
   { id: "plan-kommentieren", text: "Mit Kommentaren zurückgeben" },
 ];
+function textMitVerlauf(chat: Chat, pfad: string, text: string) {
+  const anbieter = chat.modell === "gpt-6.1-sol" ? "codex" : "claude";
+  if (!chat.verlauf.length || (chat.sitzung?.anbieter.toLowerCase() === anbieter && chat.sitzung.pfad === pfad)) return text;
+  const nachrichten = chat.verlauf.slice(-20).map(n => `${n.von}: ${n.text}`);
+  let gekuerzt = chat.verlauf.length > 20;
+  const kontext = () => `Bisheriger Verlauf dieses Chats (zur Einordnung):\n\n${gekuerzt ? "[Verlauf gekürzt: Älteste Nachrichten ausgelassen.]\n\n" : ""}${nachrichten.join("\n\n")}`;
+  while (kontext().length > 20000) { nachrichten.shift(); gekuerzt = true; }
+  return `${kontext()}\n\nNeue Nachricht:\n${text}`;
+}
 export function nachrichtAblegen(quelle: BeispielQuelle, text: string) {
   const daten = quelle.lesen(), chat = daten.chats.find(c => c.id === daten.aktiverChatId);
   if (!chat) throw new Error("Kein Chat ausgewählt.");
@@ -72,7 +81,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (werte.kontextfenster && !Object.hasOwn(werte, "kontextProzent")) werte.kontextProzent = ziel.kontextProzent * ziel.kontextfenster / werte.kontextfenster;
     Object.assign(ziel, werte); quelle.aktualisieren(neu);
   };
-  const senden = async (inhalt: string, freigabe?: string) => {
+  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt) => {
     if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
     if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
     if (freigabe) {
@@ -81,7 +90,12 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       if (!ziel || !nachricht?.aktionen.some(a => a.id === "plan-freigeben")) return;
       nachricht.aktionen = []; ziel.modus = "Ausführen"; quelle.aktualisieren(neu);
     }
-    try { nachrichtAblegen(quelle, inhalt); schreiben(""); setFehler(""); }
+    let gesendet = inhalt;
+    try {
+      const vorher = quelle.lesen(), ziel = vorher.chats.find(c => c.id === chat.id);
+      if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, inhalt);
+      nachrichtAblegen(quelle, anzeige); schreiben(""); setFehler("");
+    }
     catch { setFehler("Nicht gesendet. Dein Text bleibt stehen."); return; }
     if (!isTauri()) return;
     laufende.current.add(chat.id);
@@ -91,7 +105,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     const modus = ziel.modus, anfang = ziel.verlauf.length;
     try {
       await empfang.current;
-      const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus: ziel.modus, sitzung, text: inhalt });
+      const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus: ziel.modus, sitzung, text: gesendet });
       aendern({ sitzung: antwort.sitzung });
       if (modus === "Planen" && antwort.erfolg) {
         const neu = quelle.lesen(), letzter = neu.chats.find(c => c.id === chat.id)?.verlauf.slice(anfang).reverse().find(n => n.von === "Orchestrator");
@@ -105,7 +119,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     const neu = quelle.lesen(), ziel = neu.chats.find(c => c.id === chat.id);
     const nachricht = ziel?.verlauf.find(n => n.id === nachrichtId);
     if (!ziel || !nachricht?.aktionen.some(a => a.id === aktionId)) return;
-    if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId);
+    if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId, "Plan freigegeben.");
     if (aktionId !== "plan-kommentieren") return;
     nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);
     schreiben(text.startsWith("Kommentare zum Plan: ") ? text : `Kommentare zum Plan: ${text}`); document.getElementById("chat-nachricht")?.focus();

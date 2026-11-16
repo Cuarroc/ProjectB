@@ -34,7 +34,9 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
   const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" });
   await feld.fill("Prüfe den CSV-Export im geöffneten Projekt."); await feld.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(1);
-  expect(await page.evaluate(() => window.auftraege[0])).toEqual({ chat: "csv-export", pfad: "C:\\ProjectB", modell: "Opus 5.5", effort: "Hoch", modus: "Ausführen", sitzung: null, text: "Prüfe den CSV-Export im geöffneten Projekt." });
+  const bisher = await page.evaluate(async () => (await import("/src/daten/beispiel.ts")).beispiel.chats[0].verlauf.map(n => `${n.von}: ${n.text}`).join("\n\n"));
+  expect(await page.evaluate(() => window.auftraege[0])).toEqual({ chat: "csv-export", pfad: "C:\\ProjectB", modell: "Opus 5.5", effort: "Hoch", modus: "Ausführen", sitzung: null,
+    text: `Bisheriger Verlauf dieses Chats (zur Einordnung):\n\n${bisher}\n\nNeue Nachricht:\nPrüfe den CSV-Export im geöffneten Projekt.` });
   await expect(page.getByRole("log").getByText("Prüfe den CSV-Export im geöffneten Projekt.")).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "Orchestrator arbeitet …" })).toBeVisible();
   await expect(feld).toHaveAccessibleDescription(/Bitte warte vor dem nächsten Senden/);
@@ -69,6 +71,15 @@ test("streamt echte Chat-Ereignisse, sperrt den laufenden Chat und setzt die Sit
   await feld.fill("Prüfe auch leere Listen."); await feld.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(2);
   expect(await page.evaluate(() => window.auftraege[1])).toMatchObject({ chat: "csv-export", modell: "Opus 5.5", effort: "Hoch", sitzung: { id: "s-1", anbieter: "Claude", pfad: "C:\\ProjectB" }, text: "Prüfe auch leere Listen." });
+  await page.evaluate(() => window.beenden());
+  await expect(page.getByRole("status").filter({ hasText: "Orchestrator arbeitet …" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Modell: Opus 5.5", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "gpt-6.1-sol", exact: true }).click();
+  await feld.fill("Wie geht es weiter?"); await feld.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(3);
+  expect(await page.evaluate(() => window.auftraege[2])).toMatchObject({ modell: "gpt-6.1-sol",
+    text: `Bisheriger Verlauf dieses Chats (zur Einordnung):\n\n${bisher}\n\nDu: Prüfe den CSV-Export im geöffneten Projekt.\n\nOrchestrator: Ich prüfe den CSV-Export und seine Tests.\n\nOrchestrator: Die ersten Tests sind grün. Ich prüfe jetzt die Randfälle.\n\nDu: Prüfe auch leere Listen.\n\nNeue Nachricht:\nWie geht es weiter?` });
+  await expect(page.locator(".r-du .r-msg-text").last()).toHaveText("Wie geht es weiter?");
   await page.evaluate(() => window.beenden());
   await expect(page.getByRole("status").filter({ hasText: "Orchestrator arbeitet …" })).toHaveCount(0);
   await projekt.click(); await page.getByRole("menuitemradio", { name: "C:\\Anderes", exact: true }).click();

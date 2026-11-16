@@ -32,7 +32,8 @@ it.each([["Opus 5.5", "Niedrig"], ["gpt-6.1-sol", "Sehr hoch"]])("sendet %s mit 
   await Promise.resolve(); await Promise.resolve();
   expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Baue den Export" });
   expect(auftragSenden).toHaveBeenCalledExactlyOnceWith({ chat: chat().id, pfad: daten.kopf.pfad,
-    modell, effort, modus: "Ausführen", sitzung: null, text: "Baue den Export" });
+    modell, effort, modus: "Ausführen", sitzung: null,
+    text: `Bisheriger Verlauf dieses Chats (zur Einordnung):\n\n${daten.chats[0].verlauf.map(n => `${n.von}: ${n.text}`).join("\n\n")}\n\nNeue Nachricht:\nBaue den Export` });
   expect(chat().gestartetUm).toMatch(/^\d\d:\d\d$/);
   await ansicht().props.senden("Noch einmal");
   expect(auftragSenden).toHaveBeenCalledOnce(); expect(chat().verlauf).toHaveLength(vorher + 1);
@@ -120,4 +121,53 @@ it.each(["Ausführen", "Planen", "Interview"])("sendet den aktuellen Modus %s au
   expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus, sitzung: null }));
   await ansicht().props.senden("Weiter");
   expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus, sitzung }));
+});
+
+it.each(["Ausführen", "Planen", "Interview"])("übergibt bei Anbieterwechsel in %s den Verlauf, zeigt aber nur den neuen Text", async modus => {
+  const d = quelle.lesen(); Object.assign(d.chats[0], { modus, modell: "gpt-6.1-sol",
+    sitzung: { id: "alt", anbieter: "Claude", pfad: d.kopf.pfad }, verlauf: [
+      { id: "1", von: "Du", text: "Plane den Export.", aktionen: [] },
+      { id: "2", von: "Orchestrator", text: "Mein Exportplan", aktionen: [] },
+    ] }); quelle.aktualisieren(d);
+  vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  await ansicht().props.senden("Kommentare zum Plan: Umlaute");
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ modus,
+    text: "Bisheriger Verlauf dieses Chats (zur Einordnung):\n\nDu: Plane den Export.\n\nOrchestrator: Mein Exportplan\n\nNeue Nachricht:\nKommentare zum Plan: Umlaute" }));
+  expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Kommentare zum Plan: Umlaute" });
+  expect(chat().verlauf).toHaveLength(3);
+});
+it.each([
+  ["Opus 5.5", "Codex", false, true], ["Sonnet 5.5", "Claude", false, false],
+  ["Haiku 5.5", "Claude", false, false], ["gpt-6.1-sol", "Codex", false, false],
+  ["Opus 5.5", "Claude", true, true], ["Opus 5.5", null, false, true],
+])("prüft Modell %s, Sitzung %s und Pfadwechsel %s", async (modell, anbieter, andererPfad, kontext) => {
+  const d = quelle.lesen(); Object.assign(d.chats[0], { modell,
+    sitzung: anbieter ? { id: "alt", anbieter, pfad: andererPfad ? "D:\\Anderes" : d.kopf.pfad } : null });
+  quelle.aktualisieren(d); vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  await ansicht().props.senden("Weiter");
+  const gesendet = vi.mocked(auftragSenden).mock.calls.at(-1)[0].text;
+  if (kontext) { expect(gesendet).toContain(`Du: ${d.chats[0].verlauf[0].text}`); expect(gesendet.endsWith("Neue Nachricht:\nWeiter")).toBe(true); }
+  else expect(gesendet).toBe("Weiter");
+});
+it.each([
+  ["Anzahl", Array.from({ length: 22 }, (_, i) => `Nachricht ${i}`), 20],
+  ["Zeichen", ["A".repeat(9000), "B".repeat(9000), "C".repeat(9000)], 2],
+  ["überlange Einzelnachricht", ["A".repeat(20001)], 0],
+])("kürzt den Kontext nach %s von vorne mit Hinweis", async (_fall, texte, anzahl) => {
+  const d = quelle.lesen(); d.chats[0].verlauf = texte.map((text, i) => ({ id: String(i), von: "Du", text, aktionen: [] }));
+  quelle.aktualisieren(d); vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  await ansicht().props.senden("Neue Bitte");
+  const gesendet = vi.mocked(auftragSenden).mock.calls.at(-1)[0].text, kontext = gesendet.split("\n\nNeue Nachricht:\n")[0];
+  expect(kontext.length).toBeLessThanOrEqual(20000); expect(kontext).toMatch(/Verlauf gekürzt/);
+  expect(kontext.match(/^Du: /gm) ?? []).toHaveLength(anzahl);
+  expect(kontext).not.toContain(`Du: ${texte[0]}`);
+  if (anzahl) expect(kontext.endsWith(`Du: ${texte.at(-1)}`)).toBe(true);
+  expect(gesendet.endsWith("Neue Nachricht:\nNeue Bitte")).toBe(true);
+  expect(chat().verlauf.map(n => n.text)).toEqual([...texte, "Neue Bitte"]);
+});
+it("sendet im leeren Chat keinen Kontextblock", async () => {
+  const d = quelle.lesen(); d.chats[0].verlauf = []; quelle.aktualisieren(d);
+  vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  await ansicht().props.senden("Erste Nachricht");
+  expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ text: "Erste Nachricht" }));
 });
