@@ -1,5 +1,5 @@
 use crate::{
-    arbeitskopie, chat, start, verbrauch,
+    anhalten, arbeitskopie, chat, start, verbrauch,
     zustand::{AgentZustand, Stammdaten},
     Anbieter, Ereignis, Lauf,
 };
@@ -20,8 +20,10 @@ pub struct TeamAuftrag {
 }
 
 pub struct Team {
-    laeufe: Vec<Lauf>,
+    laeufe: Vec<(String, Lauf)>,
     ordner: Vec<PathBuf>,
+    ordnernamen: Vec<String>,
+    ungesichert: bool,
 }
 
 impl Team {
@@ -50,6 +52,9 @@ impl Team {
         melden: impl Fn(String) + Send + Sync + 'static,
         starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf>,
     ) -> io::Result<Self> {
+        if auftraege.is_empty() {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "Mindestens ein Auftrag"));
+        }
         if auftraege.len() > 3 {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "Höchstens 3 Agenten pro Team"));
         }
@@ -59,7 +64,7 @@ impl Team {
             }
         }
         let melden = Arc::new(melden);
-        let mut team = Self { laeufe: Vec::new(), ordner: Vec::new() };
+        let mut team = Self { laeufe: vec![], ordner: vec![], ordnernamen: vec![], ungesichert: false };
         for auftrag in auftraege {
             let mut stammdaten = Stammdaten {
                 id: auftrag.name.clone(),
@@ -76,18 +81,19 @@ impl Team {
                 if !auftrag.anbieter.eq_ignore_ascii_case(anbieter.name) {
                     return Err(io::Error::new(io::ErrorKind::InvalidInput, "Anbieter passt nicht zum Modell"));
                 }
-                let kopie = arbeitskopie::anlegen_in(projekt, &auftrag.name, Path::new(".worktrees"))?;
+                let (kopie, basis) = arbeitskopie::anlegen_in(projekt, &auftrag.name, Path::new(".worktrees"))?;
                 stammdaten.arbeitskopie = kopie.pfad.to_string_lossy().into_owned();
                 team.ordner.push(kopie.pfad.clone());
-                starten(anbieter, &wunsch, &kopie.pfad)
+                team.ordnernamen.push(auftrag.name.clone());
+                starten(anbieter, &wunsch, &kopie.pfad).map(|lauf| (lauf, basis))
             })();
             let arbeitskopie = PathBuf::from(&stammdaten.arbeitskopie);
             let mut zustand = AgentZustand::neu(stammdaten);
             match lauf {
-                Ok(mut lauf) => {
+                Ok((mut lauf, basis)) => {
                     // Nur den Empfänger abgeben: der Lauf samt Job-Objekt bleibt für Anhalten erreichbar.
                     let ereignisse = std::mem::replace(&mut lauf.ereignisse, mpsc::channel().1);
-                    team.laeufe.push(lauf);
+                    team.laeufe.push((auftrag.name.clone(), lauf));
                     let melden = Arc::clone(&melden);
                     let kontingent = kontingent.map(Path::to_path_buf);
                     thread::spawn(move || {
@@ -108,7 +114,7 @@ impl Team {
                                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
                             };
                             if dateien_aktualisieren {
-                                if let Ok(dateien) = arbeitskopie::geaenderte_dateien(&arbeitskopie) {
+                                if let Ok(dateien) = arbeitskopie::geaenderte_dateien_seit(&arbeitskopie, &basis) {
                                     zustand.dateien_setzen(dateien);
                                 }
                             }
@@ -136,7 +142,32 @@ impl Team {
         &self.ordner
     }
 
-    pub fn laeufe_mut(&mut self) -> &mut [Lauf] {
-        &mut self.laeufe
+    pub fn laeufe_mut(&mut self) -> Vec<&mut Lauf> {
+        self.laeufe.iter_mut().map(|(_, lauf)| lauf).collect()
+    }
+
+    pub fn laeuft(&self) -> bool {
+        self.laeufe.iter().any(|(_, lauf)| !lauf.beendet())
+    }
+
+    pub fn ersetzbar(&self) -> bool {
+        !self.laeuft() && !self.ungesichert
+    }
+
+    pub fn anhalten(&mut self, name: Option<&str>, frist: Duration) -> io::Result<anhalten::Bericht> {
+        if name.is_some_and(|name| !self.ordnernamen.iter().any(|n| n == name)) {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "Unbekannter Agentenname"));
+        }
+        let ordner: Vec<_> = self
+            .ordner
+            .iter()
+            .zip(&self.ordnernamen)
+            .filter_map(|(pfad, n)| name.is_none_or(|name| name == n).then_some(pfad.clone()))
+            .collect();
+        let laeufe =
+            self.laeufe.iter_mut().filter_map(|(n, lauf)| name.is_none_or(|name| name == n).then_some(lauf)).collect();
+        let bericht = anhalten::alles_anhalten(laeufe, &ordner, frist);
+        self.ungesichert = !bericht.alles_gesichert() || (name.is_some() && self.ungesichert);
+        Ok(bericht)
     }
 }
