@@ -30,6 +30,14 @@ fn main() {
     }
     let mut auftrag = String::new();
     std::io::stdin().read_to_string(&mut auftrag).expect("stdin");
+    if hat("--datei-ohne-ereignis") {
+        std::fs::write("still.txt", "eins\nzwei\n").unwrap();
+        let frist = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !std::path::Path::new(auftrag.trim()).is_file() {
+            assert!(std::time::Instant::now() < frist, "Datei wurde nicht live gemeldet");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
     let text = if hat("--argumente") {
         std::env::args().skip(1).collect::<Vec<_>>().join(" ")
     } else {
