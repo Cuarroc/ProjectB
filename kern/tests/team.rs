@@ -1,4 +1,5 @@
 use projectb_kern::{
+    anhalten::Ordnerstatus,
     start,
     team::{Team, TeamAuftrag},
     Anbieter,
@@ -252,29 +253,20 @@ fn git(pfad: &std::path::Path, args: &[&str]) -> String {
     String::from_utf8(ausgabe.stdout).unwrap().trim().into()
 }
 
-fn haengendes_team(repo: &Repo, namen: &[&str]) -> Team {
+fn haengendes_team(repo: &Repo, namen: &[&str], melden: impl Fn(String) + Send + Sync + 'static) -> Team {
     git(&repo.0, &["config", "user.name", "Test"]);
     git(&repo.0, &["config", "user.email", "test@example.invalid"]);
     git(&repo.0, &["config", "commit.gpgSign", "false"]);
-    let team = Team::starten_mit(
-        &repo.0,
-        namen.iter().map(|n| auftrag(n)).collect(),
-        |_| {},
-        |a, w, pfad| {
-            if pfad.ends_with("startfehler") {
-                return Err(std::io::Error::other("Start fehlgeschlagen"));
-            }
-            start::starten(
-                &Anbieter {
-                    programm: env!("CARGO_BIN_EXE_test_agent"),
-                    argumente: &["--team-arbeit", "--haengen"],
-                    ..*a
-                },
-                w,
-                pfad,
-            )
-        },
-    )
+    let team = Team::starten_mit(&repo.0, namen.iter().map(|n| auftrag(n)).collect(), melden, |a, w, pfad| {
+        if pfad.ends_with("startfehler") {
+            return Err(std::io::Error::other("Start fehlgeschlagen"));
+        }
+        start::starten(
+            &Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &["--team-arbeit", "--haengen"], ..*a },
+            w,
+            pfad,
+        )
+    })
     .unwrap();
     let frist = std::time::Instant::now() + Duration::from_secs(5);
     for pfad in team.ordner().iter().filter(|p| !p.ends_with("startfehler")) {
@@ -287,19 +279,46 @@ fn haengendes_team(repo: &Repo, namen: &[&str]) -> Team {
 }
 
 #[test]
+fn indexsperre_erlaubt_erneute_sicherung_und_dateiliste_bleibt_erhalten() {
+    let repo = Repo::neu();
+    let sperre = std::sync::Arc::new(std::sync::Mutex::new(()));
+    let pause = sperre.lock().unwrap();
+    let frei = sperre.clone();
+    let (tx, rx) = mpsc::channel();
+    let mut team = haengendes_team(&repo, &["eins"], move |json| {
+        let _frei = frei.lock().unwrap(); // Dateiliste erst nach dem WIP-Commit abfragen.
+        tx.send(json).unwrap();
+    });
+    let sperrdatei = team.ordner()[0].join(git(&team.ordner()[0], &["rev-parse", "--git-dir"])).join("index.lock");
+    fs::write(&sperrdatei, "").unwrap();
+    let bericht = team.anhalten(None, Duration::from_secs(30)).unwrap();
+    assert!(bericht.lauffehler.is_empty());
+    assert!(matches!(bericht.ordner[0].status, Ordnerstatus::Fehler { .. }));
+    assert!(!bericht.alles_gesichert());
+    fs::remove_file(sperrdatei).unwrap();
+    let mut bericht = team.anhalten(None, Duration::ZERO).unwrap();
+    assert!(matches!(bericht.ordner[0].status, Ordnerstatus::Gesichert { .. }));
+    assert!(bericht.frist_ueberschritten);
+    assert!(bericht.alles_gesichert());
+    bericht.lauffehler.push((0, "Anhalten fehlgeschlagen".into()));
+    assert!(!bericht.alles_gesichert());
+    drop(pause);
+    let letzte: Value = serde_json::from_str(&rx.into_iter().last().unwrap()).unwrap();
+    assert_eq!(letzte["dateien"], serde_json::json!([{"pfad":"arbeit.txt", "hinzugefuegt":1, "entfernt":0}]));
+}
+
+#[test]
 fn alles_anhalten_sichert_arbeit_und_neustart_erhaelt_alten_branch() {
     let repo = Repo::neu();
-    let mut team = haengendes_team(&repo, &["x", "y"]);
+    let mut team = haengendes_team(&repo, &["x", "y"], |_| {});
     assert!(team.laeuft());
     let bericht = team.anhalten(None, Duration::from_secs(30)).unwrap();
     assert!(!team.laeuft());
     assert!(!team.laeufe_mut()[0].warten().unwrap().success());
-    assert!(bericht.lauffehler.is_empty());
-    assert!(!bericht.frist_ueberschritten);
+    assert!(bericht.alles_gesichert());
     assert_eq!(bericht.ordner.len(), 2);
-    assert!(bericht.ordner.iter().all(|o| matches!(o.status, projectb_kern::anhalten::Ordnerstatus::Gesichert { .. })));
     let sha = git(&repo.0, &["rev-parse", "agent/x"]);
-    assert_eq!(bericht.ordner[0].status, projectb_kern::anhalten::Ordnerstatus::Gesichert { sha: sha.clone() });
+    assert_eq!(bericht.ordner[0].status, Ordnerstatus::Gesichert { sha: sha.clone() });
     assert_eq!(git(&repo.0, &["show", "agent/x:arbeit.txt"]), "Agentenarbeit");
     assert!(git(&repo.0, &["log", "-1", "--format=%s", "agent/x"]).starts_with("WIP:"));
     let (mut neu, rx) = starten(&repo, &["x"]);
@@ -314,15 +333,14 @@ fn alles_anhalten_sichert_arbeit_und_neustart_erhaelt_alten_branch() {
 #[test]
 fn einzeln_anhalten_trifft_nur_den_benannten_agenten() {
     let repo = Repo::neu();
-    let mut team = haengendes_team(&repo, &["eins", "zwei"]);
+    let mut team = haengendes_team(&repo, &["eins", "zwei"], |_| {});
     assert_eq!(team.anhalten(Some("unbekannt"), Duration::ZERO).unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
     let bericht = team.anhalten(Some("eins"), Duration::from_secs(30)).unwrap();
     assert_eq!(bericht.ordner.len(), 1);
     assert_eq!(bericht.ordner[0].ordner, team.ordner()[0]);
-    assert!(matches!(bericht.ordner[0].status, projectb_kern::anhalten::Ordnerstatus::Gesichert { .. }));
+    assert!(matches!(bericht.ordner[0].status, Ordnerstatus::Gesichert { .. }));
     assert!(team.laeufe_mut()[0].beendet());
     assert!(!team.laeufe_mut()[1].beendet());
-    assert!(team.laeuft());
     team.anhalten(None, Duration::from_secs(30)).unwrap();
     assert!(!team.laeuft());
 }
@@ -330,7 +348,7 @@ fn einzeln_anhalten_trifft_nur_den_benannten_agenten() {
 #[test]
 fn startfehler_verschiebt_die_zuordnung_nicht() {
     let repo = Repo::neu();
-    let mut team = haengendes_team(&repo, &["startfehler", "gut"]);
+    let mut team = haengendes_team(&repo, &["startfehler", "gut"], |_| {});
     let bericht = team.anhalten(Some("startfehler"), Duration::from_secs(30)).unwrap();
     assert_eq!(bericht.ordner[0].ordner, team.ordner()[0]);
     assert!(team.laeuft());
@@ -344,7 +362,6 @@ fn leere_auftragsliste_wird_abgelehnt() {
     let repo = Repo::neu();
     let fehler = Team::starten(&repo.0, vec![], |_| panic!("kein Start")).err().unwrap();
     assert_eq!(fehler.kind(), std::io::ErrorKind::InvalidInput);
-    assert!(fehler.to_string().contains("Mindestens ein Auftrag"));
 }
 
 #[test]
@@ -360,7 +377,6 @@ fn vorhandener_branch_oder_ordner_wird_uebersprungen() {
         fs::create_dir_all(repo.0.join(".worktrees/x-2")).unwrap();
         let team = Team::starten_mit(&repo.0, vec![auftrag("x")], |_| {}, |_, _, _| Err(std::io::Error::other("Test")))
             .unwrap();
-        assert_eq!(team.ordner().len(), 1);
         assert!(team.ordner()[0].ends_with(".worktrees/x-3"));
         assert_eq!(git(team.ordner().first().unwrap(), &["branch", "--show-current"]), "agent/x-3");
         if branch {

@@ -84,26 +84,20 @@ pub async fn team_anhalten(
             .ok_or("Es läuft kein Team")?
             .anhalten(name.as_deref(), STANDARD_FRIST)
             .map_err(|e| e.to_string())?;
-        if name.is_none() {
+        if name.is_none() && bericht.alles_gesichert() {
             *team = None;
         }
         let ordner: Vec<_> = bericht
             .ordner
             .into_iter()
-            .map(|o| {
-                let mut json = serde_json::json!({"ordner": o.ordner});
-                match o.status {
-                    Ordnerstatus::Gesichert { sha } => {
-                        json["status"] = "gesichert".into();
-                        json["sha"] = sha.into();
-                    }
-                    Ordnerstatus::Sauber => json["status"] = "sauber".into(),
-                    Ordnerstatus::Fehler { meldung } => {
-                        json["status"] = "fehler".into();
-                        json["meldung"] = meldung.into();
-                    }
+            .map(|o| match o.status {
+                Ordnerstatus::Gesichert { sha } => {
+                    serde_json::json!({"ordner": o.ordner, "status": "gesichert", "sha": sha})
                 }
-                json
+                Ordnerstatus::Sauber => serde_json::json!({"ordner": o.ordner, "status": "sauber"}),
+                Ordnerstatus::Fehler { meldung } => {
+                    serde_json::json!({"ordner": o.ordner, "status": "fehler", "meldung": meldung})
+                }
             })
             .collect();
         let lauffehler: Vec<_> = bericht

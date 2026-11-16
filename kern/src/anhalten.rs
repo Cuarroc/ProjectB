@@ -28,6 +28,12 @@ pub struct Bericht {
     pub frist_ueberschritten: bool,
 }
 
+impl Bericht {
+    pub fn alles_gesichert(&self) -> bool {
+        self.lauffehler.is_empty() && !self.ordner.iter().any(|o| matches!(o.status, Ordnerstatus::Fehler { .. }))
+    }
+}
+
 /// Die Frist ist eine Meldegrenze: auch danach werden alle Sicherungen versucht.
 /// Ein Git-Fehler lässt die Dateien und gegebenenfalls den gefüllten Index stehen.
 pub fn alles_anhalten(laeufe: Vec<&mut Lauf>, ordner: &[PathBuf], frist: Duration) -> Bericht {

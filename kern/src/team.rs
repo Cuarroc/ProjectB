@@ -80,16 +80,16 @@ impl Team {
                 if !auftrag.anbieter.eq_ignore_ascii_case(anbieter.name) {
                     return Err(io::Error::new(io::ErrorKind::InvalidInput, "Anbieter passt nicht zum Modell"));
                 }
-                let kopie = arbeitskopie::anlegen_in(projekt, &auftrag.name, Path::new(".worktrees"))?;
+                let (kopie, basis) = arbeitskopie::anlegen_in(projekt, &auftrag.name, Path::new(".worktrees"))?;
                 stammdaten.arbeitskopie = kopie.pfad.to_string_lossy().into_owned();
                 team.ordner.push(kopie.pfad.clone());
                 team.ordnernamen.push(auftrag.name.clone());
-                starten(anbieter, &wunsch, &kopie.pfad)
+                starten(anbieter, &wunsch, &kopie.pfad).map(|lauf| (lauf, basis))
             })();
             let arbeitskopie = PathBuf::from(&stammdaten.arbeitskopie);
             let mut zustand = AgentZustand::neu(stammdaten);
             match lauf {
-                Ok(mut lauf) => {
+                Ok((mut lauf, basis)) => {
                     // Nur den Empfänger abgeben: der Lauf samt Job-Objekt bleibt für Anhalten erreichbar.
                     let ereignisse = std::mem::replace(&mut lauf.ereignisse, mpsc::channel().1);
                     team.laeufe.push((auftrag.name.clone(), lauf));
@@ -113,7 +113,7 @@ impl Team {
                                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
                             };
                             if dateien_aktualisieren {
-                                if let Ok(dateien) = arbeitskopie::geaenderte_dateien(&arbeitskopie) {
+                                if let Ok(dateien) = arbeitskopie::geaenderte_dateien_seit(&arbeitskopie, &basis) {
                                     zustand.dateien_setzen(dateien);
                                 }
                             }
@@ -157,15 +157,10 @@ impl Team {
             .ordner
             .iter()
             .zip(&self.ordnernamen)
-            .filter(|(_, n)| name.is_none_or(|name| name == n.as_str()))
-            .map(|(pfad, _)| pfad.clone())
+            .filter_map(|(pfad, n)| name.is_none_or(|name| name == n).then(|| pfad.clone()))
             .collect();
-        let laeufe = self
-            .laeufe
-            .iter_mut()
-            .filter(|(n, _)| name.is_none_or(|name| name == n.as_str()))
-            .map(|(_, lauf)| lauf)
-            .collect();
+        let laeufe =
+            self.laeufe.iter_mut().filter_map(|(n, lauf)| name.is_none_or(|name| name == n).then_some(lauf)).collect();
         Ok(anhalten::alles_anhalten(laeufe, &ordner, frist))
     }
 }
