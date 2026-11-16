@@ -13,6 +13,17 @@ const planAktionen = [
   { id: "plan-freigeben", text: "Freigeben und bauen" },
   { id: "plan-kommentieren", text: "Mit Kommentaren zurückgeben" },
 ];
+function interviewAktionen(text: string) {
+  const punkte: string[] = [];
+  for (const zeile of text.trimEnd().split(/\r?\n/).reverse()) {
+    if (!zeile.trim()) continue;
+    const punkt = zeile.match(/^[ \t]*(?:[-*]|\d+\.)[ \t]+(\S.*)$/);
+    if (!punkt) break;
+    punkte.unshift(punkt[1].trimEnd());
+  }
+  return punkte.length >= 2 && punkte.length <= 4
+    ? punkte.map((antwort, i) => ({ id: `antwort-${i}`, text: Array.from(antwort).slice(0, 80).join(""), antwort })) : [];
+}
 function textMitVerlauf(chat: Chat, pfad: string, text: string) {
   const anbieter = chat.modell === "gpt-6.1-sol" ? "codex" : "claude";
   if (!chat.verlauf.length || (chat.sitzung?.anbieter.toLowerCase() === anbieter && chat.sitzung.pfad === pfad)) return text;
@@ -107,9 +118,9 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       await empfang.current;
       const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus: ziel.modus, sitzung, text: gesendet });
       aendern({ sitzung: antwort.sitzung });
-      if (modus === "Planen" && antwort.erfolg) {
+      if ((modus === "Planen" || modus === "Interview") && antwort.erfolg) {
         const neu = quelle.lesen(), letzter = neu.chats.find(c => c.id === chat.id)?.verlauf.slice(anfang).reverse().find(n => n.von === "Orchestrator");
-        if (letzter) { letzter.aktionen = planAktionen; quelle.aktualisieren(neu); }
+        if (letzter) { letzter.aktionen = modus === "Planen" ? planAktionen : interviewAktionen(letzter.text); quelle.aktualisieren(neu); }
       }
     } catch (e) { orchestratorNachricht(quelle, chat.id, `Problem: ${e instanceof Error ? e.message : String(e)}`); }
     finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
@@ -118,7 +129,9 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (laufende.current.has(chat.id)) return;
     const neu = quelle.lesen(), ziel = neu.chats.find(c => c.id === chat.id);
     const nachricht = ziel?.verlauf.find(n => n.id === nachrichtId);
-    if (!ziel || !nachricht?.aktionen.some(a => a.id === aktionId)) return;
+    const aktion = nachricht?.aktionen.find(a => a.id === aktionId);
+    if (!ziel || !nachricht || !aktion) return;
+    if (aktionId.startsWith("antwort-") && aktion.antwort !== undefined) return senden(aktion.antwort);
     if (aktionId === "plan-freigeben") return senden(`Der Plan ist freigegeben. Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId, "Plan freigegeben.");
     if (aktionId !== "plan-kommentieren") return;
     nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);

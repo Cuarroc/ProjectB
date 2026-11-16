@@ -47,6 +47,7 @@
 .r-frage-kopf svg { flex-shrink: 0; }
 .r-frage-text { margin: 0; font: var(--schrift-text); overflow-wrap: anywhere; }
 .r-antworten, .r-aktionen { display: flex; flex-wrap: wrap; gap: var(--abstand-2); }
+.r-aktionen .kn-antwort { max-width: 100%; height: auto; min-height: var(--steuer-hoehe); padding-block: var(--abstand-2); white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .r-antworten .knopf[aria-pressed=true] { box-shadow: var(--schatten-auswahl); }
 .chat-meldung:empty { display: none; }
 .chat-meldung { align-self: center; padding: var(--abstand-2) var(--abstand-4); border-radius: var(--rund-knopf); background: var(--flaeche-2); font: var(--schrift-klein); }
