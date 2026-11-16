@@ -34,6 +34,7 @@
 .tm-testplot>span{position:absolute;left:0;top:0;color:var(--text-2)}.tm-testplot .tm-null{top:auto;bottom:0}.tm-testplot>b{position:absolute;border-radius:var(--rund-voll);padding:0 var(--abstand-1);font:var(--schrift-klein)}.tm-testplot .tm-rot{left:50%;top:30%;color:var(--status-problem);background:var(--status-problem-grund)}.tm-testplot .tm-gruen{right:var(--abstand-1);bottom:0;background:var(--status-fertig-grund)}
 .team-details .tm-jetzt{color:var(--jetzt-text);background:var(--jetzt-glas);border-radius:var(--rund-voll);padding-inline:var(--abstand-2)}.tm-dkarte pre{font:var(--schrift-code);white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
 .team-details .zs{margin-top:var(--abstand-2)}.team-details .zs-schaetzung{overflow:hidden}.team-details .zs-ereignis{top:calc(-1 * var(--abstand-5))}
+.tm-diff-plus{color:var(--status-fertig)}.tm-diff-minus{color:var(--status-problem)}.tm-diff-kopf{color:var(--text-3)}
 @keyframes team-details{from{opacity:0;transform:translateY(var(--weg-gross))}to{opacity:1;transform:translateY(0)}}
 [data-bewegung=reduziert] .team-details{animation-name:team-details-ruhig}
 @keyframes team-details-ruhig{from{opacity:0}to{opacity:1}}

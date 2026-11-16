@@ -10,6 +10,7 @@ import { agentenTestverlauf } from "../daten/beispiel";
 import { spur } from "./TeamAnsichten";
 import "./TeamDetails.css";
 import { AnhalteMarke } from "./anhalten";
+import { teamDateiAnsehen } from "../daten/tauri";
 
 const status = { Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fertig", Problem: "problem" } as const;
 const dauer = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -21,6 +22,7 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
   if (angehalten) agent = { ...agent, schaetzung: null };
   const bereich = useRef<HTMLElement>(null), [vorschau, zeige] = useState<string | null>(null);
   const vorschauBereich = useRef<HTMLElement>(null), vorschauKnopf = useRef<HTMLButtonElement>(null);
+  const [datei, setDatei] = useState<{ inhalt: string; laedt: boolean } | null>(null), anfrage = useRef(0);
   const zustand = angehalten ? "offen" : status[agent.zustand], beleg = belegFuer(daten, agent.id);
   const zeitspur = echt ? { jetzt: agent.laufzeitSekunden, phasen: [] } : agent.id === "orchestrator" ? { jetzt: orchestratorBeispiel.laufzeitSekunden, phasen: [...orchestratorBeispiel.phasen] } : spur(agent);
   const ausgaben = daten.ausgaben.filter(a => a.sitzungId === agent.id);
@@ -30,7 +32,7 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
   const testpunkte = agentenTestverlauf[agent.id] ?? [], testzeit = (zeit: string) => Number(zeit.slice(0, 2)) * 60 + Number(zeit.slice(3));
   const testX = (zeit: string) => 20 + (testzeit(zeit) - testzeit(testpunkte[0]?.zeit ?? zeit)) / Math.max(1, testzeit(testpunkte.at(-1)?.zeit ?? zeit) - testzeit(testpunkte[0]?.zeit ?? zeit)) * 195;
   useLayoutEffect(() => {
-    zeige(null);
+    zeige(null); setDatei(null);
     const spalte = bereich.current?.closest(".team-bereich");
     const karte = [...spalte?.querySelectorAll<HTMLElement>(`[data-agent="${agent.id}"]`) ?? []].find(el => el.getClientRects().length);
     const liste = karte?.closest<HTMLElement>(".team-liste"), achse = liste?.querySelector<HTMLElement>(".team-achse");
@@ -40,14 +42,27 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
     }
     karte?.scrollIntoView({ block: "start", behavior: "instant" });
     bereich.current?.focus({ preventScroll: true });
-    return () => { if (liste) { liste.style.scrollPaddingTop = ""; liste.style.paddingBottom = ""; } };
+    return () => { anfrage.current++; if (liste) { liste.style.scrollPaddingTop = ""; liste.style.paddingBottom = ""; } };
   }, [agent.id]);
   useLayoutEffect(() => { if (vorschau) { vorschauBereich.current?.scrollIntoView({ block: "nearest" }); vorschauBereich.current?.focus({ preventScroll: true }); } }, [vorschau]);
+  useLayoutEffect(() => {
+    if (datei && !datei.laedt && document.activeElement === vorschauBereich.current) vorschauBereich.current?.scrollIntoView({ block: "nearest" });
+  }, [datei]);
   const zu = () => {
     const knopf = [...bereich.current?.closest(".team-bereich")?.querySelectorAll<HTMLElement>(`[data-agent="${agent.id}"] [aria-expanded="true"]`) ?? []].find(el => el.getClientRects().length);
     schliessen(); knopf?.focus({ preventScroll: true });
   };
-  const oeffnen = (e: React.MouseEvent<HTMLButtonElement>, inhalt: string) => { vorschauKnopf.current = e.currentTarget; zeige(inhalt); };
+  const oeffnen = (e: React.MouseEvent<HTMLButtonElement>, inhalt: string) => { anfrage.current++; setDatei(null); vorschauKnopf.current = e.currentTarget; zeige(inhalt); };
+  const ansehen = async (e: React.MouseEvent<HTMLButtonElement>, pfad: string) => {
+    oeffnen(e, pfad);
+    if (!echt) return;
+    const nummer = anfrage.current;
+    setDatei({ inhalt: "", laedt: true });
+    let inhalt: string;
+    try { inhalt = await teamDateiAnsehen(agent.name, pfad); }
+    catch (fehler) { inhalt = fehler instanceof Error ? fehler.message : String(fehler); }
+    if (nummer === anfrage.current) setDatei({ inhalt, laedt: false });
+  };
   return <aside id="team-details" ref={bereich} tabIndex={-1} className="team-details" aria-label={`Details: ${agent.name}`} style={{ "--detail-glanz": `var(--status-${zustand}-grund)` } as CSSProperties}
     onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); zu(); } }}>
     <div className="tm-det">
@@ -73,10 +88,20 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
             <span>{agent.tests.gesamt}</span><span className="tm-null">0</span>{rot && <b className="tm-rot">{rot.rot} rot</b>}<b className="tm-gruen">{agent.tests.gruen} / {agent.tests.gesamt}</b></div>
             <div className="team-diagramm-zeiten"><span>{rot?.zeit ?? agent.tests.gruenSeit}</span><span className="tm-jetzt">Jetzt</span></div>
             <p>{agent.tests.gruen} von {agent.tests.gesamt} grün{rot && ` · Um ${rot.zeit} waren ${rot.rot} rot, der Agent hat sie repariert`}</p></> : <p>Noch keine Tests</p>}</section></>}
-        <section className="tm-dkarte"><h4>Dateien</h4><ul className="tm-dateien">{agent.dateien.map(d => <li key={d.pfad}><span><code>{d.pfad}</code><small>+{d.hinzugefuegt} −{d.entfernt}</small></span>{!echt && <Knopf text="Ansehen" onClick={e => { vorschauKnopf.current = e.currentTarget; zeige(d.pfad); }} />}</li>)}</ul>{!agent.dateien.length && <p>Noch keine Dateien</p>}</section>
+        <section className="tm-dkarte"><h4>Dateien</h4><ul className="tm-dateien">{agent.dateien.map(d => <li key={d.pfad}><span><code>{d.pfad}</code><small>+{d.hinzugefuegt} −{d.entfernt}</small></span><Knopf text="Ansehen" onClick={e => ansehen(e, d.pfad)} /></li>)}</ul>{!agent.dateien.length && <p>Noch keine Dateien</p>}</section>
         {!echt && <section className="tm-dkarte"><h4>Ausgaben</h4><ul className="tm-dateien">{ausgaben.map(a => <li key={a.id}><span>{a.name}<small>{a.pfad}</small></span><Knopf text="Ansehen" onClick={e => { vorschauKnopf.current = e.currentTarget; zeige(a.pfad); }} /></li>)}</ul>{!ausgaben.length && <p>Noch keine Ausgaben</p>}</section>}
         {beleg && agent.zustand === "Fertig" && <section className="tm-dkarte tm-breit"><h4>Beleg</h4><p>{beleg.titel}</p><a href={beleg.prLink} target="_blank" rel="noreferrer">PR ansehen</a></section>}
-        {vorschau && <section ref={vorschauBereich} tabIndex={-1} className="tm-dkarte tm-breit" aria-label="Vorschau" aria-live="polite"><h4><FileText size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /> Vorschau</h4><code>{vorschau}</code>{vorschau === "Protokoll" ? <pre>{agent.letzteZeilen.join("\n") || "Noch keine Ausgabe"}</pre> : <p>{vorschau === "Agent fragen" ? "Nachrichten an Agenten sind in dieser Vorschau noch nicht verfügbar." : "Die Vorschau dieser Beispieldatei ist noch nicht verfügbar."}</p>}<Knopf text="Vorschau schließen" variante="leise" onClick={() => { zeige(null); vorschauKnopf.current?.focus(); }} /></section>}
+        {vorschau && <section ref={vorschauBereich} tabIndex={-1} className="tm-dkarte tm-breit" aria-label="Vorschau" aria-live="polite" aria-busy={datei?.laedt}>
+          <h4><FileText size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /> Vorschau</h4><code>{vorschau}</code>
+          {datei ? datei.laedt ? <p>Lädt …</p> : <pre>{datei.inhalt.split("\n").map((zeile, i) => {
+            const klasse = zeile.startsWith("+") && !zeile.startsWith("+++") ? "tm-diff-plus"
+              : zeile.startsWith("-") && !zeile.startsWith("---") ? "tm-diff-minus"
+              : /^(diff --git |index |@@)/.test(zeile) ? "tm-diff-kopf" : undefined;
+            return <span key={i} className={klasse}>{i > 0 && "\n"}{zeile}</span>;
+          })}</pre> : vorschau === "Protokoll" ? <pre>{agent.letzteZeilen.join("\n") || "Noch keine Ausgabe"}</pre>
+            : <p>{vorschau === "Agent fragen" ? "Nachrichten an Agenten sind in dieser Vorschau noch nicht verfügbar." : "Die Vorschau dieser Beispieldatei ist noch nicht verfügbar."}</p>}
+          <Knopf text="Vorschau schließen" variante="leise" onClick={() => { anfrage.current++; zeige(null); vorschauKnopf.current?.focus(); }} />
+        </section>}
       </div>
     </div>
   </aside>;

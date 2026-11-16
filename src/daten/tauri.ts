@@ -84,3 +84,8 @@ export async function einstellungenLaden(projekt: string) {
 export async function einstellungenAendern(projekt: string, werte: Kernwerte) {
   return anzeigen(await invoke<Kernwerte>("einstellungen_speichern", { projekt, werte }));
 }
+
+export async function teamDateiAnsehen(name: string, pfad: string): Promise<string> {
+  if (!isTauri()) throw new Error("Ansehen geht nur in der App.");
+  return invoke<string>("team_datei_ansehen", { name, pfad });
+}
