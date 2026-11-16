@@ -38,6 +38,9 @@ fn main() {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
     }
+    if hat("--team-arbeit") {
+        std::fs::write("arbeit.txt", "Agentenarbeit").unwrap();
+    }
     let text = if hat("--argumente") {
         std::env::args().skip(1).collect::<Vec<_>>().join(" ")
     } else {

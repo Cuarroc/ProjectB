@@ -18,6 +18,7 @@ pub mod pruefung;
 pub mod verbrauch;
 pub mod zustand;
 
+pub use serde_json;
 use serde_json::Value;
 pub mod arbeitskopie;
 use std::fmt;
@@ -271,6 +272,10 @@ impl Lauf {
 
     pub fn warten(&mut self) -> io::Result<ExitStatus> {
         self.kind.lock().unwrap().wait()
+    }
+
+    pub fn beendet(&self) -> bool {
+        matches!(self.kind.lock().unwrap().try_wait(), Ok(Some(_)))
     }
 }
 

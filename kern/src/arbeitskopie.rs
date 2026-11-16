@@ -10,7 +10,12 @@ pub struct Arbeitskopie {
 
 /// Änderungen gegen HEAD samt neuen Dateien; unlesbare Einträge mit 0/0.
 pub fn geaenderte_dateien(repo: &Path) -> io::Result<Vec<serde_json::Value>> {
-    let diff = ausfuehren(git(repo).args(["diff", "--numstat", "-z", "HEAD", "--"]))?;
+    geaenderte_dateien_seit(repo, "HEAD")
+}
+
+/// Wie `geaenderte_dateien`, aber gegen einen festen Start-Commit (bleibt nach WIP-Commits gleich).
+pub fn geaenderte_dateien_seit(repo: &Path, basis: &str) -> io::Result<Vec<serde_json::Value>> {
+    let diff = ausfuehren(git(repo).args(["diff", "--numstat", "-z", basis, "--"]))?;
     let neue = ausfuehren(git(repo).args(["ls-files", "--others", "--exclude-standard", "-z"]))?;
     let diff = String::from_utf8(diff).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     let neue = String::from_utf8(neue).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
@@ -54,20 +59,35 @@ fn zeilen_neuer_datei(pfad: &Path) -> io::Result<u64> {
 
 /// Legt eine Arbeitskopie von HEAD unter `<repo>/.worktrees/<name>` an.
 pub fn anlegen(repo: &Path, name: &str) -> io::Result<Arbeitskopie> {
-    anlegen_in(repo, name, Path::new(".worktrees"))
+    anlegen_in(repo, name, Path::new(".worktrees")).map(|(kopie, _)| kopie)
 }
 
-/// Relative Zielordner beziehen sich auf `repo`; der Agentenname wird angehängt.
-pub fn anlegen_in(repo: &Path, name: &str, ordner: &Path) -> io::Result<Arbeitskopie> {
+/// Liefert Arbeitskopie und Start-Commit; relative Zielordner beziehen sich auf `repo`.
+pub fn anlegen_in(repo: &Path, name: &str, ordner: &Path) -> io::Result<(Arbeitskopie, String)> {
     if name.is_empty() || name.contains("..") || name.contains(['/', '\\']) || name.starts_with('-') {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "Ungültiger Name der Arbeitskopie"));
     }
-    let branch = format!("agent/{name}");
+    let mut branch = format!("agent/{name}");
     ausfuehren(git(repo).args(["check-ref-format", &format!("refs/heads/{branch}")]))
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Ungültiger Branchname"))?;
-    let pfad = std::fs::canonicalize(repo)?.join(ordner).join(name);
-    ausfuehren(git(repo).args(["worktree", "add", "-b", &branch]).arg(git_pfad(&pfad)).arg("HEAD"))?;
-    Ok(Arbeitskopie { pfad: std::fs::canonicalize(pfad)?, branch: Some(branch) })
+    let basis = std::fs::canonicalize(repo)?.join(ordner);
+    let mut pfad = basis.join(name);
+    let mut nummer = 2;
+    loop {
+        let status = git(repo).args(["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")]).status()?;
+        match status.code() {
+            Some(1) if !pfad.try_exists()? => break,
+            Some(0 | 1) => {}
+            _ => return Err(io::Error::other(format!("Git-Branchprüfung fehlgeschlagen: {status}"))),
+        }
+        branch = format!("agent/{name}-{nummer}");
+        pfad = basis.join(format!("{name}-{nummer}"));
+        nummer += 1;
+    }
+    let start = String::from_utf8(ausfuehren(git(repo).args(["rev-parse", "HEAD"]))?)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    ausfuehren(git(repo).args(["worktree", "add", "-b", &branch]).arg(git_pfad(&pfad)).arg(start.trim()))?;
+    Ok((Arbeitskopie { pfad: std::fs::canonicalize(pfad)?, branch: Some(branch) }, start.trim().to_owned()))
 }
 
 /// Enthält auch die Hauptarbeitskopie; abgelöste HEADs haben keinen Branch.
@@ -308,7 +328,7 @@ mod tests {
     fn eigener_ordner_und_fremdes_repo() {
         let repo = TempRepo::neu();
         let fremd = TempRepo::neu();
-        let kopie = anlegen_in(&repo.0, "agent-2", Path::new("anderer Ordner")).unwrap();
+        let (kopie, _) = anlegen_in(&repo.0, "agent-2", Path::new("anderer Ordner")).unwrap();
         assert_eq!(kopie.pfad, fs::canonicalize(repo.0.join("anderer Ordner/agent-2")).unwrap());
         assert!(entfernen(&fremd.0, &kopie).is_err());
         assert!(kopie.pfad.exists());
