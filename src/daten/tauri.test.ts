@@ -3,6 +3,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beispiel } from "./beispiel";
 import { auftragSenden, chatNachrichtenHoeren, projektOeffnen, projektPruefen, projekteZuletzt } from "./tauri";
+import { teamStarten, teamAnhalten, teamAgentHoeren } from "./tauri";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: vi.fn(() => false) }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
@@ -58,5 +59,34 @@ it("abonniert chat-nachricht und reicht die Nutzdaten und das Abmelden weiter", 
 it("weist Browseraufträge zurück und liefert dort ein leeres Abmelden", async () => {
   await expect(auftragSenden(auftrag)).rejects.toThrow("Echte Aufträge gehen nur in der Desktop-App.");
   (await chatNachrichtenHoeren(vi.fn()))();
+  expect(invoke).not.toHaveBeenCalled(); expect(listen).not.toHaveBeenCalled();
+});
+
+it("sendet Teamaufträge und beide Anhaltevarianten unverändert", async () => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  const auftraege = [{ name: "Kern", anbieter: "Codex" as const, modell: "gpt-6.1-sol", effort: "Hoch" as const, text: "Prüfe CSV" }];
+  const bericht = { ordner: [{ ordner: "/repo/kern", status: "sauber" }], lauffehler: [], fristUeberschritten: false };
+  await teamStarten("/repo", auftraege);
+  vi.mocked(invoke).mockResolvedValue(bericht);
+  expect(await teamAnhalten("Kern")).toBe(bericht); expect(await teamAnhalten()).toBe(bericht);
+  expect(vi.mocked(invoke).mock.calls).toEqual([
+    ["team_starten", { pfad: "/repo", auftraege }], ["team_anhalten", { name: "Kern" }], ["team_anhalten", {}],
+  ]);
+  vi.mocked(invoke).mockRejectedValueOnce("Stoppen fehlgeschlagen");
+  await expect(teamAnhalten()).rejects.toBe("Stoppen fehlgeschlagen");
+});
+it("liest den ganzen Agenten aus dem JSON-String und gibt das Abmelden zurück", async () => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  const cb = vi.fn(), abmelden = vi.fn(), agent = { ...beispiel.agenten[0], name: "Echter Kern" };
+  vi.mocked(listen).mockResolvedValue(abmelden);
+  expect(await teamAgentHoeren(cb)).toBe(abmelden);
+  expect(listen).toHaveBeenCalledExactlyOnceWith("team-agent", expect.any(Function));
+  vi.mocked(listen).mock.calls[0][1]({ event: "team-agent", id: 1, payload: JSON.stringify(agent) });
+  expect(cb).toHaveBeenCalledExactlyOnceWith(agent);
+});
+it("lässt Teamfunktionen ohne Tauri harmlos", async () => {
+  await expect(teamStarten("/repo", [])).resolves.toBeUndefined();
+  await expect(teamAnhalten()).resolves.toBeUndefined();
+  (await teamAgentHoeren(vi.fn()))();
   expect(invoke).not.toHaveBeenCalled(); expect(listen).not.toHaveBeenCalled();
 });
