@@ -35,12 +35,14 @@ test("Interview-Vorschläge: Tastatur, voller Antworttext und freies Feld", asyn
   const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" });
   const punkt = "Mein Team braucht einen CSV-Export mit Status, Dauer und Umlauten für die wöchentliche Auswertung.";
   const erster = page.getByRole("button", { name: "Nur für mich", exact: true });
-  const zweiter = page.getByRole("button", { name: punkt.slice(0, 80), exact: true });
+  const zweiter = page.getByRole("button", { name: punkt, exact: true });
   await feld.fill("Ich möchte einen CSV-Export."); await feld.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(1);
   await page.evaluate(p => window.antwort(`Wer soll den Export nutzen?\n- Nur für mich\n- ${p}`), punkt);
   await expect(erster).toHaveCount(0); await page.evaluate(() => window.beenden());
   await expect(erster).toBeEnabled(); await expect(zweiter).toBeEnabled();
+  await expect(zweiter).toHaveAccessibleName(punkt);
+  await expect(zweiter.locator(".knopf-inhalt").first()).toHaveText("Mein Team braucht einen CSV-Export mit Status, Dauer und Umlauten für die…");
   await feld.fill("Eigene Ergänzung"); await expect(feld).toBeEditable();
   await erster.focus(); await expect(erster).toBeFocused(); await page.keyboard.press("Tab"); await expect(zweiter).toBeFocused();
   expect(await zweiter.evaluate(el => { const r = el.getBoundingClientRect(), karte = el.closest("article").getBoundingClientRect(); return r.left >= karte.left && r.right <= karte.right && el.scrollWidth <= el.clientWidth; })).toBe(true);
@@ -50,7 +52,9 @@ test("Interview-Vorschläge: Tastatur, voller Antworttext und freies Feld", asyn
     await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p52o_interview_1440x900.png`, animations: "disabled" });
   }
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.interviewChats).chats[0].verlauf.at(-1).aktionen.length)).toBe(2);
-  await page.reload(); await expect(zweiter).toBeEnabled(); await zweiter.focus(); await page.keyboard.press("Enter");
+  await page.reload(); await expect(zweiter).toBeEnabled();
+  await page.getByRole("radio", { name: "Ausführen", exact: true }).click();
+  await zweiter.focus(); await page.keyboard.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(1);
   expect(await page.evaluate(() => window.auftraege[0])).toMatchObject({ modus: "Interview", text: punkt, sitzung: { id: "s-interview", anbieter: "Claude", pfad: "C:\\ProjectB" } });
   await expect(page.locator(".r-du .r-msg-text").last()).toHaveText(punkt);
@@ -60,5 +64,17 @@ test("Interview-Vorschläge: Tastatur, voller Antworttext und freies Feld", asyn
   await expect(feld).toBeEditable(); await feld.fill("Ja, genau."); await feld.press("Enter");
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(2);
   expect(await page.evaluate(() => window.auftraege[1])).toMatchObject({ modus: "Interview", text: "Ja, genau." });
+  await page.evaluate(() => window.beenden());
+  await expect(feld).toBeEditable(); await feld.fill("Noch eine Frage."); await feld.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(3);
+  await page.evaluate(() => { window.antwort("Wer?\n- **Nur ich**\n- *Mein Team* mit `CSV`"); window.beenden(); });
+  const nurIch = page.locator(".r-aktionen").getByRole("button", { name: "Nur ich", exact: true });
+  await expect(nurIch).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Mein Team mit CSV", exact: true })).toBeEnabled();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await nurIch.click();
+  await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(4);
+  expect(await page.evaluate(() => window.auftraege[3])).toMatchObject({ modus: "Interview", text: "Nur ich" });
+  await expect(page.locator(".r-du .r-msg-text").last()).toHaveText("Nur ich");
   await page.evaluate(() => window.beenden());
 });
