@@ -1,7 +1,7 @@
 export type Zustand = "Arbeitet" | "Wartet auf dich" | "Fertig" | "Problem";
 export type Anbieter = "Claude" | "Codex";
 export type Effort = "Niedrig" | "Mittel" | "Hoch" | "Sehr hoch";
-export type Aktion = { id: string; text: string };
+export type Aktion = { id: string; text: string; antwort?: string };
 export type Agent = {
   id: string; name: string; anbieter: Anbieter; modell: string; effort: Effort;
   zustand: Zustand; fortschritt: number; arbeitskopie: string;
