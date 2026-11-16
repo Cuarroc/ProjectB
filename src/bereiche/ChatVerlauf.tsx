@@ -10,7 +10,7 @@ import type { Plan, Planschritt } from "../daten/typen";
 import "./ChatVerlauf.css";
 import "../bausteine/bausteine2.css";
 import Planfenster, { type PlanMarken } from "./Planfenster";
-import { planKommentare } from "../daten/plan";
+import { planKommentare, markdownKlartext } from "../daten/plan";
 import Interview, { type InterviewZustand } from "./Interview";
 import { AnhalteHinweis, useAnhalten } from "./anhalten";
 
@@ -50,8 +50,10 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
   const [, zeitAktualisieren] = useState(0);
   useEffect(() => {
     if (!chat?.gestartetUm) return;
-    const timer = setInterval(() => zeitAktualisieren(wert => wert + 1), 60_000);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => { zeitAktualisieren(wert => wert + 1); timer = setTimeout(tick, 60_000 - Date.now() % 60_000); };
+    timer = setTimeout(tick, 60_000 - Date.now() % 60_000);
+    return () => clearTimeout(timer);
   }, [chat?.gestartetUm]);
   const jetzt = new Date(), [stunden, minuten] = (chat?.gestartetUm ?? "00:00").split(":").map(Number);
   const laufzeit = (jetzt.getHours() * 60 + jetzt.getMinutes() - stunden * 60 - minuten + 1440) % 1440;
@@ -118,7 +120,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
                 <div className="r-antworten">{frage.antwortknoepfe.map(a => <Knopf key={a.id} text={a.text} variante="antwort" aria-pressed={antworten[frage.id] === a.id}
                   onClick={() => { setAntworten(v => ({ ...v, [frage.id]: a.id })); onAntwort?.(frage.id, a.id); }} />)}</div>
               </section>}
-              {(n.aktionen.length > 0 || n.plan) && <div className="r-aktionen">{n.aktionen.map(a => <Knopf key={a.id} text={a.text} aria-label={a.antwort?.replace(/(\*\*|\*|`)(.+?)\1/g, "$2")} variante={a.id === "plan-freigeben" ? "haupt" : a.id.startsWith("antwort-") ? "antwort" : "zweit"} disabled={!onAktion || !!chat.gestartetUm} onClick={() => onAktion?.(n.id, a.id)} />)}
+              {(n.aktionen.length > 0 || n.plan) && <div className="r-aktionen">{n.aktionen.map(a => <Knopf key={a.id} text={a.text} aria-label={a.antwort === undefined ? undefined : markdownKlartext(a.antwort)} variante={a.id === "plan-freigeben" ? "haupt" : a.id.startsWith("antwort-") ? "antwort" : "zweit"} disabled={!onAktion || !!chat.gestartetUm} onClick={() => onAktion?.(n.id, a.id)} />)}
                 {n.plan && <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen({ plan: n.plan!, echt: true }); onPlanOeffnen?.(n.plan!.id); }} />}
               </div>}
             </article>
@@ -127,7 +129,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
       </ol>
     </div>
     <div className="chat-meldung" role="status">{meldung}</div>
-    {planOffen && <Planfenster daten={daten} plan={planOffen.echt ? planOffen.plan : undefined} entscheidbar={!planOffen.echt || (!!onAktion && !chat?.gestartetUm && !!chat?.verlauf.find(n => n.id === planOffen.plan.id)?.aktionen.length)} gespeicherteMarken={planMarken[planOffen.plan.id] ?? {}} onSchliessen={() => setPlanOffen(null)} onEntscheiden={(plan, marken, stil) => {
+    {planOffen && <Planfenster daten={daten} laeuft={!!chat?.gestartetUm} plan={planOffen.echt ? planOffen.plan : undefined} entscheidbar={!planOffen.echt || (!!onAktion && !chat?.gestartetUm && !!chat?.verlauf.find(n => n.id === planOffen.plan.id)?.aktionen.length)} gespeicherteMarken={planMarken[planOffen.plan.id] ?? {}} onSchliessen={() => setPlanOffen(null)} onEntscheiden={(plan, marken, stil) => {
       if (planOffen.echt) { onAktion?.(plan.id, plan.freigabe === "Freigegeben" ? "plan-freigeben" : "plan-kommentieren", planKommentare(plan, stil, marken)); return; }
       if (quelle instanceof BeispielQuelle) quelle.aktualisieren({ ...quelle.lesen(), plan });
       else setDaten(d => ({ ...d, plan }));

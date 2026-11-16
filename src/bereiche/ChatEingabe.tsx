@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { auftragSenden, chatNachrichtenHoeren } from "../daten/tauri";
-import { antwortPlan } from "../daten/plan";
+import { antwortPlan, aufgabenListe, markdownKlartext } from "../daten/plan";
 import { BeispielQuelle } from "../daten/quelle";
 import type { Chat, Todo } from "../daten/typen";
 import { Eingabefeld } from "../bausteine/Eingabefeld";
@@ -15,24 +15,11 @@ const planAktionen = [
   { id: "plan-kommentieren", text: "Mit Kommentaren zurückgeben" },
 ];
 function antwortTodos(text: string) {
-  let liste: Todo[] | undefined, inListe = false;
-  let codeZaun = "";
-  for (const zeile of text.split(/\r?\n/)) {
-    const zaun = zeile.match(/^[ \t]*(`{3,}|~{3,})(.*)$/);
-    if (codeZaun) {
-      if (zaun && zaun[1][0] === codeZaun[0] && zaun[1].length >= codeZaun.length && !zaun[2].trim()) codeZaun = "";
-      continue;
-    }
-    if (zaun) { codeZaun = zaun[1]; continue; }
-    const punkt = zeile.match(/^[ \t]*[-*][ \t]+\[([ xX])\][ \t]+(\S.*)$/);
-    if (!punkt) { if (zeile.trim() && !/^[ \t]/.test(zeile)) inListe = false; continue; }
-    if (!inListe || !liste) liste = [];
-    inListe = true;
-    if (liste.length < 20) liste.push({ id: crypto.randomUUID(),
-      text: punkt[2].trimEnd().replace(/(\*\*|\*|`)(.+?)\1/g, "$2"), fertig: punkt[1] !== " ", von: "Orchestrator" });
-  }
-  return liste;
+  const liste: Todo[] = aufgabenListe(text).flatMap(({ punkt }) => punkt ? [{ id: crypto.randomUUID(),
+    text: markdownKlartext(punkt[2].trimEnd()), fertig: punkt[1] !== " ", von: "Orchestrator" as const }] : []).slice(0, 20);
+  return liste.length ? liste : undefined;
 }
+
 function interviewAktionen(text: string) {
   const punkte: string[] = [];
   for (const zeile of text.trimEnd().split(/\r?\n/).reverse()) {
@@ -43,7 +30,7 @@ function interviewAktionen(text: string) {
   }
   return punkte.length >= 2 && punkte.length <= 4
     ? punkte.map((antwort, i) => {
-      const klartext = antwort.replace(/(\*\*|\*|`)(.+?)\1/g, "$2"), zeichen = Array.from(klartext);
+      const klartext = markdownKlartext(antwort), zeichen = Array.from(klartext);
       // Ganze Wörter erhalten, damit sichtbarer Text und zugänglicher Name übereinstimmen.
       return { id: `antwort-${i}`, text: zeichen.length > 80 ? zeichen.slice(0, 79).join("").replace(/\s+\S*$/, "") + "…" : klartext, antwort };
     }) : [];
@@ -156,7 +143,8 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
   };
   const onAktion = (nachrichtId: string, aktionId: string, kommentar?: string) => {
-    if (laufende.current.has(chat.id) || (isTauri() && !quelle.lesen().kopf.geoeffnet)) return;
+    if (laufende.current.has(chat.id)) return;
+    if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
     const neu = quelle.lesen(), ziel = neu.chats.find(c => c.id === chat.id);
     const nachricht = ziel?.verlauf.find(n => n.id === nachrichtId);
     const aktion = nachricht?.aktionen.find(a => a.id === aktionId);
@@ -167,7 +155,8 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     }
     if (aktionId === "plan-freigeben") {
       if (nachricht.plan) { nachricht.plan.freigabe = "Freigegeben"; quelle.aktualisieren(neu); }
-      return senden(`Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${nachricht.text}`, nachrichtId, "Plan freigegeben.");
+      const hinweise = kommentar?.split("\n").slice(1).join("\n");
+      return senden(`Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${nachricht.text}${hinweise ? `\n\nBeachte dabei:\n${hinweise}` : ""}`, nachrichtId, "Plan freigegeben.");
     }
     if (aktionId !== "plan-kommentieren") return;
     nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);

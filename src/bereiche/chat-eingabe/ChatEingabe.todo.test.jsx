@@ -64,3 +64,20 @@ it.each(["```", "~~~"])("ignoriert Codeblöcke (%s), ohne die Liste zu beenden",
   await antwort(`- [ ] Export bauen\n${zaun}text\nKeine Aufgabe\n- [ ] Beispielaufgabe\n${zaun}\n- [ ] Export testen\n${zaun}\n- [ ] Weiteres Beispiel\n${zaun}`);
   expect(chat().todos.map(todo => todo.text)).toEqual(["Export bauen", "Export testen"]);
 });
+
+it.each(["Neuer Plan:", "# Neuer Plan"])("behält nach %s die ganze letzte Liste trotz Fließtext", async trenner => {
+  await antwort(`Stand:\n- [x] Alt\n${trenner}\n- [ ] A\nA erklärt.\n- [ ] B`);
+  expect(chat().todos.map(t => t.text)).toEqual(["A", "B"]);
+});
+it("ignoriert zitierte Listen und deren Trenner", async () => {
+  await antwort("- [ ] A\n> Stand:\n> - [x] Zitat\n- [ ] B");
+  expect(chat().todos.map(t => t.text)).toEqual(["A", "B"]);
+});
+it("erhält Rechenzeichen in Aufgaben", async () => {
+  await antwort("- [ ] 2 * 3 * 4 und **fett**");
+  expect(chat().todos[0].text).toBe("2 * 3 * 4 und fett");
+});
+it.each(["  Betroffene Dateien:", "\tBetroffene Dateien:", "  ## Betroffene Dateien", "\t## Betroffene Dateien"])("behält beide Todos bei eingerücktem Text %j", async zeile => {
+  await antwort(`- [ ] Export bauen\n${zeile}\n  - src/export.ts\n- [ ] Export testen`);
+  expect(chat().todos.map(t => t.text)).toEqual(["Export bauen", "Export testen"]);
+});

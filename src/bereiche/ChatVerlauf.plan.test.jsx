@@ -23,12 +23,12 @@ it("leitet Fenster-Freigabe und Chat-Freigabe an dieselbe Nachrichtenaktion weit
   knoten(Planfenster(fenster.props)).find(n => n.props.text === "Freigeben und bauen").props.onClick();
   expect(onAktion.mock.calls.map(([id, aktion]) => [id, aktion])).toEqual([[plan.id, "plan-freigeben"], [plan.id, "plan-freigeben"]]);
 });
-it("schickt auch einen reinen Stilwunsch aus dem echten Fenster zurück", () => {
+it("gibt den echten Plan ohne Stilvorgabe zurück", () => {
   h.werte = []; h.i = 0; const onEntscheiden = vi.fn(), plan = antwortPlan("- [ ] Export", "n");
   const baum = knoten(Planfenster({ daten: { agenten: [] }, plan, gespeicherteMarken: {}, onSchliessen: vi.fn(), onEntscheiden }));
   expect(baum.filter(n => ["pl-warum", "pl-chips"].includes(n.props.className))).toEqual([]);
   baum.find(n => n.props.text === "Neu schreiben lassen").props.onClick();
-  expect(onEntscheiden).toHaveBeenCalledWith(plan, {}, "Ausführlicher");
+  expect(onEntscheiden).toHaveBeenCalledWith(plan, {}, "");
 });
 it("reicht die Textmarken des echten Fensters an die Kommentar-Nachricht weiter", () => {
   h.werte = []; const quelle = new BeispielQuelle(), daten = quelle.lesen(), onAktion = vi.fn(), plan = antwortPlan("- [ ] Export", "echt");
