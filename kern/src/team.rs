@@ -23,6 +23,7 @@ pub struct Team {
     laeufe: Vec<(String, Lauf)>,
     ordner: Vec<PathBuf>,
     ordnernamen: Vec<String>,
+    basis: Vec<String>,
     ungesichert: bool,
 }
 
@@ -64,7 +65,7 @@ impl Team {
             }
         }
         let melden = Arc::new(melden);
-        let mut team = Self { laeufe: vec![], ordner: vec![], ordnernamen: vec![], ungesichert: false };
+        let mut team = Self { laeufe: vec![], ordner: vec![], ordnernamen: vec![], basis: vec![], ungesichert: false };
         for auftrag in auftraege {
             let mut stammdaten = Stammdaten {
                 id: auftrag.name.clone(),
@@ -85,6 +86,7 @@ impl Team {
                 stammdaten.arbeitskopie = kopie.pfad.to_string_lossy().into_owned();
                 team.ordner.push(kopie.pfad.clone());
                 team.ordnernamen.push(auftrag.name.clone());
+                team.basis.push(basis.clone());
                 starten(anbieter, &wunsch, &kopie.pfad).map(|lauf| (lauf, basis))
             })();
             let arbeitskopie = PathBuf::from(&stammdaten.arbeitskopie);
@@ -140,6 +142,15 @@ impl Team {
 
     pub fn ordner(&self) -> &[PathBuf] {
         &self.ordner
+    }
+
+    pub fn unterschied(&self, name: &str, pfad: &str) -> io::Result<String> {
+        let index = self
+            .ordnernamen
+            .iter()
+            .position(|n| n == name)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Unbekannter Agentenname"))?;
+        arbeitskopie::unterschied_seit(&self.ordner[index], &self.basis[index], pfad)
     }
 
     pub fn laeufe_mut(&mut self) -> Vec<&mut Lauf> {

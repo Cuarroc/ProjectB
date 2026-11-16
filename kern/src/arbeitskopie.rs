@@ -43,6 +43,74 @@ pub fn geaenderte_dateien_seit(repo: &Path, basis: &str) -> io::Result<Vec<serde
     Ok(dateien)
 }
 
+pub(crate) fn unterschied_seit(repo: &Path, basis: &str, pfad: &str) -> io::Result<String> {
+    let ungueltig = || io::Error::new(io::ErrorKind::InvalidInput, "Datei gehört nicht zu diesem Agenten");
+    if !geaenderte_dateien_seit(repo, basis)?.iter().any(|d| d["pfad"].as_str() == Some(pfad)) {
+        return Err(ungueltig());
+    }
+    let mut ziel = repo.to_owned();
+    for teil in Path::new(pfad).components() {
+        if !matches!(teil, std::path::Component::Normal(_)) {
+            return Err(ungueltig());
+        }
+        ziel.push(teil);
+        match std::fs::symlink_metadata(&ziel) {
+            Ok(meta) if meta.file_type().is_symlink() || (!meta.is_file() && !meta.is_dir()) => return Err(ungueltig()),
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => break, // Gelöschte Dateien bleiben ansehbar.
+            Err(e) => return Err(e),
+        }
+    }
+    match std::fs::File::open(repo.join(pfad)) {
+        Ok(datei) => {
+            let mut anfang = Vec::new();
+            datei.take(8000).read_to_end(&mut anfang)?;
+            if anfang.contains(&0) {
+                return Ok("Binärdatei, keine Vorschau.".into());
+            }
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            let vorher = ausfuehren(git(repo).args(["show", &format!("{basis}:{pfad}")]))?;
+            if vorher.iter().take(8000).any(|&b| b == 0) {
+                return Ok("Binärdatei, keine Vorschau.".into());
+            }
+        }
+        Err(e) => return Err(e),
+    }
+    let neu = !ausfuehren(git(repo).args([
+        "--literal-pathspecs",
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "-z",
+        "--",
+        pfad,
+    ]))?
+    .is_empty();
+    let mut befehl = git(repo);
+    befehl.args(["--literal-pathspecs", "diff", "--no-ext-diff", "--no-textconv", "--no-color"]);
+    if neu {
+        let leer = if cfg!(windows) { "NUL" } else { "/dev/null" };
+        befehl.args(["--no-index", "--", leer, pfad]);
+    } else {
+        befehl.args([basis, "--", pfad]);
+    }
+    let ausgabe = befehl.output()?;
+    if !ausgabe.status.success() && !(neu && ausgabe.status.code() == Some(1)) {
+        return Err(io::Error::other(format!("Git fehlgeschlagen: {}", String::from_utf8_lossy(&ausgabe.stderr))));
+    }
+    let mut diff = String::from_utf8_lossy(&ausgabe.stdout).into_owned();
+    if diff.len() > 200_000 {
+        let mut ende = 200_000;
+        while !diff.is_char_boundary(ende) {
+            ende -= 1;
+        }
+        diff.truncate(ende);
+        diff.push_str("\n… gekürzt");
+    }
+    Ok(diff)
+}
+
 fn zeilen_neuer_datei(pfad: &Path) -> io::Result<u64> {
     if !std::fs::symlink_metadata(pfad)?.is_file() {
         return Ok(0);
