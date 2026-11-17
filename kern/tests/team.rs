@@ -621,7 +621,9 @@ fn testbefehl_erkennen() {
     let repo = Repo::neu();
     let erkennen = || projectb_kern::pruefung::testbefehl(&repo.0);
     assert_eq!(erkennen(), None);
-    for inhalt in ["{}", r#"{"scripts":{"test":false}}"#, "kaputt"] {
+    // Der Platzhalter aus `npm init` ist kein Test, er endet immer mit Exit 1.
+    let platzhalter = r#"{"scripts":{"test":"echo \"Error: no test specified\" && exit 1"}}"#;
+    for inhalt in ["{}", r#"{"scripts":{"test":false}}"#, "kaputt", platzhalter] {
         fs::write(repo.0.join("package.json"), inhalt).unwrap();
         assert_eq!(erkennen(), None);
     }
