@@ -10,7 +10,7 @@ import { Umschalter } from "../bausteine/Umschalter";
 import { TeamBoard, TeamZeitstrahl, spur, teamAngehalten } from "./TeamAnsichten";
 import type { Datenstand, Agent } from "../daten/typen";
 import "./Team.css";
-import { TeamDetails, mitBeleg } from "./TeamDetails";
+import { TeamDetails, belegFuer, mitBeleg } from "./TeamDetails";
 import { allesAnhalten, AnhalteHinweis, AnhalteMarke, useAnhalten } from "./anhalten";
 import { teamAgentHoeren, teamAnhalten, teamLauf } from "../daten/tauri";
 import { Leerzustand } from "../bausteine/Leerzustand";
@@ -43,7 +43,7 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
   const tests = agenten.reduce((summe, a) => ({ gruen: summe.gruen + (a.tests?.gruen ?? 0), gesamt: summe.gesamt + (a.tests?.gesamt ?? 0) }), { gruen: 0, gesamt: 0 });
   const gesamtTokens = orchestratorBeispiel.tokens + agenten.reduce((summe, a) => summe + a.tokens, 0);
   return <section className="team-bereich" aria-labelledby="team">
-    <header className="team-kopf"><h2 id="team">Team</h2><span className="team-chip">{agenten.length} Agenten</span>
+    <header className="team-kopf"><h2 id="team">Team</h2><span className="team-chip">{agenten.length} {agenten.length === 1 ? "Agent" : "Agenten"}</span>
       <Umschalter className="team-ansichten" moeglichkeiten={["Karten", "Board", "Zeitstrahl"]} wert={ansicht} beschriftung="Team-Ansicht" onChange={umschalten} symbole={[LayoutGrid, Kanban, ChartGantt].map((Symbol, i) => <Symbol key={i} size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />)} />
       {!pause && <Knopf text="Alles anhalten" symbol={OctagonPause} onClick={() => allesStoppen ? allesStoppen() : aendern(anhalten(original))} />}</header>
     <AnhalteHinweis pause={pause} />
@@ -69,7 +69,7 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
         onDetails={() => waehlen(auswahl === "orchestrator" ? null : "orchestrator")} gewaehlt={auswahl === "orchestrator"} avatar={<Users size={20} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} /></div>
       {agenten.map(a => <div key={a.id} data-agent={a.id}>
         <Agentenkarte name={a.name} modell={`${a.anbieter} · ${a.modell}`} zustand={pause && a.zustand !== "Fertig" ? "offen" : status[a.zustand]} statusmarke={pause && a.zustand !== "Fertig" ? <AnhalteMarke /> : undefined} fortschritt={a.fortschritt}
-          zeitspur={{ ...spur(a), angehalten: pause && a.zustand !== "Fertig" }} zeile={a.liveZeile} tokens={tokens(a.tokens)} laufzeit={dauer(a.laufzeitSekunden)}
+          zeitspur={{ ...spur(a), angehalten: pause && a.zustand !== "Fertig" }} zeile={a.liveZeile} tokens={tokens(a.tokens)} laufzeit={dauer(a.laufzeitSekunden)} belegLink={a.zustand === "Fertig" ? belegFuer(daten, a)?.prLink : undefined}
           gewaehlt={auswahl === a.id} onDetails={() => waehlen(auswahl === a.id ? null : a.id)}
           aktion={pause || a.zustand === "Fertig" ? undefined : a.liveZeile.startsWith("Angehalten.") ? "Fortsetzen" : "Anhalten"}
           onAktion={() => aendern(a.liveZeile.startsWith("Angehalten.") ? { ...original, agenten: original.agenten.map(agent => agent.id === a.id ? fortsetzen(agent) : agent) } : anhalten(original, a.id))} />
@@ -123,16 +123,16 @@ function TeamEcht() {
     finally { setStoppt(false); }
   };
   useEffect(() => { if (angefordert && !pause && !stoppt) void stoppen(); }, [angefordert, pause, stoppt]);
-  const anzeige = agenten.map((a): Agent => a.zustand === "Fertig" ? { ...a, zustand: "Wartet auf dich", liveZeile: "Arbeit fertig. Tests, Review und PR fehlen noch." } : a);
+  const anzeige = agenten.map((a): Agent => a.zustand === "Fertig" && !belegFuer({ belege: [] }, a) ? { ...a, zustand: "Wartet auf dich", liveZeile: "Arbeit fertig. Tests, Review und PR fehlen noch." } : a);
   const details = anzeige.find(a => a.id === auswahl);
   return <div className="team-spalte"><section className="team-bereich team-echt" aria-labelledby="team">
-    <header className="team-kopf"><h2 id="team">Team</h2><span className="team-chip">{agenten.length} Agenten</span>
+    <header className="team-kopf"><h2 id="team">Team</h2><span className="team-chip">{agenten.length} {agenten.length === 1 ? "Agent" : "Agenten"}</span>
       {!!agenten.length && !pause && <Knopf text="Alles anhalten" symbol={OctagonPause} laedt={stoppt} onClick={() => allesAnhalten.setzen(true)} />}</header>
     <AnhalteHinweis pause={pause} fortsetzen={false} />
     {!agenten.length ? <Leerzustand bereich="team" titel="Noch kein Team." zeile="Es startet, wenn ein Plan gebaut wird." /> : <div className="team-liste" aria-label="Agenten" aria-busy={stoppt}>
       {anzeige.map((a, i) => <div key={a.id} data-agent={a.id}><Agentenkarte name={a.name} modell={`${a.anbieter} · ${a.modell}`}
         zustand={angehalten.has(a.name) ? "wartet" : status[a.zustand]} statusmarke={angehalten.has(a.name) ? <AnhalteMarke /> : undefined}
-        zeile={angehalten.has(a.name) ? "Angehalten." : a.liveZeile} tokens="–" laufzeit={dauer(a.laufzeitSekunden)} ohneZeitspur
+        zeile={angehalten.has(a.name) ? "Angehalten." : a.liveZeile} tokens="–" laufzeit={dauer(a.laufzeitSekunden)} ohneZeitspur belegLink={a.zustand === "Fertig" ? a.beleg?.prLink : undefined}
         zeitspur={{ phasen: [], jetzt: a.laufzeitSekunden, zustand: status[a.zustand] }}
         gewaehlt={auswahl === a.id} onDetails={() => waehlen(auswahl === a.id ? null : a.id)}
         aktion={!pause && !stoppt && agenten[i].zustand !== "Fertig" && !angehalten.has(a.name) ? "Anhalten" : undefined} onAktion={() => stoppen(a.name)} /></div>)}
