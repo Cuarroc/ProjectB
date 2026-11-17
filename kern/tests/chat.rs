@@ -24,6 +24,7 @@ fn chat_auswahl_erreicht_die_argumente_beider_anbieter() {
             assert_eq!(a.name, name);
             assert_eq!(w.modell.as_deref(), Some(cli));
             assert_eq!(w.effort, Some(effort));
+            assert_eq!(w.berechtigung, None);
             assert_eq!(w.prompt(), "Hallo");
             assert!(w.fortsetzen.is_none());
             let mut erwartet: Vec<String> = a.argumente.iter().map(|s| s.to_string()).collect();
@@ -68,7 +69,15 @@ fn agent(codex: bool, argumente: &'static [&'static str]) -> Anbieter {
 }
 
 fn wunsch() -> Startwunsch {
-    Startwunsch { rolle: None, modell: None, effort: None, fortsetzen: None, nur_lesen: false, auftrag: "Hallo".into() }
+    Startwunsch {
+        rolle: None,
+        modell: None,
+        effort: None,
+        fortsetzen: None,
+        berechtigung: None,
+        nur_lesen: false,
+        auftrag: "Hallo".into(),
+    }
 }
 
 #[test]

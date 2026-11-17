@@ -74,6 +74,7 @@ fn starten(repo: &Repo, namen: &[&str]) -> (Team, mpsc::Receiver<String>) {
         move |json| tx.send(json).unwrap(),
         |a, w, pfad| {
             assert!(!w.nur_lesen);
+            assert_eq!(w.berechtigung, None);
             assert_eq!(w.modell.as_deref(), Some("claude-opus-5-5"));
             assert_eq!(w.effort, Some(start::Effort::Hoch));
             start::starten(

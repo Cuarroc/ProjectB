@@ -9,6 +9,7 @@ fn wunsch() -> Startwunsch {
         modell: None,
         effort: None,
         fortsetzen: None,
+        berechtigung: Default::default(),
         nur_lesen: false,
         auftrag: "Prüfe den Code.".into(),
     }
@@ -142,4 +143,39 @@ fn unbekannter_anbieter_darf_nicht_still_schreibend_starten() {
     let a = Anbieter { name: "unbekannt", ..CLAUDE };
     let w = Startwunsch { nur_lesen: true, ..wunsch() };
     assert_eq!(argumente(&a, &w).unwrap_err().kind(), ErrorKind::Unsupported);
+}
+
+#[test]
+fn git_push_mit_optionen_scheitert_nur_mit_agenten_umgebung() {
+    use std::{fs, process::Command};
+    let git = |pfad: &Path, args: &[&str]| {
+        let aus = Command::new("git").arg("-C").arg(pfad).args(args).output().unwrap();
+        assert!(aus.status.success(), "{}", String::from_utf8_lossy(&aus.stderr));
+        String::from_utf8(aus.stdout)
+    };
+    let zeit = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+    let pfad = std::env::temp_dir().join(format!("projectb-push-test-{zeit}"));
+    fs::create_dir(&pfad).unwrap();
+    git(&pfad, &["init", "."]).unwrap();
+    git(&pfad, &["init", "--bare", "remote.git"]).unwrap();
+    git(
+        &pfad,
+        &["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "Test"],
+    )
+    .unwrap();
+    for protokoll in ["https://", "http://", "ssh://", "git@"] {
+        let url = format!("{protokoll}example.invalid/repo");
+        git(&pfad, &["config", "--add", "url.remote.git.insteadOf", &url]).unwrap();
+        git(&pfad, &["config", "remote.origin.url", &url]).unwrap();
+        let agent =
+            Anbieter { programm: "git", argumente: &["-C", ".", "push", "origin", "HEAD:refs/heads/test"], ..CLAUDE };
+        let mut lauf = projectb_kern::Lauf::starten(&agent, "", &pfad).unwrap();
+        assert!(!lauf.warten().unwrap().success(), "Push darf nicht gelingen: {protokoll}");
+        git(&pfad, &["-C", ".", "push", "origin", "HEAD:refs/heads/test"]).unwrap();
+        assert_eq!(
+            git(&pfad.join("remote.git"), &["rev-parse", "test"]).unwrap(),
+            git(&pfad, &["rev-parse", "HEAD"]).unwrap()
+        );
+    }
+    fs::remove_dir_all(pfad).unwrap();
 }

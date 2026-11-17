@@ -31,6 +31,7 @@ pub fn startwunsch(
     Ok((
         anbieter,
         start::Startwunsch {
+            berechtigung: None,
             nur_lesen: rolle.is_some(),
             rolle,
             modell: Some(cli_modell.into()),
