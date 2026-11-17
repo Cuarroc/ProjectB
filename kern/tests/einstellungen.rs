@@ -21,7 +21,10 @@ impl Datei {
 }
 impl Drop for Datei {
     fn drop(&mut self) {
-        fs::remove_dir_all(self.0.parent().unwrap()).unwrap();
+        let weg = fs::remove_dir_all(self.0.parent().unwrap());
+        if !std::thread::panicking() {
+            weg.unwrap();
+        }
     }
 }
 
