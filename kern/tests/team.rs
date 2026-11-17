@@ -316,7 +316,10 @@ fn alles_anhalten_sichert_arbeit_und_neustart_erhaelt_alten_branch() {
     assert!(!team.laeuft());
     assert!(!team.laeufe_mut()[0].warten().unwrap().success());
     assert!(bericht.alles_gesichert());
+    assert!(bericht.lauffehler.is_empty());
+    assert!(!bericht.frist_ueberschritten);
     assert_eq!(bericht.ordner.len(), 2);
+    assert!(bericht.ordner.iter().all(|o| matches!(o.status, Ordnerstatus::Gesichert { .. })));
     let sha = git(&repo.0, &["rev-parse", "agent/x"]);
     assert_eq!(bericht.ordner[0].status, Ordnerstatus::Gesichert { sha: sha.clone() });
     assert_eq!(git(&repo.0, &["show", "agent/x:arbeit.txt"]), "Agentenarbeit");
@@ -324,7 +327,7 @@ fn alles_anhalten_sichert_arbeit_und_neustart_erhaelt_alten_branch() {
     let (mut neu, rx) = starten(&repo, &["x"]);
     assert!(neu.ordner()[0].ends_with(".worktrees/x-2"));
     let meldungen = bis_fertig(&rx, neu.ordner(), 1);
-    assert!(meldungen.iter().all(|v| v["id"] == "x" && v["name"] == "x"));
+    assert!(meldungen.iter().all(|v| v["id"] == "x-2" && v["name"] == "x"));
     neu.laeufe_mut()[0].warten().unwrap();
     assert!(!neu.laeuft());
     assert_eq!(git(&repo.0, &["rev-parse", "agent/x"]), sha);
@@ -341,6 +344,7 @@ fn einzeln_anhalten_trifft_nur_den_benannten_agenten() {
     assert!(matches!(bericht.ordner[0].status, Ordnerstatus::Gesichert { .. }));
     assert!(team.laeufe_mut()[0].beendet());
     assert!(!team.laeufe_mut()[1].beendet());
+    assert!(team.laeuft());
     team.anhalten(None, Duration::from_secs(30)).unwrap();
     assert!(!team.laeuft());
 }
@@ -362,6 +366,7 @@ fn leere_auftragsliste_wird_abgelehnt() {
     let repo = Repo::neu();
     let fehler = Team::starten(&repo.0, vec![], |_| panic!("kein Start")).err().unwrap();
     assert_eq!(fehler.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(fehler.to_string().contains("Mindestens ein Auftrag"));
 }
 
 #[test]
@@ -377,6 +382,7 @@ fn vorhandener_branch_oder_ordner_wird_uebersprungen() {
         fs::create_dir_all(repo.0.join(".worktrees/x-2")).unwrap();
         let team = Team::starten_mit(&repo.0, vec![auftrag("x")], |_| {}, |_, _, _| Err(std::io::Error::other("Test")))
             .unwrap();
+        assert_eq!(team.ordner().len(), 1);
         assert!(team.ordner()[0].ends_with(".worktrees/x-3"));
         assert_eq!(git(team.ordner().first().unwrap(), &["branch", "--show-current"]), "agent/x-3");
         if branch {

@@ -24,6 +24,7 @@ test("Echten Plan öffnen, kommentieren und freigeben", async ({ page }, testInf
           return { chats: [{ ...chats[0], verlauf: [], gestartetUm: null }], aktiverChatId };
         }
         if (cmd === "chats_speichern") { localStorage.planChats = JSON.stringify(args.daten); return; }
+        if (cmd === "team_starten") { window.teamStart = args; return; }
         if (cmd === "auftrag_senden") {
           window.auftraege.push(args);
           return new Promise(resolve => { window.beenden = () => resolve({ sitzung: { id: "s-plan", anbieter: "Claude", pfad: args.pfad }, erfolg: true }); });
@@ -69,14 +70,13 @@ test("Echten Plan öffnen, kommentieren und freigeben", async ({ page }, testInf
   await page.evaluate(text => { window.antwort(text); window.beenden(); }, plantext);
   await page.getByRole("button", { name: "Plan öffnen", exact: true }).last().click();
   await dialog.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(2);
-  expect(await page.evaluate(() => window.auftraege[1])).toMatchObject({ modus: "Ausführen", text: `Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${plantext}` });
+  await expect.poll(() => page.evaluate(() => window.teamStart?.auftraege.length)).toBe(3);
+  expect(await page.evaluate(() => window.auftraege.length)).toBe(1);
   await expect(page.locator(".r-aktionen").getByRole("button", { name: /^(Freigeben und bauen|Mit Kommentaren zurückgeben)$/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Plan öffnen", exact: true }).last().click();
-  await expect(dialog.locator(".pl-kopf .statusmarke")).toHaveAttribute("data-zustand", "arbeitet");
-  await expect(dialog.locator(".pl-kopf .statusmarke")).toHaveText("Arbeitet");
+  await expect(dialog.locator(".pl-kopf .statusmarke")).toHaveAttribute("data-zustand", "fertig");
+  await expect(dialog.locator(".pl-kopf .statusmarke")).toHaveText("Freigegeben");
   await dialog.getByRole("button", { name: "Plan schließen", exact: true }).click();
-  await page.evaluate(() => window.beenden());
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.planChats).chats[0].verlauf.filter(n => n.plan).at(-1).plan.freigabe)).toBe("Freigegeben");
   for (const neuladen of [false, true]) {
     if (neuladen) await page.reload();

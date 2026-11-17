@@ -12,7 +12,7 @@ import type { Datenstand, Agent } from "../daten/typen";
 import "./Team.css";
 import { TeamDetails, mitBeleg } from "./TeamDetails";
 import { allesAnhalten, AnhalteHinweis, AnhalteMarke, useAnhalten } from "./anhalten";
-import { teamAgentHoeren, teamAnhalten } from "../daten/tauri";
+import { teamAgentHoeren, teamAnhalten, teamLauf } from "../daten/tauri";
 import { Leerzustand } from "../bausteine/Leerzustand";
 import { Toast, ToastSpeicher } from "../bausteine/Toast";
 
@@ -84,6 +84,7 @@ function TeamEcht() {
   const [agenten, setzen] = useState<Agent[]>([]), [auswahl, waehlen] = useState<string | null>(null);
   const [pause, setPause] = useState(false), [stoppt, setStoppt] = useState(false);
   const lauf = useRef({ ids: new Set<string>(), angehalten: false });
+  const [angehalten, setAngehalten] = useState(() => new Set<string>());
   const angefordert = useAnhalten();
   const [meldungen] = useState(() => new ToastSpeicher());
   const fehler = (zeile: string) => meldungen.melden({ id: zeile, art: "problem", agent: "Team", titel: "Team: Anhalten oder Empfang fehlgeschlagen", zeile });
@@ -91,9 +92,10 @@ function TeamEcht() {
     let beendet = false, abmelden = () => {};
     teamAgentHoeren(agent => {
       if (beendet) return;
-      if (lauf.current.angehalten && !lauf.current.ids.has(agent.id)) {
-        lauf.current.ids.clear(); lauf.current.angehalten = false;
-        setzen([]); waehlen(null); setPause(false); allesAnhalten.setzen(false);
+      // Das erste Ereignis nach teamStarten beginnt immer einen neuen Lauf, auch bei gleichen ids (anderes Projekt).
+      if (teamLauf.neu || (lauf.current.angehalten && !lauf.current.ids.has(agent.id))) {
+        lauf.current.ids.clear(); lauf.current.angehalten = false; teamLauf.neu = false;
+        setzen([]); waehlen(null); setPause(false); setAngehalten(new Set()); allesAnhalten.setzen(false);
       }
       lauf.current.ids.add(agent.id);
       setzen(alt => alt.some(a => a.id === agent.id) ? alt.map(a => a.id === agent.id ? agent : a) : [...alt, agent]);
@@ -111,6 +113,7 @@ function TeamEcht() {
       else {
         if (bericht?.fristUeberschritten) meldungen.melden({ id: "frist", art: "info", agent: "Team", titel: "Team: Anhalten abgeschlossen", zeile: "Anhalten hat zu lange gedauert." });
         if (name === undefined) { lauf.current.angehalten = true; setPause(true); allesAnhalten.setzen(true); }
+        else setAngehalten(alt => new Set([...alt, name]));
       }
     } catch (e) { if (name === undefined) allesAnhalten.setzen(false); fehler(e instanceof Error ? e.message : String(e)); }
     finally { setStoppt(false); }
@@ -124,10 +127,11 @@ function TeamEcht() {
     <AnhalteHinweis pause={pause} fortsetzen={false} />
     {!agenten.length ? <Leerzustand bereich="team" titel="Noch kein Team." zeile="Es startet, wenn ein Plan gebaut wird." /> : <div className="team-liste" aria-label="Agenten" aria-busy={stoppt}>
       {anzeige.map((a, i) => <div key={a.id} data-agent={a.id}><Agentenkarte name={a.name} modell={`${a.anbieter} · ${a.modell}`}
-        zustand={status[a.zustand]} zeile={a.liveZeile} tokens="–" laufzeit={dauer(a.laufzeitSekunden)} ohneZeitspur
+        zustand={angehalten.has(a.name) ? "wartet" : status[a.zustand]} statusmarke={angehalten.has(a.name) ? <AnhalteMarke /> : undefined}
+        zeile={angehalten.has(a.name) ? "Angehalten." : a.liveZeile} tokens="–" laufzeit={dauer(a.laufzeitSekunden)} ohneZeitspur
         zeitspur={{ phasen: [], jetzt: a.laufzeitSekunden, zustand: status[a.zustand] }}
         gewaehlt={auswahl === a.id} onDetails={() => waehlen(auswahl === a.id ? null : a.id)}
-        aktion={!pause && !stoppt && agenten[i].zustand !== "Fertig" ? "Anhalten" : undefined} onAktion={() => stoppen(a.name)} /></div>)}
+        aktion={!pause && !stoppt && agenten[i].zustand !== "Fertig" && !angehalten.has(a.name) ? "Anhalten" : undefined} onAktion={() => stoppen(a.name)} /></div>)}
     </div>}
     {details && <TeamDetails agent={details} echt schliessen={() => waehlen(null)} />}
     <Toast speicher={meldungen} />
