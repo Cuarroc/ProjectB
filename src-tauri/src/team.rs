@@ -53,6 +53,7 @@ pub async fn team_starten(
                     }
                 },
                 kern::start::starten,
+                Some(kern::team::PR_WEG),
             )
             .map_err(|e| e.to_string())?,
         );
