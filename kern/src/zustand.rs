@@ -26,6 +26,7 @@ pub struct AgentZustand {
     prueft: bool,
     tests: Option<Value>,
     beleg: Option<Value>,
+    review: Option<Value>,
     dateien: Vec<Value>,
 }
 
@@ -43,6 +44,7 @@ impl AgentZustand {
             prueft: false,
             tests: None,
             beleg: None,
+            review: None,
             dateien: Vec::new(),
         }
     }
@@ -130,6 +132,35 @@ impl AgentZustand {
         }
     }
 
+    pub(crate) fn review_starten(&mut self, familie: &str) {
+        self.prueft = true;
+        self.review = Some(json!({"familie": familie, "urteil": null, "text": ""}));
+        self.zeilen(&format!("Review durch {familie} …"));
+    }
+
+    pub(crate) fn review_beenden(&mut self, text: &str, ergebnis: Result<(), String>) {
+        self.prueft = false;
+        let (funde, letzte) = text.trim_end().rsplit_once('\n').unwrap_or(("", text.trim_end()));
+        let urteil = match letzte {
+            "URTEIL: OK" => Some("OK"),
+            "URTEIL: FUNDE" => Some("FUNDE"),
+            _ => None,
+        };
+        let review = self.review.as_mut().expect("Review gestartet");
+        review["urteil"] = json!(urteil);
+        review["text"] = json!(if urteil.is_some() { funde } else { text });
+        let familie = review["familie"].as_str().unwrap().to_owned();
+        self.zeilen(if urteil.is_some() { funde } else { text });
+        match (ergebnis, urteil) {
+            (Ok(()), Some("OK")) => self.zeilen(&format!("Review OK ({familie})")),
+            (Ok(()), Some("FUNDE")) => self.zeilen("Review: Funde"),
+            (ergebnis, _) => {
+                self.problem = true;
+                self.zeilen(&format!("Review fehlgeschlagen: {}", ergebnis.err().unwrap_or("Kein Urteil".into())));
+            }
+        }
+    }
+
     fn antwort(&mut self, text: &str) {
         self.zeilen(text);
     }
@@ -153,6 +184,8 @@ impl AgentZustand {
     pub fn als_json_um(&self, jetzt: Instant) -> Value {
         let zustand = if self.problem {
             "Problem"
+        } else if !self.prueft && self.review.as_ref().is_some_and(|r| r["urteil"] == "OK") {
+            "Fertig"
         } else if self.ergebnis_ok && self.beendet_ok && !self.prueft {
             "Wartet auf dich"
         } else {
@@ -166,7 +199,7 @@ impl AgentZustand {
             "effort": self.stammdaten.effort, "arbeitskopie": self.stammdaten.arbeitskopie,
             "zustand": zustand, "liveZeile": self.live_zeile, "letzteZeilen": self.letzte_zeilen,
             "tokens": 0, "laufzeitSekunden": laufzeit, "fortschritt": 0,
-            "phasen": [], "dateien": self.dateien, "tests": self.tests, "beleg": self.beleg, "schaetzung": null,
+            "phasen": [], "dateien": self.dateien, "tests": self.tests, "beleg": self.beleg, "review": self.review, "schaetzung": null,
         })
     }
 }
