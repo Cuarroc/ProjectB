@@ -28,6 +28,9 @@ pub type Scannen = fn(&Path, Option<&str>) -> Result<(), String>;
 /// Scan und PR-Anlage; Tests ersetzen beide.
 pub type PrWeg = (Scannen, PrAnlegen);
 pub const PR_WEG: PrWeg = (scannen, pr_anlegen);
+const REVIEW_CLAUDE: &str = "Opus 5.5"; // chat::startwunsch übersetzt zu claude-opus-5-5.
+const REVIEW_CODEX: &str = "gpt-6.1-sol";
+const REVIEW_EFFORT: &str = "Mittel";
 
 /// Produktion: gitleaks ohne Shell; nur Exit 0 ohne Fehlerausgabe gilt als sauber.
 pub fn scannen(ordner: &Path, seit: Option<&str>) -> Result<(), String> {
@@ -108,6 +111,7 @@ pub struct TeamAuftrag {
 pub struct Team {
     laeufe: Vec<(String, Lauf)>,
     nachlaeufe: Vec<(String, Arc<Mutex<bool>>)>,
+    reviews: Arc<Mutex<Vec<(String, Lauf)>>>,
     ordner: Vec<PathBuf>,
     ordnernamen: Vec<String>,
     basis: Vec<String>,
@@ -128,7 +132,7 @@ impl Team {
         projekt: &Path,
         auftraege: Vec<TeamAuftrag>,
         melden: impl Fn(String) + Send + Sync + 'static,
-        starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf>,
+        starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf> + Send + Sync + 'static,
     ) -> io::Result<Self> {
         Self::starten_mit_kontingent(projekt, auftraege, None, melden, starten, None)
     }
@@ -139,7 +143,7 @@ impl Team {
         auftraege: Vec<TeamAuftrag>,
         kontingent: Option<&Path>,
         melden: impl Fn(String) + Send + Sync + 'static,
-        starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf>,
+        starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf> + Send + Sync + 'static,
         pr_weg: Option<PrWeg>,
     ) -> io::Result<Self> {
         if auftraege.is_empty() {
@@ -154,9 +158,11 @@ impl Team {
             }
         }
         let melden = Arc::new(melden);
+        let starten = Arc::new(starten);
         let mut team = Self {
             laeufe: vec![],
             nachlaeufe: vec![],
+            reviews: Arc::default(),
             ordner: vec![],
             ordnernamen: vec![],
             basis: vec![],
@@ -199,6 +205,8 @@ impl Team {
                     team.laeufe.push((auftrag.name.clone(), lauf));
                     let melden = Arc::clone(&melden);
                     let kontingent = kontingent.map(Path::to_path_buf);
+                    let starten = Arc::clone(&starten);
+                    let reviews = Arc::clone(&team.reviews);
                     let aktiv = Arc::new(Mutex::new(true));
                     team.nachlaeufe.push((auftrag.name.clone(), Arc::clone(&aktiv)));
                     thread::spawn(move || {
@@ -255,7 +263,71 @@ impl Team {
                                             &ergebnis,
                                             pr_weg,
                                         );
+                                        let pr_ok = pr.is_ok();
                                         zustand.pr_beenden(&auftrag.name, pr);
+                                        if pr_ok {
+                                            let aktiv = aktiv.lock().unwrap();
+                                            if !*aktiv {
+                                                break;
+                                            }
+                                            let (familie, modell) = if auftrag.anbieter.eq_ignore_ascii_case("codex") {
+                                                ("Claude", REVIEW_CLAUDE)
+                                            } else {
+                                                ("Codex", REVIEW_CODEX)
+                                            };
+                                            zustand.review_starten(familie);
+                                            melden(zustand.als_json().to_string());
+                                            let prompt = format!("Prüfe nur lesend die Änderungen seit {basis} (git diff {basis}..HEAD) auf Fehler, Sicherheit und fehlende Tests. Antworte am Ende mit genau einer Zeile URTEIL: OK oder URTEIL: FUNDE, davor höchstens 10 Zeilen Funde.");
+                                            let review = (|| {
+                                                let (anbieter, mut wunsch) = chat::startwunsch(
+                                                    modell,
+                                                    REVIEW_EFFORT,
+                                                    "Ausführen",
+                                                    None,
+                                                    "",
+                                                    prompt,
+                                                )
+                                                .map_err(io::Error::other)?;
+                                                wunsch.nur_lesen = true;
+                                                let mut lauf = starten(anbieter, &wunsch, &arbeitskopie)?;
+                                                let rx = std::mem::replace(&mut lauf.ereignisse, mpsc::channel().1);
+                                                reviews.lock().unwrap().push((auftrag.name.clone(), lauf));
+                                                Ok::<_, io::Error>(rx)
+                                            })();
+                                            drop(aktiv); // Anhalten erreicht den registrierten Prüfer, bevor es sichert.
+                                            let mut text = String::new();
+                                            let ergebnis = review.map_err(|e| e.to_string()).and_then(|rx| {
+                                                let (mut fertig, mut fehler) = (false, false);
+                                                for e in rx {
+                                                    match e {
+                                                        Ereignis::Text(t) => {
+                                                            text.push_str(&t);
+                                                            text.push('\n');
+                                                        }
+                                                        Ereignis::Fertig { erfolg, zusammenfassung } => {
+                                                            fertig = erfolg;
+                                                            fehler |= !erfolg;
+                                                            if !zusammenfassung.is_empty() {
+                                                                text = zusammenfassung;
+                                                            }
+                                                        }
+                                                        Ereignis::Beendet { erfolg, code }
+                                                            if erfolg && code == Some(0) && fertig && !fehler =>
+                                                        {
+                                                            return Ok(())
+                                                        }
+                                                        Ereignis::Beendet { code, .. } => {
+                                                            return Err(format!(
+                                                                "Prüferlauf fehlgeschlagen (Exit-Code: {code:?})"
+                                                            ))
+                                                        }
+                                                        _ => {}
+                                                    }
+                                                }
+                                                Err("Prüferlauf ohne Prozessabschluss".into())
+                                            });
+                                            zustand.review_beenden(&text, ergebnis);
+                                        }
                                     }
                                 } else {
                                     zustand.pruefung_beenden(None);
@@ -306,7 +378,9 @@ impl Team {
     }
 
     pub fn laeuft(&self) -> bool {
+        let review_laeuft = self.reviews.lock().unwrap().iter().any(|(_, lauf)| !lauf.beendet());
         self.laeufe.iter().any(|(_, lauf)| !lauf.beendet())
+            || review_laeuft
             || self.nachlaeufe.iter().any(|(_, aktiv)| *aktiv.lock().unwrap())
     }
 
@@ -327,8 +401,14 @@ impl Team {
             .zip(&self.ordnernamen)
             .filter_map(|(pfad, n)| name.is_none_or(|name| name == n).then_some(pfad.clone()))
             .collect();
-        let laeufe =
-            self.laeufe.iter_mut().filter_map(|(n, lauf)| name.is_none_or(|name| name == n).then_some(lauf)).collect();
+        // shortcut: Unter Unix stoppt Lauf::anhalten nur den Prüfer selbst; Prozessbaum-Abbruch dort später ergänzen.
+        let mut reviews = self.reviews.lock().unwrap();
+        let laeufe = self
+            .laeufe
+            .iter_mut()
+            .filter_map(|(n, lauf)| name.is_none_or(|name| name == n).then_some(lauf))
+            .chain(reviews.iter_mut().filter_map(|(n, lauf)| name.is_none_or(|name| name == n).then_some(lauf)))
+            .collect();
         let bericht = anhalten::alles_anhalten(laeufe, &ordner, frist);
         self.ungesichert = !bericht.alles_gesichert() || (name.is_some() && self.ungesichert);
         Ok(bericht)

@@ -3,7 +3,7 @@ use projectb_kern::{
     pr::{Autor, PrInfo},
     start,
     team::{PrAnlegen, PrWeg, Scannen, Team, TeamAuftrag},
-    Anbieter,
+    Anbieter, Ereignis,
 };
 use serde_json::Value;
 use std::{
@@ -95,7 +95,7 @@ fn bis_fertig(rx: &mpsc::Receiver<String>, ordner: &[PathBuf], anzahl: usize) ->
 }
 fn datei_team(repo: &Repo, n: &str, args: &'static [&str], f: fn(&std::path::Path)) -> (Team, mpsc::Receiver<String>) {
     let (tx, rx) = mpsc::channel();
-    let starten = |a: &Anbieter, w: &_, pfad: &std::path::Path| {
+    let starten = move |a: &Anbieter, w: &_, pfad: &std::path::Path| {
         f(pfad);
         let a = Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: args, ..*a };
         start::starten(&a, w, pfad)
@@ -211,17 +211,17 @@ fn ungueltiger_name_stoert_den_anderen_agenten_nicht() {
 #[test]
 fn doppelte_namen_starten_nichts() {
     let repo = Repo::neu();
-    let starts = std::cell::Cell::new(0);
+    let (starts, rx) = mpsc::channel();
     let ergebnis = Team::starten_mit(
         &repo.0,
         ["gut", "doppelt", "doppelt"].map(auftrag).into(),
         |_| {},
-        |_, _, _| {
-            starts.set(starts.get() + 1);
+        move |_, _, _| {
+            starts.send(()).unwrap();
             Err(std::io::Error::other("kein echter Prozess"))
         },
     );
-    assert_eq!(starts.get(), 0);
+    assert!(rx.try_recv().is_err());
     assert_eq!(ergebnis.err().unwrap().kind(), std::io::ErrorKind::InvalidInput);
     assert!(!repo.0.join(".worktrees").exists());
     assert_eq!(projectb_kern::arbeitskopie::liste(&repo.0).unwrap().len(), 1);
@@ -513,7 +513,7 @@ fn team_prueft_nur_erfolgreiche_agenten_und_meldet_der_reihe_nach() {
             &repo.0,
             vec![auftrag("eins")],
             move |j| tx.send(j).unwrap(),
-            |a, w, p| {
+            move |a, w, p| {
                 if let Some(skript) = skript {
                     fs::write(p.join("package.json"), r#"{"scripts":{"test":"node test.js"}}"#).unwrap();
                     fs::write(p.join("test.js"), skript).unwrap();
@@ -652,26 +652,60 @@ const FUND_IN_COMMITS: Scannen =
     |o, seit| if seit.is_some_and(|b| b == git(o, &["rev-parse", "HEAD~1"])) { FUND(o, seit) } else { Ok(()) };
 
 fn pr_team(repo: &Repo, skript: &'static str, pr: PrWeg) -> (Team, mpsc::Receiver<String>) {
+    review_team(repo, skript, pr, false, "URTEIL: OK", &[])
+}
+
+fn review_team(
+    repo: &Repo,
+    skript: &'static str,
+    pr: PrWeg,
+    codex: bool,
+    antwort: &'static str,
+    args: &'static [&str],
+) -> (Team, mpsc::Receiver<String>) {
     for (schluessel, wert) in
         [("user.name", "Test"), ("user.email", "test@example.invalid"), ("commit.gpgSign", "false")]
     {
         git(&repo.0, &["config", schluessel, wert]);
     }
     let (tx, rx) = mpsc::channel();
-    let starten = |a: &Anbieter, w: &_, p: &Path| {
+    let starten = move |a: &Anbieter, w: &start::Startwunsch, p: &Path| {
+        let a = Anbieter { lesen: projectb_kern::lies_claude, ..*a };
+        if w.nur_lesen {
+            assert_eq!(a.name, if codex { "claude" } else { "codex" });
+            assert_eq!(w.modell.as_deref(), Some(if codex { "claude-opus-5-5" } else { "gpt-6.1-sol" }));
+            assert_eq!(w.effort, Some(start::Effort::Mittel));
+            assert!(w.auftrag.contains(&format!("git diff {}..HEAD", git(p, &["rev-parse", "HEAD~1"]))));
+            if antwort == "Startfehler" {
+                return Err(std::io::Error::other(antwort));
+            }
+            let mut lauf =
+                start::starten(&Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: args, ..a }, w, p)?;
+            let (tx, rx) = mpsc::channel();
+            let ereignisse = std::mem::replace(&mut lauf.ereignisse, rx);
+            std::thread::spawn(move || {
+                for mut e in ereignisse {
+                    match &mut e {
+                        Ereignis::Text(t) | Ereignis::Fertig { zusammenfassung: t, .. } => *t = antwort.into(),
+                        _ => {}
+                    }
+                    let _ = tx.send(e);
+                }
+            });
+            return Ok(lauf);
+        }
         fs::write(p.join("package.json"), r#"{"scripts":{"test":"node test.js"}}"#).unwrap();
         fs::write(p.join("test.js"), skript).unwrap();
-        start::starten(&Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &[], ..*a }, w, p)
+        start::starten(&Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &[], ..a }, w, p)
     };
-    let team = Team::starten_mit_kontingent(
-        &repo.0,
-        vec![auftrag("eins")],
-        None,
-        move |j| tx.send(j).unwrap(),
-        starten,
-        Some(pr),
-    )
-    .unwrap();
+    let mut arbeit = auftrag("eins");
+    if codex {
+        arbeit.anbieter = "codex".into();
+        arbeit.modell = "gpt-6.1-sol".into();
+    }
+    let team =
+        Team::starten_mit_kontingent(&repo.0, vec![arbeit], None, move |j| tx.send(j).unwrap(), starten, Some(pr))
+            .unwrap();
     (team, rx)
 }
 
@@ -693,10 +727,9 @@ fn gruene_tests_legen_pr_mit_beleg_an() {
     let meldungen = alle(&rx);
     let legt_an = meldungen.iter().position(|v| v["liveZeile"] == "Legt PR an …").unwrap();
     assert_eq!(meldungen[legt_an]["zustand"], "Arbeitet");
-    assert!(meldungen.iter().all(|v| v["zustand"] != "Fertig"));
     let letzte = meldungen.last().unwrap();
-    assert_eq!(letzte["zustand"], "Wartet auf dich");
-    assert_eq!(letzte["liveZeile"], "PR #7 angelegt");
+    assert_eq!(letzte["zustand"], "Fertig");
+    assert_eq!(letzte["liveZeile"], "Review OK (Codex)");
     assert_eq!(letzte["beleg"], serde_json::json!({"titel": "eins", "prLink": "https://github.com/o/r/pull/7"}));
     assert_eq!(
         fs::read_to_string(team.ordner()[0].join("pr-aufruf")).unwrap(),
@@ -763,4 +796,56 @@ fn secret_fund_verhindert_commit_und_pr() {
         assert!(ordner.join("package.json").exists());
         team.laeufe_mut()[0].warten().unwrap();
     }
+}
+
+#[test]
+fn review_der_anderen_familie_entscheidet_ueber_fertig() {
+    for codex in [true, false] {
+        for (antwort, args, status, urteil) in [
+            ("URTEIL: OK", &[][..], "Fertig", Some("OK")),
+            ("Test fehlt\nURTEIL: FUNDE", &[][..], "Wartet auf dich", Some("FUNDE")),
+            ("Kein Urteil", &[][..], "Problem", None),
+            ("URTEIL: OK\nNachtrag", &[][..], "Problem", None),
+            ("Startfehler", &[][..], "Problem", None),
+            ("URTEIL: OK", &["--fehler"][..], "Problem", Some("OK")),
+        ] {
+            let repo = Repo::neu();
+            let (_team, rx) = review_team(&repo, "process.exit(0)", (SAUBER, pr_ok), codex, antwort, args);
+            let meldungen = alle(&rx);
+            let familie = if codex { "Claude" } else { "Codex" };
+            assert!(meldungen
+                .iter()
+                .any(|v| v["liveZeile"] == format!("Review durch {familie} …") && v["zustand"] == "Arbeitet"));
+            let letzte = meldungen.last().unwrap();
+            assert_eq!(letzte["zustand"], status);
+            assert_eq!(letzte["beleg"]["prLink"], "https://github.com/o/r/pull/7");
+            assert_eq!(letzte["review"]["familie"], familie);
+            assert_eq!(letzte["review"]["urteil"], serde_json::json!(urteil));
+            if status == "Fertig" {
+                assert_eq!(letzte["liveZeile"], format!("Review OK ({familie})"));
+            }
+            if urteil == Some("FUNDE") {
+                assert_eq!(letzte["liveZeile"], "Review: Funde");
+                assert_eq!(letzte["review"]["text"], "Test fehlt");
+                assert!(letzte["letzteZeilen"].as_array().unwrap().contains(&serde_json::json!("Test fehlt")));
+            }
+        }
+    }
+}
+
+#[test]
+fn anhalten_trifft_pruefer_und_verwirft_spaetes_review() {
+    let repo = Repo::neu();
+    let (mut team, rx) = review_team(&repo, "process.exit(0)", (SAUBER, pr_ok), false, "URTEIL: OK", &["--haengen"]);
+    loop {
+        let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        assert_ne!(v["zustand"], "Fertig");
+        if v["liveZeile"] == "Review durch Codex …" {
+            break;
+        }
+    }
+    assert!(team.laeuft());
+    assert!(team.anhalten(None, Duration::from_secs(2)).unwrap().lauffehler.is_empty());
+    assert!(!team.laeuft());
+    assert!(alle(&rx).is_empty());
 }
