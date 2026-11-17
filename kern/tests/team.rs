@@ -1,11 +1,18 @@
 use projectb_kern::{
     anhalten::Ordnerstatus,
+    pr::{Autor, PrInfo},
     start,
-    team::{Team, TeamAuftrag},
+    team::{PrAnlegen, PrWeg, Scannen, Team, TeamAuftrag},
     Anbieter,
 };
 use serde_json::Value;
-use std::{fs, path::PathBuf, process::Command, sync::mpsc, time::Duration};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    sync::mpsc,
+    time::Duration,
+};
 
 struct Repo(PathBuf);
 impl Repo {
@@ -237,6 +244,7 @@ fn team_kontingent_wird_wie_im_chat_gespeichert() {
                 pfad,
             )
         },
+        None,
     )
     .unwrap();
     bis_fertig(&rx, team.ordner(), 1);
@@ -621,4 +629,136 @@ fn testbefehl_erkennen() {
     assert_eq!(erkennen(), Some(vec!["npm", "test"]));
     fs::write(repo.0.join("Cargo.toml"), "").unwrap();
     assert_eq!(erkennen(), Some(vec!["cargo", "test"]));
+}
+
+fn pr_ok(ordner: &Path, titel: &str, text: &str, autor: Autor, branch: &str) -> std::io::Result<PrInfo> {
+    let stand = git(ordner, &["status", "--porcelain"]);
+    let betreff = git(ordner, &["log", "-1", "--format=%s"]);
+    fs::write(ordner.join("pr-aufruf"), format!("{titel}|{branch}|{autor:?}|{stand}|{betreff}|{text}")).unwrap();
+    Ok(PrInfo { url: "https://github.com/o/r/pull/7".into(), nummer: 7 })
+}
+
+fn pr_fehler(ordner: &Path, _: &str, _: &str, _: Autor, _: &str) -> std::io::Result<PrInfo> {
+    fs::write(ordner.join("pr-fehler"), "").unwrap();
+    Err(std::io::Error::other("Push abgelehnt: https://x:geheim@github.com/o/r"))
+}
+
+const SAUBER: Scannen = |_, _| Ok(());
+const FUND: Scannen = |_, _| Err("Secret-Scan: Fund, nichts übertragen".into());
+// Fund nur beim Scan der Commits seit der Team-Basis, also vor dem PR-Commit.
+const FUND_IN_COMMITS: Scannen =
+    |o, seit| if seit.is_some_and(|b| b == git(o, &["rev-parse", "HEAD~1"])) { FUND(o, seit) } else { Ok(()) };
+
+fn pr_team(repo: &Repo, skript: &'static str, pr: PrWeg) -> (Team, mpsc::Receiver<String>) {
+    for (schluessel, wert) in
+        [("user.name", "Test"), ("user.email", "test@example.invalid"), ("commit.gpgSign", "false")]
+    {
+        git(&repo.0, &["config", schluessel, wert]);
+    }
+    let (tx, rx) = mpsc::channel();
+    let starten = |a: &Anbieter, w: &_, p: &Path| {
+        fs::write(p.join("package.json"), r#"{"scripts":{"test":"node test.js"}}"#).unwrap();
+        fs::write(p.join("test.js"), skript).unwrap();
+        start::starten(&Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &[], ..*a }, w, p)
+    };
+    let team = Team::starten_mit_kontingent(
+        &repo.0,
+        vec![auftrag("eins")],
+        None,
+        move |j| tx.send(j).unwrap(),
+        starten,
+        Some(pr),
+    )
+    .unwrap();
+    (team, rx)
+}
+
+fn alle(rx: &mpsc::Receiver<String>) -> Vec<Value> {
+    let mut meldungen = Vec::new();
+    loop {
+        match rx.recv_timeout(Duration::from_secs(10)) {
+            Ok(j) => meldungen.push(serde_json::from_str::<Value>(&j).unwrap()),
+            Err(mpsc::RecvTimeoutError::Disconnected) => return meldungen,
+            Err(e) => panic!("Team-Thread endet nicht: {e}"),
+        }
+    }
+}
+
+#[test]
+fn gruene_tests_legen_pr_mit_beleg_an() {
+    let repo = Repo::neu();
+    let (mut team, rx) = pr_team(&repo, "console.log('Tests 2 passed (2)')", (SAUBER, pr_ok));
+    let meldungen = alle(&rx);
+    let legt_an = meldungen.iter().position(|v| v["liveZeile"] == "Legt PR an …").unwrap();
+    assert_eq!(meldungen[legt_an]["zustand"], "Arbeitet");
+    assert!(meldungen.iter().all(|v| v["zustand"] != "Fertig"));
+    let letzte = meldungen.last().unwrap();
+    assert_eq!(letzte["zustand"], "Wartet auf dich");
+    assert_eq!(letzte["liveZeile"], "PR #7 angelegt");
+    assert_eq!(letzte["beleg"], serde_json::json!({"titel": "eins", "prLink": "https://github.com/o/r/pull/7"}));
+    assert_eq!(
+        fs::read_to_string(team.ordner()[0].join("pr-aufruf")).unwrap(),
+        "eins|agent/eins|Claude||eins: Stand für PR|Team-Agent eins: Tests in der Arbeitskopie grün (2 von 2)."
+    );
+    team.laeufe_mut()[0].warten().unwrap();
+}
+
+#[test]
+fn rote_tests_oder_pr_fehler_geben_problem_ohne_beleg() {
+    for (skript, pr, aufruf, zeile) in [
+        (
+            "console.log('Tests 1 passed | 1 failed (2)'); process.exit(1)",
+            (SAUBER, pr_ok as PrAnlegen),
+            "pr-aufruf",
+            "Tests rot: 1 von 2 grün",
+        ),
+        (
+            "process.exit(0)",
+            (SAUBER, pr_fehler),
+            "pr-fehler",
+            "PR fehlgeschlagen: Push abgelehnt: https://github.com/o/r",
+        ),
+    ] {
+        let repo = Repo::neu();
+        let (mut team, rx) = pr_team(&repo, skript, pr);
+        let letzte = alle(&rx).pop().unwrap();
+        assert_eq!(letzte["zustand"], "Problem");
+        assert_eq!(letzte["liveZeile"], zeile);
+        assert!(letzte["beleg"].is_null());
+        assert_eq!(team.ordner()[0].join(aufruf).exists(), aufruf == "pr-fehler");
+        team.laeufe_mut()[0].warten().unwrap();
+    }
+}
+
+#[test]
+fn anhalten_vor_pr_legt_keinen_pr_an() {
+    let repo = Repo::neu();
+    let skript = "require('fs').writeFileSync('prueft', ''); const t=setInterval(()=>{if(require('fs').existsSync('weiter'))clearInterval(t)},10)";
+    let (mut team, rx) = pr_team(&repo, skript, (SAUBER, pr_ok));
+    let frist = std::time::Instant::now() + Duration::from_secs(10);
+    while !team.ordner()[0].join("prueft").exists() {
+        assert!(std::time::Instant::now() < frist);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    team.anhalten(None, Duration::from_secs(30)).unwrap();
+    fs::write(team.ordner()[0].join("weiter"), "").unwrap();
+    assert_eq!(alle(&rx).last().unwrap()["liveZeile"], "Prüft: npm test");
+    assert!(!team.ordner()[0].join("pr-aufruf").exists());
+}
+
+#[test]
+fn secret_fund_verhindert_commit_und_pr() {
+    for (scan, betreff) in [(FUND, "Start"), (FUND_IN_COMMITS, "eins: Stand für PR")] {
+        let repo = Repo::neu();
+        let (mut team, rx) = pr_team(&repo, "process.exit(0)", (scan, pr_ok));
+        let letzte = alle(&rx).pop().unwrap();
+        assert_eq!(letzte["zustand"], "Problem");
+        assert_eq!(letzte["liveZeile"], "PR fehlgeschlagen: Secret-Scan: Fund, nichts übertragen");
+        let ordner = &team.ordner()[0];
+        assert!(!ordner.join("pr-aufruf").exists());
+        assert_eq!(git(ordner, &["log", "-1", "--format=%s"]), betreff);
+        assert_eq!(git(ordner, &["diff", "--cached", "--name-only"]), "");
+        assert!(ordner.join("package.json").exists());
+        team.laeufe_mut()[0].warten().unwrap();
+    }
 }
