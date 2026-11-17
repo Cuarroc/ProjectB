@@ -66,7 +66,17 @@ fn freigabepfade(ordner: &Path, basis: &str) -> Result<Vec<String>, String> {
     // Ohne Rename-Erkennung erscheinen alter und neuer Name getrennt; NUL erhält auch Sonderzeichen.
     for args in [
         // Jeder Commit einzeln: auch eine angelegte und wieder entfernte Datei würde mitgepusht.
-        vec!["log", "--format=", "--name-only", "--no-renames", "-z", &format!("{basis}..HEAD"), "--"],
+        // --diff-merges=separate: auch Änderungen, die erst in einem Merge-Commit entstehen.
+        vec![
+            "log",
+            "--format=",
+            "--name-only",
+            "--no-renames",
+            "--diff-merges=separate",
+            "-z",
+            &format!("{basis}..HEAD"),
+            "--",
+        ],
         vec!["diff", "--cached", "--name-only", "--no-renames", "-z", "--"],
         vec!["diff", "--name-only", "--no-renames", "-z", "--"],
         vec!["ls-files", "--others", "-z"],

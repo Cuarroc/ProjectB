@@ -762,7 +762,7 @@ fn pruefe_pfadschutz(pfad: &str, modus: &str) {
     fs::create_dir_all(repo.0.join(Path::new(pfad).parent().unwrap())).unwrap();
     if modus == "ignoriert" {
         fs::write(repo.0.join(".gitignore"), pfad).unwrap();
-    } else if modus != "neu" && modus != "zurueck" {
+    } else if !["neu", "zurueck", "merge"].contains(&modus) {
         fs::write(repo.0.join(pfad), if modus == "umbenannt" { "Agentenarbeit" } else { "vorher" }).unwrap();
     }
     git(&repo.0, &["add", "-A"]);
@@ -778,6 +778,7 @@ fn pruefe_pfadschutz(pfad: &str, modus: &str) {
         if(m==='index'||m==='commit')git('add',p);
         if(m==='commit')git('commit','-m','Agent ändert');
         if(m==='umbenannt'){{git('mv',p,'harmlos.txt');git('commit','-m','Agent benennt um');}}
+        if(m==='merge'){{fs.rmSync(p);const b=git('branch','--show-current').toString().trim();git('checkout','-q','-b','seite');fs.writeFileSync('harmlos.txt','x');git('add','harmlos.txt');git('commit','-q','-m','Seite');git('checkout','-q',b);git('merge','-q','--no-ff','--no-commit','seite');fs.writeFileSync(p,'Agentenarbeit');git('add',p);git('commit','-q','-m','Merge');}}
         if(m==='zurueck'){{git('add',p);git('commit','-m','Agent ändert');git('rm','-q',p);git('commit','-m','Agent nimmt zurück');}}
         fs.writeFileSync('stand-head',git('rev-parse','HEAD'));
         fs.writeFileSync('stand-index',git('diff','--cached','--binary'));
@@ -811,7 +812,7 @@ fn pruefe_pfadschutz(pfad: &str, modus: &str) {
 
 #[test]
 fn pfadschutz_github_vor_pr() {
-    for modus in ["arbeit", "index", "commit", "umbenannt", "zurueck"] {
+    for modus in ["arbeit", "index", "commit", "umbenannt", "zurueck", "merge"] {
         pruefe_pfadschutz(".github/workflows/x.yml", modus);
     }
 }
