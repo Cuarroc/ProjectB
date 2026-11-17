@@ -172,9 +172,9 @@ impl Lauf {
     pub fn starten(a: &Anbieter, auftrag: &str, ordner: &Path) -> io::Result<Lauf> {
         let mut befehl = Command::new(finde_programm(a.programm));
         befehl.args(a.argumente).current_dir(ordner);
-        let zeit = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(io::Error::other)?;
-        let gh_ordner = std::env::temp_dir().join(format!("projectb-gh-{}-{}", std::process::id(), zeit.as_nanos()));
-        std::fs::create_dir(&gh_ordner)?;
+        // Ein leerer gh-Ordner je App-Prozess statt je Start, damit sich im Temp nichts ansammelt.
+        let gh_ordner = std::env::temp_dir().join(format!("projectb-gh-{}", std::process::id()));
+        std::fs::create_dir_all(&gh_ordner)?;
         for (key, value) in start::agenten_umgebung(&gh_ordner) {
             if let Some(value) = value {
                 befehl.env(key, value);

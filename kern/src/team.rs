@@ -56,6 +56,31 @@ pub fn scannen(ordner: &Path, seit: Option<&str>) -> Result<(), String> {
     }
 }
 
+enum PrSchritt {
+    Angelegt(PrInfo),
+    Freigabe(String),
+}
+
+fn freigabepfade(ordner: &Path, basis: &str) -> Result<Vec<String>, String> {
+    let mut pfade = std::collections::BTreeSet::new();
+    // Ohne Rename-Erkennung erscheinen alter und neuer Name getrennt; NUL erhält auch Sonderzeichen.
+    for args in [
+        vec!["diff", "--name-only", "--no-renames", "-z", &format!("{basis}..HEAD"), "--"],
+        vec!["diff", "--cached", "--name-only", "--no-renames", "-z", "--"],
+        vec!["diff", "--name-only", "--no-renames", "-z", "--"],
+        vec!["ls-files", "--others", "-z"],
+    ] {
+        let ausgabe = anhalten::git(ordner, &args)?;
+        for pfad in ausgabe.split('\0').filter(|p| !p.is_empty()) {
+            let ort = pfad.split('/').next().unwrap_or_default().to_ascii_lowercase();
+            if matches!(ort.as_str(), ".github" | ".mergify.yml" | ".mcp.json" | ".claude" | ".agents") {
+                pfade.insert(pfad.to_owned());
+            }
+        }
+    }
+    Ok(pfade.into_iter().take(3).collect())
+}
+
 fn pr_schritt(
     ordner: &Path,
     name: &str,
@@ -64,7 +89,14 @@ fn pr_schritt(
     basis: &str,
     ergebnis: &pruefung::Ergebnis,
     (scannen, pr_anlegen): PrWeg,
-) -> Result<PrInfo, String> {
+) -> Result<PrSchritt, String> {
+    let pfade = freigabepfade(ordner, basis).map_err(|e| ohne_zugangsdaten(&e))?;
+    if !pfade.is_empty() {
+        return Ok(PrSchritt::Freigabe(format!(
+            "Änderung an freigabepflichtigen Dateien ({}): braucht Elias’ Ja",
+            pfade.join(", ")
+        )));
+    }
     let autor = if anbieter.eq_ignore_ascii_case("codex") { Autor::Codex } else { Autor::Claude };
     let (gruen, gesamt) = (ergebnis.gruen.unwrap_or(0), ergebnis.gesamt.unwrap_or(0));
     let text = format!("Team-Agent {name}: Tests in der Arbeitskopie grün ({gruen} von {gesamt}).");
@@ -81,7 +113,7 @@ fn pr_schritt(
             anhalten::git(ordner, &["commit", "-m", &format!("{name}: Stand für PR")])?;
         }
         scannen(ordner, Some(basis))?;
-        pr_anlegen(ordner, name, &text, autor, branch).map_err(|e| e.to_string())
+        pr_anlegen(ordner, name, &text, autor, branch).map(PrSchritt::Angelegt).map_err(|e| e.to_string())
     })()
     .map_err(|fehler| ohne_zugangsdaten(&fehler))
 }
@@ -178,9 +210,10 @@ impl Team {
                 arbeitskopie: String::new(),
             };
             let lauf = (|| {
-                let (anbieter, wunsch) =
+                let (anbieter, mut wunsch) =
                     chat::startwunsch(&auftrag.modell, &auftrag.effort, "Ausführen", None, "", auftrag.text)
                         .map_err(io::Error::other)?;
+                wunsch.berechtigung = Some(start::Berechtigung::default());
                 if !auftrag.anbieter.eq_ignore_ascii_case(anbieter.name) {
                     return Err(io::Error::new(io::ErrorKind::InvalidInput, "Anbieter passt nicht zum Modell"));
                 }
@@ -263,8 +296,12 @@ impl Team {
                                             &ergebnis,
                                             pr_weg,
                                         );
-                                        let pr_ok = pr.is_ok();
-                                        zustand.pr_beenden(&auftrag.name, pr);
+                                        let pr_ok = matches!(pr, Ok(PrSchritt::Angelegt(_)));
+                                        match pr {
+                                            Ok(PrSchritt::Freigabe(zeile)) => zustand.freigabe_abwarten(&zeile),
+                                            Ok(PrSchritt::Angelegt(pr)) => zustand.pr_beenden(&auftrag.name, Ok(pr)),
+                                            Err(fehler) => zustand.pr_beenden(&auftrag.name, Err(fehler)),
+                                        }
                                         if pr_ok {
                                             let aktiv = aktiv.lock().unwrap();
                                             if !*aktiv {

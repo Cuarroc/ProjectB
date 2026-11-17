@@ -169,6 +169,8 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
                 sperren.split(',').filter_map(|r| r.strip_prefix("Bash")).map(|r| format!("PowerShell{r}")).collect();
             sperren.push(',');
             sperren.push_str(&powershell.join(","));
+            // Dass PowerShell(rm *) auch das Cmdlet hinter dem Alias trifft, ist nicht belegt.
+            sperren.push_str(",PowerShell(Remove-Item *)");
             if wunsch.nur_lesen {
                 args.extend(["--settings".into(), r#"{"useAutoModeDuringPlan":false}"#.into()]);
                 sperren.push_str(",ExitPlanMode");
@@ -293,6 +295,9 @@ mod tests {
             let claude = argumente(&CLAUDE, &w).unwrap();
             assert!(claude.windows(2).any(|p| p == ["--permission-mode", "acceptEdits"]), "{claude:?}");
             assert!(!claude.iter().any(|a| a.contains("bypassPermissions")));
+            assert!(claude
+                .iter()
+                .any(|a| a.starts_with("--disallowedTools=") && a.contains("PowerShell(Remove-Item *)")));
             let erlaubt = claude.iter().find_map(|a| a.strip_prefix("--allowedTools=")).unwrap_or("");
             for befehl in ["git status", "git diff", "git log", "cargo test", "npm test", "npm run test"] {
                 assert_eq!(erlaubt.contains(&format!("Bash({befehl} *)")), stufe != Berechtigung::Autonom);
