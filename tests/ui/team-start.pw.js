@@ -142,6 +142,7 @@ test("Fehler beim Teamstart lässt Plan und Freigabeknöpfe stehen", async ({ pa
   await expect(page.getByText("Plan freigegeben. Team mit 3 Agenten gestartet.", { exact: true })).toBeVisible();
 });
 test("Projektwechsel bleibt während des Teamstarts gesperrt, Freigabe wird gespeichert", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Freigeben und bauen", exact: true })).toBeVisible();
   await page.evaluate(() => {
@@ -170,6 +171,7 @@ test("Projektwechsel bleibt während des Teamstarts gesperrt, Freigabe wird gesp
   })).toEqual({ freigabe: "Freigegeben", gestartetUm: null });
 });
 test("Laufendes Team lehnt zweite Freigabe ab und behält Karten und Stoppmarken", async ({ page }, testInfo) => {
+  test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");
   await page.goto("/"); await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
   const karten = page.locator(".team-echt [data-agent]"); await expect(karten).toHaveCount(3);
   await karten.first().getByRole("button", { name: "Anhalten", exact: true }).click();
@@ -202,6 +204,7 @@ test("Laufendes Team lehnt zweite Freigabe ab und behält Karten und Stoppmarken
   }
 });
 test("Beendete Agenten mit Problem oder Frage lassen einen neuen Start zu", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");
   await page.goto("/"); await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
   await expect(page.locator(".team-echt [data-agent]")).toHaveCount(3);
   await page.evaluate(() => window.starts[0].auftraege.forEach((a, i) => window.agentSenden({ ...a, id: a.name, zustand: i ? "Problem" : "Wartet auf dich", liveZeile: "Ende", laufzeitSekunden: 9 })));
