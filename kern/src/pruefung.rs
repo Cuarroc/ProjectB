@@ -21,8 +21,9 @@ pub fn testbefehl(ordner: &Path) -> Option<Vec<&'static str>> {
         return Some(vec!["cargo", "test"]);
     }
     let paket: serde_json::Value = serde_json::from_slice(&std::fs::read(ordner.join("package.json")).ok()?).ok()?;
-    paket.pointer("/scripts/test")?.as_str()?;
-    Some(vec!["npm", "test"])
+    // Der Platzhalter aus `npm init` endet immer mit Exit 1 und ist kein Test.
+    let skript = paket.pointer("/scripts/test")?.as_str()?;
+    (!skript.contains("no test specified")).then(|| vec!["npm", "test"])
 }
 
 /// Führt Programm und Argumente im angegebenen Arbeitsordner aus, ohne eigene Shell.
