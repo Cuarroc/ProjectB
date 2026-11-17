@@ -171,6 +171,97 @@ test.describe("Echte Dateivorschau", () => {
     }
   });
 
+  for (const nachAnsehen of [false, true]) {
+    test(`Details schneiden oben keine Kachel an (${nachAnsehen ? "nach Ansehen" : "geöffnet"})`, async ({ page }) => {
+      const details = page.locator(".team-details");
+      if (nachAnsehen) {
+        await details.getByRole("button", { name: "Ansehen", exact: true }).first().click();
+        await page.evaluate(diff => window.dateiAnfragen[0].resolve(diff), dateiDiff);
+        await expect(details.getByRole("region", { name: "Vorschau" })).toHaveAttribute("aria-busy", "false");
+      }
+      const sichtbar = await details.boundingBox();
+      for (const kachel of await details.locator(".tm-det-kopf, .tm-det-leiste, .tm-dkarte").all()) {
+        const box = await kachel.boundingBox();
+        expect(box.y < sichtbar.y - 1 && box.y + box.height > sichtbar.y + 1, "Kachel am oberen Scrollrand angeschnitten").toBe(false);
+      }
+    });
+
+    test(`Details folgen ohne Leerfläche (${nachAnsehen ? "nach Ansehen" : "geöffnet"})`, async ({ page }) => {
+      const details = page.locator(".team-details");
+      if (nachAnsehen) {
+        await details.getByRole("button", { name: "Ansehen", exact: true }).first().click();
+        await page.evaluate(diff => window.dateiAnfragen[0].resolve(diff), dateiDiff);
+        await expect(details.getByRole("region", { name: "Vorschau" })).toHaveAttribute("aria-busy", "false");
+      }
+      const karte = await page.locator(`[data-agent="${dateiAgent.id}"] .ak`).boundingBox();
+      const box = await details.boundingBox();
+      const abstand = await details.evaluate(el => parseFloat(getComputedStyle(el).getPropertyValue("--abstand-4")));
+      expect(box.y - karte.y - karte.height).toBeGreaterThanOrEqual(0);
+      expect(box.y - karte.y - karte.height).toBeLessThanOrEqual(abstand + 1);
+    });
+  }
+
+  test("Dateien und Vorschau nutzen die volle Breite", async ({ page }, testInfo) => {
+    const details = page.locator(".team-details");
+    await details.getByRole("button", { name: "Ansehen", exact: true }).first().click();
+    await page.evaluate(diff => window.dateiAnfragen[0].resolve(diff), dateiDiff);
+    const vorschau = details.getByRole("region", { name: "Vorschau" });
+    await expect(vorschau).toHaveAttribute("aria-busy", "false");
+    const dateien = await details.locator(".tm-dkarte").filter({ has: page.getByRole("heading", { name: "Dateien", exact: true }) }).boundingBox();
+    const box = await vorschau.boundingBox(), raster = await details.locator(".tm-det-raster").boundingBox();
+    expect(Math.abs(dateien.width - box.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(dateien.width - raster.width)).toBeLessThanOrEqual(1);
+    if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53h_details_1440x900.png`, animations: "disabled" });
+    }
+  });
+
+  test("kurze Vorschau bleibt bei vielen Dateien im sichtbaren Detailbereich", async ({ page }, testInfo) => {
+    const dateien = Array.from({ length: 25 }, (_, i) => ({ pfad: `bild-${i + 1}.png`, hinzugefuegt: 0, entfernt: 0 }));
+    await page.evaluate(a => window.agentSenden(a), { ...dateiAgent, dateien });
+    const details = page.locator(".team-details");
+    const dateikachel = details.locator(".tm-dkarte").filter({ has: page.getByRole("heading", { name: "Dateien", exact: true }) });
+    expect((await dateikachel.boundingBox()).height).toBeGreaterThan((await details.boundingBox()).height);
+    await details.getByRole("button", { name: "Ansehen", exact: true }).last().click();
+    await page.evaluate(() => window.dateiAnfragen[0].resolve("Binärdatei, keine Vorschau."));
+    const vorschau = details.getByRole("region", { name: "Vorschau" });
+    await expect(vorschau.locator("pre")).toHaveText("Binärdatei, keine Vorschau.");
+    await expect(vorschau).toBeFocused();
+    const sichtbar = await details.boundingBox(), box = await vorschau.boundingBox();
+    expect(box.y).toBeGreaterThanOrEqual(sichtbar.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(sichtbar.y + sichtbar.height);
+    expect(box.y - sichtbar.y).toBeLessThanOrEqual(1);
+    const dateibox = await dateikachel.boundingBox();
+    expect(dateibox.y + dateibox.height).toBeLessThanOrEqual(sichtbar.y);
+    if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53h_viele-dateien_1440x900.png`, animations: "disabled" });
+    }
+  });
+
+  test("Angehalten hat keinen goldenen Rand; Wartet auf dich behält ihn", async ({ page }, testInfo) => {
+    await page.locator(".team-details").press("Escape");
+    await page.evaluate(a => {
+      const invoke = window.__TAURI_INTERNALS__.invoke;
+      window.__TAURI_INTERNALS__.invoke = (cmd, args) => cmd === "team_anhalten"
+        ? Promise.resolve({ ordner: [], lauffehler: [], fristUeberschritten: false }) : invoke(cmd, args);
+      window.agentSenden({ ...a, id: "wartet", name: "Wartender Agent", zustand: "Wartet auf dich" });
+    }, dateiAgent);
+    const karte = page.locator(`[data-agent="${dateiAgent.id}"] .ak`), wartet = page.locator('[data-agent="wartet"] .ak');
+    const gold = await wartet.evaluate(el => getComputedStyle(el).boxShadow);
+    const goldfarbe = gold.match(/rgba?\([^)]+\)/)[0];
+    expect(gold).not.toBe(await karte.evaluate(el => getComputedStyle(el).boxShadow));
+    await karte.getByRole("button", { name: "Anhalten", exact: true }).click();
+    await expect(karte.locator(".pause-marke")).toHaveText("Angehalten");
+    expect(await karte.evaluate(el => getComputedStyle(el).boxShadow)).not.toContain(goldfarbe);
+    expect(await wartet.evaluate(el => getComputedStyle(el).boxShadow)).toBe(gold);
+    if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53h_angehalten_1440x900.png`, animations: "disabled" });
+    }
+  });
+
   test("ignoriert verspätete Antworten nach Dateiwechsel und Schließen", async ({ page }) => {
     const details = page.locator("#team-details"), knoepfe = details.getByRole("button", { name: "Ansehen", exact: true });
     const vorschau = details.getByRole("region", { name: "Vorschau" });
