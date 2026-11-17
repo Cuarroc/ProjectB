@@ -9,6 +9,7 @@ fn wunsch() -> Startwunsch {
         modell: None,
         effort: None,
         fortsetzen: None,
+        berechtigung: Default::default(),
         nur_lesen: false,
         auftrag: "Prüfe den Code.".into(),
     }
@@ -19,7 +20,7 @@ fn claude_modell_und_alle_efforts() {
     for (effort, wert) in [(Effort::Niedrig, "low"), (Effort::Mittel, "medium"), (Effort::Hoch, "high")] {
         let w = Startwunsch { modell: Some("claude-opus-5-5".into()), effort: Some(effort), ..wunsch() };
         assert_eq!(
-            argumente(&CLAUDE, &w).unwrap(),
+            &argumente(&CLAUDE, &w).unwrap()[..8],
             ["-p", "--output-format", "stream-json", "--verbose", "--model", "claude-opus-5-5", "--effort", wert]
         );
     }
@@ -30,8 +31,8 @@ fn codex_modell_und_alle_efforts() {
     for (effort, wert) in [(Effort::Niedrig, "low"), (Effort::Mittel, "medium"), (Effort::Hoch, "high")] {
         let w = Startwunsch { modell: Some("gpt-6.1-sol".into()), effort: Some(effort), ..wunsch() };
         assert_eq!(
-            argumente(&CODEX, &w).unwrap(),
-            ["exec", "--json", "--model", "gpt-6.1-sol", "-c", &format!("model_reasoning_effort=\"{wert}\""), "-"]
+            &argumente(&CODEX, &w).unwrap()[..6],
+            ["exec", "--json", "--model", "gpt-6.1-sol", "-c", &format!("model_reasoning_effort=\"{wert}\"")]
         );
     }
 }
@@ -51,7 +52,9 @@ fn ungueltige_modellnamen_werden_abgelehnt() {
 #[test]
 fn gueltige_modellzeichen_und_einzelne_optionen() {
     for a in [&CLAUDE, &CODEX] {
-        assert_eq!(argumente(a, &wunsch()).unwrap(), a.argumente);
+        assert!(argumente(a, &wunsch()).unwrap().starts_with(
+            &a.argumente[..if a.name == "codex" { 2 } else { 4 }].iter().map(|s| s.to_string()).collect::<Vec<_>>()
+        ));
         let w = Startwunsch { modell: Some("AZaz09._:-".into()), ..wunsch() };
         assert!(argumente(a, &w).unwrap().contains(&"AZaz09._:-".into()));
         let w = Startwunsch { effort: Some(Effort::Mittel), ..wunsch() };
@@ -69,7 +72,7 @@ fn rolle_und_auftrag_sind_nur_prompt_text() {
     assert_eq!(w.prompt(), "Prüfer\n--model fremd; & echo \"Test\"\n\n--effort high\nPrüfe C:\\Projekt.");
     assert_eq!(wunsch().prompt(), "Prüfe den Code.");
     for a in [&CLAUDE, &CODEX] {
-        assert_eq!(argumente(a, &w).unwrap(), a.argumente);
+        assert_eq!(argumente(a, &w).unwrap(), argumente(a, &wunsch()).unwrap());
     }
 }
 
@@ -98,10 +101,10 @@ fn startweg_validiert_und_verwendet_lauf_ohne_echte_cli() {
 fn sehr_hoch_wird_fuer_beide_clis_uebersetzt() {
     let w = Startwunsch { effort: Some(Effort::SehrHoch), ..wunsch() };
     assert_eq!(
-        argumente(&CLAUDE, &w).unwrap(),
+        &argumente(&CLAUDE, &w).unwrap()[..6],
         ["-p", "--output-format", "stream-json", "--verbose", "--effort", "xhigh"]
     );
-    assert_eq!(argumente(&CODEX, &w).unwrap(), ["exec", "--json", "-c", "model_reasoning_effort=\"xhigh\"", "-"]);
+    assert_eq!(&argumente(&CODEX, &w).unwrap()[..4], ["exec", "--json", "-c", "model_reasoning_effort=\"xhigh\""]);
 }
 
 #[test]

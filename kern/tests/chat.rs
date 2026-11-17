@@ -24,6 +24,7 @@ fn chat_auswahl_erreicht_die_argumente_beider_anbieter() {
             assert_eq!(a.name, name);
             assert_eq!(w.modell.as_deref(), Some(cli));
             assert_eq!(w.effort, Some(effort));
+            assert_eq!(w.berechtigung, Default::default());
             assert_eq!(w.prompt(), "Hallo");
             assert!(w.fortsetzen.is_none());
             let mut erwartet: Vec<String> = a.argumente.iter().map(|s| s.to_string()).collect();
@@ -34,9 +35,9 @@ fn chat_auswahl_erreicht_die_argumente_beider_anbieter() {
             if name == "claude" {
                 erwartet.extend(["--effort".into(), wert.into()]);
             } else {
-                erwartet.extend(["-c".into(), format!("model_reasoning_effort=\"{wert}\""), "-".into()]);
+                erwartet.extend(["-c".into(), format!("model_reasoning_effort=\"{wert}\"")]);
             }
-            assert_eq!(argumente(a, &w).unwrap(), erwartet);
+            assert!(argumente(a, &w).unwrap().starts_with(&erwartet));
         }
     }
 }
@@ -68,7 +69,15 @@ fn agent(codex: bool, argumente: &'static [&'static str]) -> Anbieter {
 }
 
 fn wunsch() -> Startwunsch {
-    Startwunsch { rolle: None, modell: None, effort: None, fortsetzen: None, nur_lesen: false, auftrag: "Hallo".into() }
+    Startwunsch {
+        rolle: None,
+        modell: None,
+        effort: None,
+        fortsetzen: None,
+        berechtigung: Default::default(),
+        nur_lesen: false,
+        auftrag: "Hallo".into(),
+    }
 }
 
 #[test]
@@ -222,12 +231,11 @@ fn planen_und_interview_sind_auch_beim_fortsetzen_nur_lesend() {
                         "plan",
                         "--settings",
                         r#"{"useAutoModeDuringPlan":false}"#,
-                        "--disallowedTools=ExitPlanMode",
                     ]);
                 } else {
-                    erwartet.extend(["-c", "model_reasoning_effort=\"high\"", "-c", "sandbox_mode=\"read-only\"", "-"]);
+                    erwartet.extend(["-c", "model_reasoning_effort=\"high\"", "-c", "sandbox_mode=\"read-only\""]);
                 }
-                assert_eq!(argumente(a, &w).unwrap(), erwartet);
+                assert_eq!(&argumente(a, &w).unwrap()[..erwartet.len()], erwartet);
                 let rolle = w.rolle.as_deref().unwrap();
                 assert_eq!(w.prompt(), format!("{rolle}\n\nPrüfe den Export"));
                 assert!(rolle.contains("Ändere keine Dateien."));
