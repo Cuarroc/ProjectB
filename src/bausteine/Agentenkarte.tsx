@@ -1,9 +1,10 @@
 import { Check, ChevronRight, Circle, CircleDashed, CircleX, Clock, Zap } from "lucide-react";
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Zeitspur, type ZeitspurProps } from "./Zeitspur";
+import { PrLink } from "./PrLink";
 
-export type AgentenkarteProps = { name: string; modell: string; zustand: "offen" | "arbeitet" | "wartet" | "fertig" | "problem"; fortschritt?: number; zeitspur: ZeitspurProps; ohneZeitspur?: boolean; zeile: string; tokens: string; laufzeit: string; gewaehlt?: boolean; onDetails?: () => void; aktion?: string; onAktion?: () => void; avatar?: ReactNode; statusmarke?: ReactNode };
-export function Agentenkarte({ name, modell, zustand, fortschritt, zeitspur, ohneZeitspur, zeile, tokens, laufzeit, gewaehlt, onDetails, aktion, onAktion, avatar, statusmarke }: AgentenkarteProps) {
+export type AgentenkarteProps = { name: string; modell: string; zustand: "offen" | "arbeitet" | "wartet" | "fertig" | "problem"; fortschritt?: number; zeitspur: ZeitspurProps; ohneZeitspur?: boolean; zeile: string; tokens: string; laufzeit: string; gewaehlt?: boolean; onDetails?: () => void; aktion?: string; onAktion?: () => void; avatar?: ReactNode; statusmarke?: ReactNode; belegLink?: string };
+export function Agentenkarte({ name, modell, zustand, fortschritt, zeitspur, ohneZeitspur, zeile, tokens, laufzeit, gewaehlt, onDetails, aktion, onAktion, avatar, statusmarke, belegLink }: AgentenkarteProps) {
   const tippId = useId();
   const wort = zeitspur.angehalten ? "Angehalten" : { offen: "Offen", arbeitet: "Arbeitet", wartet: "Wartet auf dich", fertig: "Fertig", problem: "Problem" }[zustand];
   const Symbol = { offen: Circle, arbeitet: CircleDashed, wartet: Circle, fertig: Check, problem: CircleX }[zustand];
@@ -16,6 +17,7 @@ export function Agentenkarte({ name, modell, zustand, fortschritt, zeitspur, ohn
     </button><span className="b2-tipp ak-tipp" id={tippId} role="tooltip">{name}</span>
     {!ohneZeitspur && <Zeitspur {...zeitspur} />}
     <div className="ak-fuss"><span className={avatar || zeitspur.zustand === "startet" || zustand === "wartet" ? "ak-zeile" : "code"} title={zeile}>{zeile}</span><span className="ak-meta"><Zap size={14} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{tokens} Tokens</span><span className="ak-meta"><Clock size={14} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{laufzeit} min</span>{aktion && <button type="button" className={`b2-kn${zustand === "wartet" ? " b2-zweit" : ""}`} onClick={onAktion}>{aktion}</button>}</div>
+    {belegLink && <PrLink url={belegLink} />}
     <span className="b2-sr" aria-live="polite">{meldung}</span>
   </div>;
 }

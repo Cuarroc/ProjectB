@@ -4,6 +4,7 @@ mod chat;
 mod chats;
 mod einstellungen;
 mod kontingent;
+mod pr;
 mod projekt;
 mod team;
 
@@ -11,6 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tauri::Builder::default()
         .manage(std::sync::Mutex::new(None::<kern::team::Team>))
         .invoke_handler(tauri::generate_handler![
+            pr::pr_oeffnen,
             team::team_starten,
             team::team_anhalten,
             team::team_datei_ansehen,

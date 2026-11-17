@@ -94,3 +94,7 @@ export async function teamDateiAnsehen(name: string, pfad: string): Promise<stri
   if (!isTauri()) throw new Error("Ansehen geht nur in der App.");
   return invoke<string>("team_datei_ansehen", { name, pfad });
 }
+
+export async function prOeffnen(url: string): Promise<void> {
+  await invoke("pr_oeffnen", { url });
+}

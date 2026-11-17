@@ -38,3 +38,4 @@
 .team-echt:has(.team-details) .team-liste{flex:none;max-height:40%;padding-bottom:var(--abstand-4)}
 .team-echt .team-details{flex:0 1 auto;max-height:none}
 .team-echt .tm-det-raster{grid-template-columns:minmax(0,1fr)}
+.team-liste .ak>a{color:var(--akzent-text);font:var(--schrift-klein)}

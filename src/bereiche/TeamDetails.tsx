@@ -11,11 +11,12 @@ import { spur } from "./TeamAnsichten";
 import "./TeamDetails.css";
 import { AnhalteMarke } from "./anhalten";
 import { teamDateiAnsehen } from "../daten/tauri";
+import { PrLink } from "../bausteine/PrLink";
 
 const status = { Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fertig", Problem: "problem" } as const;
 const dauer = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-export const belegFuer = (daten: Pick<Datenstand, "belege">, id: string) => daten.belege.find(b => b.agentId === id && b.prLink.trim());
-export const mitBeleg = (daten: Datenstand): Datenstand => ({ ...daten, agenten: daten.agenten.map(a => a.zustand === "Fertig" && !belegFuer(daten, a.id)
+export const belegFuer = (daten: Pick<Datenstand, "belege">, agent: Pick<Agent, "id" | "beleg">) => agent.beleg?.prLink.trim() ? agent.beleg : daten.belege.find(b => b.agentId === agent.id && b.prLink.trim());
+export const mitBeleg = (daten: Datenstand): Datenstand => ({ ...daten, agenten: daten.agenten.map(a => a.zustand === "Fertig" && !belegFuer(daten, a)
   ? { ...a, zustand: "Problem", liveZeile: "Beleg mit PR-Link fehlt" } : a) });
 
 export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schliessen, angehalten = false, echt = false }: { agent: Agent; daten?: Pick<Datenstand, "ausgaben" | "belege">; schliessen: () => void; angehalten?: boolean; echt?: boolean }) {
@@ -23,7 +24,7 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
   const bereich = useRef<HTMLElement>(null), [vorschau, zeige] = useState<string | null>(null);
   const vorschauBereich = useRef<HTMLElement>(null), vorschauKnopf = useRef<HTMLButtonElement>(null);
   const [datei, setDatei] = useState<{ inhalt: string; laedt: boolean } | null>(null), anfrage = useRef(0);
-  const zustand = angehalten ? "offen" : status[agent.zustand], beleg = belegFuer(daten, agent.id);
+  const zustand = angehalten ? "offen" : status[agent.zustand], beleg = belegFuer(daten, agent);
   const zeitspur = echt ? { jetzt: agent.laufzeitSekunden, phasen: [] } : agent.id === "orchestrator" ? { jetzt: orchestratorBeispiel.laufzeitSekunden, phasen: [...orchestratorBeispiel.phasen] } : spur(agent);
   const ausgaben = daten.ausgaben.filter(a => a.sitzungId === agent.id);
   const phase = agent.id === "orchestrator" ? "koordiniert" : zeitspur.phasen.find(p => "laufend" in p && p.laufend)?.art;
@@ -42,6 +43,7 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
       liste.style.paddingBottom = `${liste.clientHeight}px`;
     }
     karte?.scrollIntoView({ block: "start", behavior: "instant" });
+    if (bereich.current) bereich.current.scrollTop = 0;
     bereich.current?.focus({ preventScroll: true });
     return () => { anfrage.current++; if (liste) { liste.style.scrollPaddingTop = ""; liste.style.paddingBottom = ""; } };
   }, [agent.id]);
@@ -109,9 +111,15 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
             <span>{agent.tests.gesamt}</span><span className="tm-null">0</span>{rot && <b className="tm-rot">{rot.rot} rot</b>}<b className="tm-gruen">{agent.tests.gruen} / {agent.tests.gesamt}</b></div>
             <div className="team-diagramm-zeiten"><span>{rot?.zeit ?? agent.tests.gruenSeit}</span><span className="tm-jetzt">Jetzt</span></div>
             <p>{agent.tests.gruen} von {agent.tests.gesamt} grün{rot && ` · Um ${rot.zeit} waren ${rot.rot} rot, der Agent hat sie repariert`}</p></> : <p>Noch keine Tests</p>}</section></>}
+        {echt && <section className="tm-dkarte"><h4>Tests</h4><p>{agent.tests ? `${agent.tests.gruen} von ${agent.tests.gesamt} grün` : "Noch keine Tests"}</p></section>}
         <section className="tm-dkarte"><h4>Dateien</h4><ul className="tm-dateien">{agent.dateien.map(d => <li key={d.pfad}><span><code>{d.pfad}</code><small>+{d.hinzugefuegt} −{d.entfernt}</small></span><Knopf text="Ansehen" onClick={e => ansehen(e, d.pfad)} /></li>)}</ul>{!agent.dateien.length && <p>Noch keine Dateien</p>}</section>
         {!echt && <section className="tm-dkarte"><h4>Ausgaben</h4><ul className="tm-dateien">{ausgaben.map(a => <li key={a.id}><span>{a.name}<small>{a.pfad}</small></span><Knopf text="Ansehen" onClick={e => { vorschauKnopf.current = e.currentTarget; zeige(a.pfad); }} /></li>)}</ul>{!ausgaben.length && <p>Noch keine Ausgaben</p>}</section>}
-        {beleg && agent.zustand === "Fertig" && <section className="tm-dkarte tm-breit"><h4>Beleg</h4><p>{beleg.titel}</p><a href={beleg.prLink} target="_blank" rel="noreferrer">PR ansehen</a></section>}
+        {beleg && agent.zustand === "Fertig" && <section className="tm-dkarte tm-breit"><h4>Beleg</h4><p>{beleg.titel}</p><PrLink url={beleg.prLink} /></section>}
+        {agent.review && <section className="tm-dkarte tm-breit"><h4>Review</h4>
+          <div className="tm-det-leiste"><span>{agent.review.familie}</span>{agent.review.urteil && <Statusmarke zustand={agent.review.urteil === "OK" ? "fertig" : "wartet"} wort={agent.review.urteil === "OK" ? "OK" : "Funde"} />}</div>
+          {agent.review.urteil === null && agent.zustand === "Arbeitet" && <p>Review durch {agent.review.familie} läuft</p>}
+          {agent.review.text && agent.review.urteil !== "OK" && <pre>{agent.review.text}</pre>}
+        </section>}
         {vorschau && <section ref={vorschauBereich} tabIndex={-1} className="tm-dkarte tm-breit" aria-label="Vorschau" aria-live="polite" aria-busy={datei?.laedt}>
           <h4><FileText size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /> Vorschau</h4><code>{vorschau}</code>
           {datei ? datei.laedt ? <p>Lädt …</p> : <pre>{datei.inhalt.split("\n").map((zeile, i) => {

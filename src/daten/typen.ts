@@ -9,6 +9,8 @@ export type Agent = {
   phasen: { name: string; start: string; ende: string | null }[];
   dateien: { pfad: string; hinzugefuegt: number; entfernt: number }[];
   letzteZeilen: string[];
+  beleg?: { titel: string; prLink: string } | null;
+  review?: { familie: Anbieter; urteil: "OK" | "FUNDE" | null; text: string } | null;
   tests: { gruenSeit: string | null; gruen: number; gesamt: number;
     verlauf: { zeit: string; rot: number }[] } | null;
   schaetzung: { fertigUm: string; restMinuten: number } | null;
