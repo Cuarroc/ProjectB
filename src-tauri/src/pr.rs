@@ -24,9 +24,12 @@ pub async fn pr_oeffnen(url: String) -> Result<(), String> {
     }
     tauri::async_runtime::spawn_blocking(move || {
         let mut befehl = std::process::Command::new(if cfg!(windows) {
-            "explorer.exe"
+            std::path::PathBuf::from(
+                std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into()),
+            )
+            .join("explorer.exe")
         } else {
-            "xdg-open"
+            std::path::PathBuf::from("xdg-open")
         });
         #[cfg(windows)]
         {

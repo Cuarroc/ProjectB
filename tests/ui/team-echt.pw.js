@@ -147,10 +147,21 @@ test.describe("Echte Team-Details", () => {
     await expect(details).toContainText(beleg.titel);
     await expect(details).toContainText("12 von 12 grün");
     const review = details.locator(".tm-dkarte").filter({ has: page.getByRole("heading", { name: "Review", exact: true }) });
+    const reviewImBild = async () => {
+      await review.scrollIntoViewIfNeeded();
+      const karte = await review.boundingBox(), bereich = await details.boundingBox();
+      expect(karte).not.toBeNull();
+      expect(bereich).not.toBeNull();
+      expect(karte.x).toBeGreaterThanOrEqual(bereich.x);
+      expect(karte.y).toBeGreaterThanOrEqual(bereich.y);
+      expect(karte.x + karte.width).toBeLessThanOrEqual(bereich.x + bereich.width);
+      expect(karte.y + karte.height).toBeLessThanOrEqual(bereich.y + bereich.height);
+    };
     await expect(review).toContainText("Claude");
     await expect(review.locator(".mk-fertig")).toHaveText("OK");
     if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
-      await details.evaluate(el => { el.scrollTop = 0; }); await page.mouse.move(0, 0);
+      await page.mouse.move(0, 0);
+      await reviewImBild();
       await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p64_review_1440x900.png`, animations: "disabled" });
     }
     const funde = { ...dateiAgent, id: "funde", name: "CSV-Funde", zustand: "Wartet auf dich",
@@ -164,7 +175,8 @@ test.describe("Echte Team-Details", () => {
     await expect(review.locator("pre")).toHaveText(funde.review.text);
     await expect(details).toContainText("5 von 5 grün");
     if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
-      await details.evaluate(el => { el.scrollTop = 0; }); await page.mouse.move(0, 0);
+      await page.mouse.move(0, 0);
+      await reviewImBild();
       await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p64_funde_1440x900.png`, animations: "disabled" });
     }
     expect((await new AxeBuilder({ page }).include(".team-spalte").analyze()).violations).toEqual([]);
