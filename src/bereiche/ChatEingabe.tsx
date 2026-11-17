@@ -158,6 +158,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       const hinweise = kommentar?.split("\n").slice(1).join("\n");
       if (isTauri() && nachricht.plan?.schritte.length) {
         laufende.current.add(chat.id); setFehler("");
+        aendern({ gestartetUm: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) });
         try {
           const auftraege = teamAuftraege(nachricht.plan, ziel, nachricht.text, hinweise);
           await teamStarten(neu.kopf.pfad, auftraege);
@@ -169,7 +170,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
             orchestratorNachricht(quelle, chat.id, `Plan freigegeben. Team mit ${auftraege.length} Agenten gestartet.`);
           }
         } catch (e) { setFehler(e instanceof Error ? e.message : String(e)); }
-        finally { laufende.current.delete(chat.id); aendern({}); }
+        finally { laufende.current.delete(chat.id); aendern({ gestartetUm: null }); }
         return;
       }
       if (nachricht.plan) { nachricht.plan.freigabe = "Freigegeben"; quelle.aktualisieren(neu); }
