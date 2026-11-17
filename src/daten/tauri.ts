@@ -8,9 +8,10 @@ export type AnhalteBericht = {
   ordner: { ordner: string; status: "gesichert" | "sauber" | "fehler"; sha?: string; meldung?: string }[];
   lauffehler: { pid: number; meldung: string }[]; fristUeberschritten: boolean;
 };
-export const teamLauf = { neu: false };
+export const teamLauf = { neu: false, laeuft: false };
 export async function teamStarten(pfad: string, auftraege: TeamAuftrag[]): Promise<void> {
   if (!isTauri()) return;
+  if (teamLauf.laeuft) throw new Error("Das letzte Team läuft noch oder ist nicht gesichert.");
   teamLauf.neu = true;
   try { await invoke("team_starten", { pfad, auftraege }); }
   catch (e) { teamLauf.neu = false; throw e; }

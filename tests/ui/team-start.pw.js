@@ -141,3 +141,72 @@ test("Fehler beim Teamstart lässt Plan und Freigabeknöpfe stehen", async ({ pa
   await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
   await expect(page.getByText("Plan freigegeben. Team mit 3 Agenten gestartet.", { exact: true })).toBeVisible();
 });
+test("Projektwechsel bleibt während des Teamstarts gesperrt, Freigabe wird gespeichert", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Freigeben und bauen", exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    const invoke = window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
+      if (cmd === "projekt_oeffnen") return { projekt: "Anderes", pfad: args.pfad, zweig: "main" };
+      const antwort = await invoke(cmd, args);
+      if (cmd === "team_starten") await new Promise(resolve => { window.startBeenden = resolve; });
+      return antwort;
+    };
+  });
+  await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => typeof window.startBeenden)).toBe("function");
+  await page.getByRole("button", { name: /^Projekt wählen:/ }).click();
+  await page.getByRole("menuitem", { name: "Ordner öffnen…" }).click();
+  await page.getByRole("textbox", { name: "Pfad zum Projekt" }).fill("C:\\Anderes");
+  await page.getByRole("button", { name: "Öffnen", exact: true }).click();
+  await expect(page.getByText("Ein Auftrag läuft noch. Wechsle das Projekt, wenn er fertig ist.", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => window.startBeenden());
+  await expect(page.getByText("Plan freigegeben. Team mit 3 Agenten gestartet.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(Freigeben und bauen|Mit Kommentaren zurückgeben)$/ })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => {
+    const chat = JSON.parse(localStorage.planChats).chats[0];
+    return { freigabe: chat.verlauf[0].plan.freigabe, gestartetUm: chat.gestartetUm };
+  })).toEqual({ freigabe: "Freigegeben", gestartetUm: null });
+});
+test("Laufendes Team lehnt zweite Freigabe ab und behält Karten und Stoppmarken", async ({ page }, testInfo) => {
+  await page.goto("/"); await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  const karten = page.locator(".team-echt [data-agent]"); await expect(karten).toHaveCount(3);
+  await karten.first().getByRole("button", { name: "Anhalten", exact: true }).click();
+  await expect(karten.first().locator(".pause-marke")).toHaveText("Angehalten");
+  await page.getByRole("radio", { name: "Planen", exact: true }).click();
+  const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" });
+  await feld.fill("Plane den zweiten Lauf"); await feld.press("Enter");
+  await page.evaluate(() => {
+    const invoke = window.__TAURI_INTERNALS__.invoke;
+    window.altesEreignis = () => window.agentSenden({ ...window.starts[0].auftraege[0], id: "aenderung", zustand: "Arbeitet", liveZeile: "Arbeitet weiter", laufzeitSekunden: 15 });
+    window.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
+      if (cmd === "team_starten") {
+        window.starts.push(args); window.altesEreignis(); throw "Das letzte Team läuft noch oder ist nicht gesichert.";
+      }
+      return invoke(cmd, args);
+    };
+  });
+  await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  await expect(page.getByText("Das letzte Team läuft noch oder ist nicht gesichert.", { exact: true })).toBeVisible();
+  expect.soft(await page.evaluate(() => window.starts.length)).toBe(1);
+  await page.evaluate(() => window.altesEreignis());
+  await expect.soft(karten.locator(".ak-name b")).toHaveText(["aenderung", "aenderung-2", "pruefen"]);
+  await expect.soft(karten.first().locator(".pause-marke")).toHaveText("Angehalten");
+  await expect(page.getByRole("button", { name: "Freigeben und bauen", exact: true })).toBeEnabled();
+  expect(await page.evaluate(async () => (await import("/src/daten/tauri.ts")).teamLauf.neu)).toBe(false);
+  expect(await page.evaluate(() => JSON.parse(localStorage.planChats).chats[0].verlauf.at(-1).plan.freigabe)).toBe("Wartet auf dich");
+  if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53e2_startsperre_1440x900.png`, animations: "disabled" });
+  }
+});
+test("Beendete Agenten mit Problem oder Frage lassen einen neuen Start zu", async ({ page }) => {
+  await page.goto("/"); await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  await expect(page.locator(".team-echt [data-agent]")).toHaveCount(3);
+  await page.evaluate(() => window.starts[0].auftraege.forEach((a, i) => window.agentSenden({ ...a, id: a.name, zustand: i ? "Problem" : "Wartet auf dich", liveZeile: "Ende", laufzeitSekunden: 9 })));
+  await page.getByRole("radio", { name: "Planen", exact: true }).click();
+  const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" }); await feld.fill("Plane neu"); await feld.press("Enter");
+  await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.starts.length)).toBe(2);
+});
