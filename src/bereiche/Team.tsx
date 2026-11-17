@@ -85,6 +85,10 @@ function TeamEcht() {
   const [pause, setPause] = useState(false), [stoppt, setStoppt] = useState(false);
   const lauf = useRef({ ids: new Set<string>(), angehalten: false });
   const [angehalten, setAngehalten] = useState(() => new Set<string>());
+  useEffect(() => {
+    // Nur „Arbeitet“ hat einen laufenden Prozess; „Wartet auf dich“ und „Problem“ sind beendet, der Kern nimmt dann einen neuen Start an.
+    teamLauf.laeuft = !pause && agenten.some(a => a.zustand === "Arbeitet" && !angehalten.has(a.name));
+  }, [agenten, pause, angehalten]);
   const angefordert = useAnhalten();
   const [meldungen] = useState(() => new ToastSpeicher());
   const fehler = (zeile: string) => meldungen.melden({ id: zeile, art: "problem", agent: "Team", titel: "Team: Anhalten oder Empfang fehlgeschlagen", zeile });
