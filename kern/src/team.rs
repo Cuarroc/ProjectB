@@ -1,12 +1,12 @@
 use crate::{
-    anhalten, arbeitskopie, chat, start, verbrauch,
+    anhalten, arbeitskopie, chat, pruefung, start, verbrauch,
     zustand::{AgentZustand, Stammdaten},
     Anbieter, Ereignis, Lauf,
 };
 use std::{
     io,
     path::{Path, PathBuf},
-    sync::{mpsc, Arc},
+    sync::{mpsc, Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -21,6 +21,7 @@ pub struct TeamAuftrag {
 
 pub struct Team {
     laeufe: Vec<(String, Lauf)>,
+    nachlaeufe: Vec<(String, Arc<Mutex<bool>>)>,
     ordner: Vec<PathBuf>,
     ordnernamen: Vec<String>,
     basis: Vec<String>,
@@ -65,7 +66,14 @@ impl Team {
             }
         }
         let melden = Arc::new(melden);
-        let mut team = Self { laeufe: vec![], ordner: vec![], ordnernamen: vec![], basis: vec![], ungesichert: false };
+        let mut team = Self {
+            laeufe: vec![],
+            nachlaeufe: vec![],
+            ordner: vec![],
+            ordnernamen: vec![],
+            basis: vec![],
+            ungesichert: false,
+        };
         for auftrag in auftraege {
             let mut stammdaten = Stammdaten {
                 id: auftrag.name.clone(),
@@ -102,6 +110,8 @@ impl Team {
                     team.laeufe.push((auftrag.name.clone(), lauf));
                     let melden = Arc::clone(&melden);
                     let kontingent = kontingent.map(Path::to_path_buf);
+                    let aktiv = Arc::new(Mutex::new(true));
+                    team.nachlaeufe.push((auftrag.name.clone(), Arc::clone(&aktiv)));
                     thread::spawn(move || {
                         let mut zuletzt = zustand.als_json();
                         melden(zuletzt.to_string());
@@ -124,6 +134,29 @@ impl Team {
                                     zustand.dateien_setzen(dateien);
                                 }
                             }
+                            if beendet && zustand.erfolgreich() {
+                                if let Some(befehl) = pruefung::testbefehl(&arbeitskopie) {
+                                    {
+                                        let aktiv = aktiv.lock().unwrap();
+                                        if !*aktiv {
+                                            break;
+                                        }
+                                        zustand.pruefung_starten(&befehl.join(" "));
+                                        melden(zustand.als_json().to_string());
+                                    }
+                                    // shortcut: eigener Test-Job läuft nach Anhalten weiter; später abbrechbar an den Lauf binden.
+                                    let ergebnis = pruefung::ausfuehren(&arbeitskopie, &befehl);
+                                    zustand.pruefung_beenden(Some(&ergebnis));
+                                } else {
+                                    zustand.pruefung_beenden(None);
+                                }
+                                let mut aktiv = aktiv.lock().unwrap();
+                                if *aktiv {
+                                    melden(zustand.als_json().to_string());
+                                }
+                                *aktiv = false;
+                                break;
+                            }
                             let json = zustand.als_json();
                             if json != zuletzt {
                                 melden(json.to_string());
@@ -133,6 +166,7 @@ impl Team {
                                 break;
                             }
                         }
+                        *aktiv.lock().unwrap() = false;
                     });
                 }
                 Err(fehler) => {
@@ -163,6 +197,7 @@ impl Team {
 
     pub fn laeuft(&self) -> bool {
         self.laeufe.iter().any(|(_, lauf)| !lauf.beendet())
+            || self.nachlaeufe.iter().any(|(_, aktiv)| *aktiv.lock().unwrap())
     }
 
     pub fn ersetzbar(&self) -> bool {
@@ -172,6 +207,9 @@ impl Team {
     pub fn anhalten(&mut self, name: Option<&str>, frist: Duration) -> io::Result<anhalten::Bericht> {
         if name.is_some_and(|name| !self.ordnernamen.iter().any(|n| n == name)) {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "Unbekannter Agentenname"));
+        }
+        for (_, aktiv) in self.nachlaeufe.iter().filter(|(n, _)| name.is_none_or(|name| name == n)) {
+            *aktiv.lock().unwrap() = false;
         }
         let ordner: Vec<_> = self
             .ordner
