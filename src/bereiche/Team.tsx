@@ -83,7 +83,7 @@ export function TeamAnsicht({ daten, auswahl, waehlen, aendern, ansicht = "Karte
 function TeamEcht() {
   const [agenten, setzen] = useState<Agent[]>([]), [auswahl, waehlen] = useState<string | null>(null);
   const [pause, setPause] = useState(false), [stoppt, setStoppt] = useState(false);
-  const lauf = useRef({ ids: new Set<string>(), vorige: new Set<string>(), angehalten: false });
+  const lauf = useRef({ ids: new Set<string>(), angehalten: false });
   const [angehalten, setAngehalten] = useState(() => new Set<string>());
   const angefordert = useAnhalten();
   const [meldungen] = useState(() => new ToastSpeicher());
@@ -91,10 +91,10 @@ function TeamEcht() {
   useEffect(() => {
     let beendet = false, abmelden = () => {};
     teamAgentHoeren(agent => {
-      // Alte ids nur außerhalb eines neuen Starts verwerfen: in einem anderen Projekt vergibt der Kern dieselben Ordnernamen.
-      if (beendet || (lauf.current.vorige.has(agent.id) && !teamLauf.neu)) return;
-      if (!lauf.current.ids.has(agent.id) && (lauf.current.angehalten || teamLauf.neu)) {
-        lauf.current.vorige = new Set(lauf.current.ids); lauf.current.ids.clear(); lauf.current.angehalten = false; teamLauf.neu = false;
+      if (beendet) return;
+      // Das erste Ereignis nach teamStarten beginnt immer einen neuen Lauf, auch bei gleichen ids (anderes Projekt).
+      if (teamLauf.neu || (lauf.current.angehalten && !lauf.current.ids.has(agent.id))) {
+        lauf.current.ids.clear(); lauf.current.angehalten = false; teamLauf.neu = false;
         setzen([]); waehlen(null); setPause(false); setAngehalten(new Set()); allesAnhalten.setzen(false);
       }
       lauf.current.ids.add(agent.id);

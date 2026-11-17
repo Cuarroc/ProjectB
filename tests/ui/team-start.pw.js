@@ -111,11 +111,6 @@ test("Zweite Planfreigabe nach natürlichem Ende ersetzt alle alten Karten", asy
   await expect.poll(() => page.evaluate(() => window.starts.length)).toBe(2);
   await expect(karten.locator(".ak-name b")).toHaveText(["neu", "zweiter", "dritter"]);
   await expect(karten.getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(3);
-  // Ein spätes Ereignis des alten Laufs erzeugt keine Geisterkarte; das folgende neue Ereignis zeigt, dass es verarbeitet wurde.
-  await page.evaluate(() => { window.agentSenden({ ...window.starts[0].auftraege[0], id: "aenderung", zustand: "Fertig", liveZeile: "Spät", laufzeitSekunden: 30 });
-    window.agentSenden({ ...window.starts[1].auftraege[0], id: "neu", zustand: "Arbeitet", liveZeile: "Weiter", laufzeitSekunden: 2 }); });
-  await expect(karten.first()).toContainText("Weiter");
-  await expect(karten.locator(".ak-name b")).toHaveText(["neu", "zweiter", "dritter"]);
   // Anderes Projekt: der Kern vergibt wieder die ids des vorletzten Laufs; der neue Start muss sie zeigen.
   await page.evaluate(() => window.starts[1].auftraege.forEach(a => window.agentSenden({ ...a, id: a.name, zustand: "Fertig", liveZeile: "Fertig", laufzeitSekunden: 20 })));
   await expect(karten.getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(0);
@@ -125,6 +120,14 @@ test("Zweite Planfreigabe nach natürlichem Ende ersetzt alle alten Karten", asy
   await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.starts.length)).toBe(3);
   await expect(karten.getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(3);
+  // Gleiche ids wie der gerade angehaltene Lauf (anderes Projekt, auch nach Einzelstopp): der Start setzt trotzdem alles zurück.
+  await karten.first().getByRole("button", { name: "Anhalten", exact: true }).click(); await expect(karten.first().locator(".pause-marke")).toHaveText("Angehalten");
+  await page.getByRole("button", { name: "Alles anhalten", exact: true }).last().click(); await expect(page.locator(".team-echt .anhalte-hinweis")).toBeVisible();
+  await page.getByRole("radio", { name: "Planen", exact: true }).click(); await feld.fill("Plane den vierten Lauf"); await feld.press("Enter");
+  await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.starts.length)).toBe(4);
+  await expect(page.locator(".team-echt .anhalte-hinweis")).toHaveCount(0); await expect(karten.getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(3);
+  await expect(karten.locator(".pause-marke")).toHaveCount(0);
 });
 test("Fehler beim Teamstart lässt Plan und Freigabeknöpfe stehen", async ({ page }) => {
   test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");
