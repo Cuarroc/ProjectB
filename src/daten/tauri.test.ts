@@ -3,7 +3,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beispiel } from "./beispiel";
 import { auftragSenden, chatNachrichtenHoeren, projektOeffnen, projektPruefen, projekteZuletzt } from "./tauri";
-import { teamStarten, teamAnhalten, teamAgentHoeren, teamDateiAnsehen } from "./tauri";
+import { teamStarten, teamAnhalten, teamAgentHoeren, teamDateiAnsehen, teamLauf } from "./tauri";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: vi.fn(() => false) }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
@@ -83,6 +83,16 @@ it("liest den ganzen Agenten aus dem JSON-String und gibt das Abmelden zurück",
   expect(listen).toHaveBeenCalledExactlyOnceWith("team-agent", expect.any(Function));
   vi.mocked(listen).mock.calls[0][1]({ event: "team-agent", id: 1, payload: JSON.stringify(agent) });
   expect(cb).toHaveBeenCalledExactlyOnceWith(agent);
+});
+it("setzt das Startsignal vor invoke und nimmt es bei Fehler zurück", async () => {
+  vi.mocked(isTauri).mockReturnValue(true);
+  vi.mocked(invoke).mockImplementationOnce(async () => {
+    expect(teamLauf.neu).toBe(true); throw "Start fehlgeschlagen";
+  });
+  await expect(teamStarten("/repo", [])).rejects.toBe("Start fehlgeschlagen");
+  expect(teamLauf.neu).toBe(false);
+  vi.mocked(isTauri).mockReturnValue(false); await teamStarten("/repo", []);
+  expect(teamLauf.neu).toBe(false);
 });
 it("lässt Teamfunktionen ohne Tauri harmlos", async () => {
   await expect(teamStarten("/repo", [])).resolves.toBeUndefined();

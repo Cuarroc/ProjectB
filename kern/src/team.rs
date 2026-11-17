@@ -83,6 +83,10 @@ impl Team {
                     return Err(io::Error::new(io::ErrorKind::InvalidInput, "Anbieter passt nicht zum Modell"));
                 }
                 let (kopie, basis) = arbeitskopie::anlegen_in(projekt, &auftrag.name, Path::new(".worktrees"))?;
+                // Der Ordnername ist je Lauf eindeutig (x, x-2 …): späte Ereignisse alter Läufe bleiben unterscheidbar.
+                if let Some(ordner) = kopie.pfad.file_name() {
+                    stammdaten.id = ordner.to_string_lossy().into_owned();
+                }
                 stammdaten.arbeitskopie = kopie.pfad.to_string_lossy().into_owned();
                 team.ordner.push(kopie.pfad.clone());
                 team.ordnernamen.push(auftrag.name.clone());

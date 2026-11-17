@@ -57,11 +57,14 @@ test("zeigt echte Team-Ereignisse und hält Agenten über den Kern an", async ({
   await expect(details).toContainText("src/csv.rs"); await expect(details).toContainText("+8 −2");
   await expect(details).not.toContainText("14:30"); await details.press("Escape");
   await expect(karten.first().locator(".ak-kopf")).toBeFocused();
-  await karten.first().getByRole("button", { name: "Anhalten", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.stopps)).toEqual([{ name: "CSV-Kern aktuell" }]);
+  // Erst der Fehlschlag (Knopf bleibt), dann der gelungene Einzelstopp (Knopf verschwindet).
   await page.evaluate(() => { window.bericht.ordner = [{ ordner: "kern", status: "fehler", meldung: "Sichern fehlgeschlagen" }]; });
   await karten.first().getByRole("button", { name: "Anhalten", exact: true }).click();
   await expect(team.locator(".to-zeile")).toHaveText("Sichern fehlgeschlagen");
+  await page.evaluate(() => { window.bericht.ordner = []; });
+  await karten.first().getByRole("button", { name: "Anhalten", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.stopps)).toEqual([{ name: "CSV-Kern aktuell" }, { name: "CSV-Kern aktuell" }]);
+  await expect(karten.first().getByRole("button", { name: "Anhalten", exact: true })).toHaveCount(0);
   await page.evaluate(() => { window.bericht = { ordner: [], lauffehler: [{ pid: 42, meldung: "Prozess läuft noch" }], fristUeberschritten: true }; });
   await team.getByRole("button", { name: "Alles anhalten", exact: true }).click();
   await expect.soft(team.locator('.to[data-art="problem"] .to-zeile').last()).toHaveText("Prozess läuft noch");

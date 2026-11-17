@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { BeispielQuelle } from "../../daten/quelle";
-import { auftragSenden, chatNachrichtenHoeren } from "../../daten/tauri";
+import { auftragSenden, chatNachrichtenHoeren, teamStarten } from "../../daten/tauri";
 import { useChatEingabe } from "../ChatEingabe";
 import { antwortPlan } from "../../daten/plan";
 
@@ -11,7 +11,7 @@ vi.mock("react", async original => ({ ...await original(),
   useRef: initial => h.refs[h.r++] ??= { current: initial }, useEffect: fn => h.effekte.push(fn),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => true }));
-vi.mock("../../daten/tauri", () => ({ auftragSenden: vi.fn(), chatNachrichtenHoeren: vi.fn() }));
+vi.mock("../../daten/tauri", () => ({ auftragSenden: vi.fn(), chatNachrichtenHoeren: vi.fn(), teamStarten: vi.fn() }));
 let quelle, empfangen, aufraeumen, beenden;
 const ansicht = () => { h.i = 0; h.r = 0; h.effekte = []; return useChatEingabe(quelle); };
 const chat = () => quelle.lesen().chats[0];
@@ -26,15 +26,15 @@ beforeEach(() => {
   ansicht(); aufraeumen = h.effekte.map(fn => fn());
 });
 afterEach(() => { aufraeumen.forEach(fn => fn?.()); vi.resetAllMocks(); vi.unstubAllGlobals(); });
-it("speichert die Freigabe vor dem Senden und behält sie beim Neuladen", async () => {
+it("speichert die Freigabe nach dem Teamstart und behält sie beim Neuladen", async () => {
   const lauf = ansicht().senden("Plane"); await Promise.resolve();
   empfangen(chat().id, "- [ ] Export"); beenden({ sitzung: null, erfolg: true }); await lauf;
   const n = chat().verlauf.at(-1); let freigabeBeimSenden;
-  vi.mocked(auftragSenden).mockImplementationOnce(async () => {
-    freigabeBeimSenden = chat().verlauf.find(v => v.id === n.id).plan.freigabe; return { sitzung: null, erfolg: true };
+  vi.mocked(teamStarten).mockImplementationOnce(async () => {
+    freigabeBeimSenden = chat().verlauf.find(v => v.id === n.id).plan.freigabe;
   });
   await ansicht().onAktion(n.id, "plan-freigeben");
-  expect(freigabeBeimSenden).toBe("Freigegeben");
+  expect(freigabeBeimSenden).toBe("Wartet auf dich");
   const geladen = new BeispielQuelle(quelle.lesen()).lesen().chats[0].verlauf.find(v => v.id === n.id);
   expect(geladen.plan).toEqual({ ...antwortPlan(n.text, n.id), freigabe: "Freigegeben" });
 });
