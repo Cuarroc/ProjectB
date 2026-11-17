@@ -97,11 +97,11 @@ const dateiAgent = { id: "datei-kern", name: "Datei-Kern", anbieter: "Codex", mo
   fortschritt: 0, phasen: [], dateien: [{ pfad: "src/csv.rs", hinzugefuegt: 1, entfernt: 1 }, { pfad: "bild.png", hinzugefuegt: 0, entfernt: 0 }], tests: null, schaetzung: null };
 const dateiDiff = "diff --git a/src/csv.rs b/src/csv.rs\nindex 1234567..abcdef0 100644\n--- a/src/csv.rs\n+++ b/src/csv.rs\n@@ -1,2 +1,2 @@\n Kontext\n-alt\n+neu\n… gekürzt";
 
-test.describe("Echte Dateivorschau", () => {
+test.describe("Echte Team-Details", () => {
   test.beforeEach(async ({ page }) => {
     test.skip(process.env.UI_BASELINE === "1", "Die Dateivorschau wird am Kandidaten geprüft.");
     await page.addInitScript(() => {
-      window.isTauri = true; window.dateiAnfragen = []; window.callbacks = {}; window.listener = new Map(); let id = 0;
+      window.isTauri = true; window.prAnfragen = []; window.dateiAnfragen = []; window.callbacks = {}; window.listener = new Map(); let id = 0;
       window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: (_event, id) => window.listener.delete(id) };
       window.__TAURI_INTERNALS__ = {
         transformCallback: cb => { window.callbacks[++id] = cb; return id; },
@@ -113,6 +113,7 @@ test.describe("Echte Dateivorschau", () => {
           if (cmd === "einstellungen_laden") return {};
           if (cmd === "chats_laden") return { chats: [], aktiverChatId: null };
           if (cmd === "chats_speichern") return;
+          if (cmd === "pr_oeffnen") { window.prAnfragen.push(args); if (window.prFehler) throw window.prFehler; return; }
           if (cmd === "team_datei_ansehen") return new Promise((resolve, reject) => window.dateiAnfragen.push({ args, resolve, reject }));
           throw new Error(`Unerwarteter Command: ${cmd}`);
         },
@@ -125,6 +126,103 @@ test.describe("Echte Dateivorschau", () => {
     await expect.poll(() => page.evaluate(() => [...window.listener.values()].includes("team-agent"))).toBe(true);
     await page.evaluate(a => window.agentSenden(a), dateiAgent);
     await page.locator(`[data-agent="${dateiAgent.id}"] .ak-kopf`).click();
+  });
+
+  test("zeigt Kern-Beleg, Tests und Review OK, Funde und laufendes Review", async ({ page }, testInfo) => {
+    test.skip(process.env.UI_BASELINE === "1", "Review-Anzeige wird am Kandidaten geprüft.");
+    const beleg = { titel: "CSV-Export geprüft", prLink: "https://github.com/Cuarroc/ProjectB/pull/250" };
+    const fertig = { ...dateiAgent, zustand: "Fertig", liveZeile: "Review OK (Claude)", beleg,
+      tests: { gruenSeit: null, gruen: 12, gesamt: 12, verlauf: [] }, review: { familie: "Claude", urteil: "OK", text: "" } };
+    const details = page.locator("#team-details"), karte = page.locator(`[data-agent="${dateiAgent.id}"]`);
+    await page.evaluate(a => window.agentSenden(a), fertig);
+    await expect(page.locator(".team-chip")).toHaveText("1 Agent");
+    await expect(karte.locator(".mk")).toHaveText("Fertig");
+    await expect(details.locator(".tm-status")).toHaveText("Fertig");
+    for (const ort of [karte, details]) {
+      await expect(ort.getByRole("link", { name: "PR ansehen" })).toHaveAttribute("href", beleg.prLink);
+      await expect(ort.getByRole("link", { name: "PR ansehen" })).toHaveAttribute("target", "_blank");
+      await ort.getByRole("link", { name: "PR ansehen" }).click();
+    }
+    expect(await page.evaluate(() => window.prAnfragen)).toEqual([{ url: beleg.prLink }, { url: beleg.prLink }]);
+    await expect(details).toContainText(beleg.titel);
+    await expect(details).toContainText("12 von 12 grün");
+    const review = details.locator(".tm-dkarte").filter({ has: page.getByRole("heading", { name: "Review", exact: true }) });
+    const reviewImBild = async () => {
+      await review.scrollIntoViewIfNeeded();
+      const karte = await review.boundingBox(), bereich = await details.boundingBox();
+      expect(karte).not.toBeNull();
+      expect(bereich).not.toBeNull();
+      expect(karte.x).toBeGreaterThanOrEqual(bereich.x);
+      expect(karte.y).toBeGreaterThanOrEqual(bereich.y);
+      expect(karte.x + karte.width).toBeLessThanOrEqual(bereich.x + bereich.width);
+      expect(karte.y + karte.height).toBeLessThanOrEqual(bereich.y + bereich.height);
+    };
+    await expect(review).toContainText("Claude");
+    await expect(review.locator(".mk-fertig")).toHaveText("OK");
+    if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+      await page.mouse.move(0, 0);
+      await reviewImBild();
+      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p64_review_1440x900.png`, animations: "disabled" });
+    }
+    const funde = { ...dateiAgent, id: "funde", name: "CSV-Funde", zustand: "Wartet auf dich",
+      tests: { gruenSeit: null, gruen: 5, gesamt: 5, verlauf: [] },
+      review: { familie: "Codex", urteil: "FUNDE", text: "P2: Leere CSV wird nicht abgefangen.\nBitte Eingabe prüfen." } };
+    await page.evaluate(a => window.agentSenden(a), funde);
+    await page.locator('[data-agent="funde"] .ak-kopf').click();
+    await expect(details.locator(".tm-status")).toHaveText("Wartet auf dich");
+    await expect(review).toContainText("Codex");
+    await expect(review.locator(".mk-wartet")).toHaveText("Funde");
+    await expect(review.locator("pre")).toHaveText(funde.review.text);
+    await expect(details).toContainText("5 von 5 grün");
+    if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+      await page.mouse.move(0, 0);
+      await reviewImBild();
+      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p64_funde_1440x900.png`, animations: "disabled" });
+    }
+    expect((await new AxeBuilder({ page }).include(".team-spalte").analyze()).violations).toEqual([]);
+    await page.evaluate(a => window.agentSenden({ ...a, zustand: "Arbeitet", review: { ...a.review, urteil: null, text: "" } }), funde);
+    await expect(review).toContainText("Review durch Codex läuft");
+    await page.evaluate(a => window.agentSenden({ ...a, review: null }), funde);
+    await expect(review).toHaveCount(0);
+  });
+
+  test("Details stehen direkt unter einem oder zwei Agenten und öffnen oben", async ({ page }) => {
+    const details = page.locator("#team-details"), liste = page.locator(".team-echt .team-liste");
+    for (const anzahl of [1, 2]) {
+      const agent = { ...dateiAgent, id: anzahl === 1 ? dateiAgent.id : "zweiter", name: `Agent ${anzahl}`, zustand: "Fertig",
+        beleg: { titel: "CSV-Export geprüft", prLink: "https://github.com/Cuarroc/ProjectB/pull/250" },
+        review: { familie: "Claude", urteil: "FUNDE", text: "P2: Bitte Eingabe prüfen.\n".repeat(20) } };
+      await details.evaluate(el => { el.scrollTop = 200; });
+      await page.evaluate(a => window.agentSenden(a), agent);
+      if (anzahl === 1) await details.press("Escape");
+      await page.locator(`[data-agent="${agent.id}"] .ak-kopf`).click();
+      await expect(details).toBeFocused();
+      const ende = await liste.locator("[data-agent]").last().boundingBox(), box = await details.boundingBox();
+      expect(box.y - ende.y - ende.height).toBeGreaterThanOrEqual(0);
+      expect(box.y - ende.y - ende.height).toBeLessThanOrEqual(24);
+      expect(await details.evaluate(el => el.scrollTop)).toBe(0);
+      await expect(details.locator(".tm-det-kopf")).toBeInViewport({ ratio: 1 });
+      await expect(details.locator(".tm-det-leiste").first()).toBeInViewport({ ratio: 1 });
+      const geometrie = await details.evaluate(el => ({ sichtbar: el.clientHeight, inhalt: el.scrollHeight,
+        abstand: el.closest(".team-bereich").getBoundingClientRect().bottom - el.getBoundingClientRect().bottom,
+        erlaubt: parseFloat(getComputedStyle(el).getPropertyValue("--abstand-4")) }));
+      expect(geometrie.inhalt).toBeGreaterThan(geometrie.sichtbar);
+      expect(geometrie.abstand).toBeGreaterThanOrEqual(0);
+      expect(geometrie.abstand).toBeLessThanOrEqual(geometrie.erlaubt + 1);
+      await details.evaluate(el => { el.scrollTop = el.scrollHeight; });
+      const letzte = await details.locator(".tm-dkarte").last().boundingBox();
+      expect(letzte.y + letzte.height).toBeLessThanOrEqual(box.y + box.height);
+    }
+  });
+
+  test("zeigt Fehler beim PR-Öffnen an beiden Links kurz an", async ({ page }) => {
+    await page.evaluate(a => { window.prFehler = "Browser konnte nicht geöffnet werden"; window.agentSenden(a); },
+      { ...dateiAgent, zustand: "Fertig", beleg: { titel: "Geprüft", prLink: "https://github.com/Cuarroc/ProjectB/pull/250" } });
+    for (const ort of [page.locator(`[data-agent="${dateiAgent.id}"]`), page.locator("#team-details")]) {
+      await ort.getByRole("link", { name: "PR ansehen" }).click();
+      await expect(ort.getByRole("status")).toHaveText("Browser konnte nicht geöffnet werden");
+      await expect(ort.getByRole("status")).toHaveCount(0, { timeout: 6000 });
+    }
   });
 
   test("zeigt Diff, Binärhinweis und Fehler mit Fokus-Rückgabe", async ({ page }, testInfo) => {

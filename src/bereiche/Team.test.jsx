@@ -5,10 +5,28 @@ import { TeamAnsicht, anhalten } from "./Team";
 import { Agentenkarte } from "../bausteine/Agentenkarte";
 import { beispiel } from "../daten/beispiel";
 import { Knopf } from "../bausteine/Knopf";
+import { belegFuer, mitBeleg } from "./TeamDetails";
 
 const ansicht = (daten = beispiel, aendern = vi.fn(), auswahl = null) => TeamAnsicht({ daten, aendern, auswahl, waehlen: vi.fn() });
 const karten = (baum, typ = Agentenkarte) => Children.toArray(baum).flatMap(k => !isValidElement(k) ? [] : k.type === typ ? [k] : karten(k.props.children, typ));
 describe("Team", () => {
+  it("zeigt bei genau einem Agenten die Einzahl im Kopf", () => {
+    const html = renderToStaticMarkup(ansicht({ ...beispiel, agenten: [beispiel.agenten[0]] }));
+    expect(html).toContain('class="team-chip">1 Agent</span>');
+  });
+  it("findet den Kern-Beleg und erhält Fertig auch ohne Vorschau-Belege", () => {
+    const beleg = { titel: "Tests und Review grün", prLink: "https://github.com/Cuarroc/ProjectB/pull/250" };
+    const agent = { ...beispiel.agenten[0], beleg }, daten = { ...beispiel, agenten: [agent], belege: [] };
+    expect(belegFuer(daten, agent)).toEqual(beleg);
+    expect(mitBeleg(daten).agenten[0]).toEqual(agent);
+    const html = renderToStaticMarkup(ansicht(daten, vi.fn(), agent.id));
+    expect(html.match(/href="https:\/\/github.com\/Cuarroc\/ProjectB\/pull\/250"/g)).toHaveLength(2);
+  });
+  it.each([null, { titel: "Ohne Link", prLink: "   " }])("wertet einen leeren Kern-Beleg nicht als Fertig", beleg => {
+    const agent = { ...beispiel.agenten[0], beleg }, daten = { ...beispiel, agenten: [agent], belege: [] };
+    expect(belegFuer(daten, agent)).toBeUndefined();
+    expect(mitBeleg(daten).agenten[0].zustand).toBe("Problem");
+  });
   it("speichert beim Anhalten ohne Beleg nur Originaldaten und erhält fertige Agenten", () => {
     const daten = { ...beispiel, belege: [] }, aendern = vi.fn();
     karten(ansicht(daten, aendern), Knopf).find(k => k.props.text === "Alles anhalten").props.onClick();
