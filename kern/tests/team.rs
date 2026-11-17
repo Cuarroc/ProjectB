@@ -75,7 +75,7 @@ fn starten(repo: &Repo, namen: &[&str]) -> (Team, mpsc::Receiver<String>) {
 
 fn bis_fertig(rx: &mpsc::Receiver<String>, ordner: &[PathBuf], anzahl: usize) -> Vec<Value> {
     let mut meldungen = Vec::new();
-    while meldungen.iter().filter(|v: &&Value| v["zustand"] == "Fertig").count() < anzahl {
+    while meldungen.iter().filter(|v: &&Value| v["zustand"] == "Wartet auf dich").count() < anzahl {
         let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
         if v["liveZeile"] == "Auftrag: weiter" {
             let pfad = PathBuf::from(v["arbeitskopie"].as_str().unwrap());
@@ -108,7 +108,7 @@ fn dateien_werden_live_gemeldet_und_laufzeit_tickert() {
             fs::write(team.ordner()[0].join("weiter"), "live bestätigt").unwrap();
             tick = true;
         }
-        if v["zustand"] == "Fertig" {
+        if v["zustand"] == "Wartet auf dich" {
             assert!(tick);
             assert_eq!(v["dateien"], serde_json::json!([{"pfad":"weiter", "hinzugefuegt":1, "entfernt":0}]));
             break;
@@ -169,7 +169,7 @@ fn zwei_agenten_arbeiten_live_in_eigenen_worktrees() {
     for name in ["eins", "zwei"] {
         let pfad = fs::canonicalize(repo.0.join(".worktrees").join(name)).unwrap();
         assert!(team.ordner().contains(&pfad));
-        for zustand in ["Arbeitet", "Fertig"] {
+        for zustand in ["Arbeitet", "Wartet auf dich"] {
             assert!(meldungen.iter().any(|v| v["id"] == name
                 && v["zustand"] == zustand
                 && v["arbeitskopie"] == pfad.to_string_lossy().as_ref()));
@@ -482,4 +482,143 @@ fn unterschied_folgt_keinen_symlinks() {
     fs::remove_file(ordner.join("link")).unwrap();
     fs::remove_file(ordner.join("unter")).unwrap();
     team.anhalten(None, Duration::from_secs(30)).unwrap();
+}
+
+#[test]
+fn team_prueft_nur_erfolgreiche_agenten_und_meldet_der_reihe_nach() {
+    for (skript, args, zeile, status, zahlen) in [
+        (Some("console.log('Tests 2 passed (2)')"), &[][..], "Tests grün: 2 von 2", "Wartet auf dich", Some((2, 2))),
+        (
+            Some("console.log('Tests 1 passed | 1 failed (2)'); process.exit(1)"),
+            &[][..],
+            "Tests rot: 1 von 2 grün",
+            "Problem",
+            Some((1, 2)),
+        ),
+        (Some("process.exit(0)"), &[][..], "Tests grün: 0 von 0", "Wartet auf dich", Some((0, 0))),
+        (None, &[][..], "Keine Tests gefunden", "Wartet auf dich", None),
+        (Some("process.exit(0)"), &["--fehler"][..], "", "Problem", None),
+    ] {
+        let repo = Repo::neu();
+        let (tx, rx) = mpsc::channel();
+        let mut team = Team::starten_mit(
+            &repo.0,
+            vec![auftrag("eins")],
+            move |j| tx.send(j).unwrap(),
+            |a, w, p| {
+                if let Some(skript) = skript {
+                    fs::write(p.join("package.json"), r#"{"scripts":{"test":"node test.js"}}"#).unwrap();
+                    fs::write(p.join("test.js"), skript).unwrap();
+                }
+                start::starten(&Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: args, ..*a }, w, p)
+            },
+        )
+        .unwrap();
+        let mut meldungen = Vec::new();
+        loop {
+            match rx.recv_timeout(Duration::from_secs(10)) {
+                Ok(j) => meldungen.push(serde_json::from_str::<Value>(&j).unwrap()),
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                Err(e) => panic!("Team-Thread endet nicht: {e}"),
+            }
+        }
+        let letzte = meldungen.last().unwrap();
+        assert!(meldungen.iter().all(|v| v["zustand"] != "Fertig"));
+        assert_eq!(letzte["zustand"], status);
+        if !zeile.is_empty() {
+            assert_eq!(letzte["liveZeile"], zeile);
+        }
+        let prueft = meldungen.iter().position(|v| v["liveZeile"] == "Prüft: npm test");
+        assert_eq!(prueft.is_some(), zahlen.is_some());
+        if let Some((gruen, gesamt)) = zahlen {
+            assert_eq!(meldungen[prueft.unwrap()]["zustand"], "Arbeitet");
+            assert!(prueft.unwrap() < meldungen.len() - 1);
+            assert_eq!(
+                letzte["tests"],
+                serde_json::json!({"gruenSeit":null,"gruen":gruen,"gesamt":gesamt,"verlauf":[]})
+            );
+        } else {
+            assert!(letzte["tests"].is_null());
+        }
+        team.laeufe_mut()[0].warten().unwrap();
+    }
+}
+
+#[test]
+fn teststartfehler_wird_als_problem_gemeldet() {
+    let repo = Repo::neu();
+    let (tx, rx) = mpsc::channel();
+    let mut team = Team::starten_mit(
+        &repo.0,
+        vec![auftrag("eins")],
+        move |j| {
+            let v: Value = serde_json::from_str(&j).unwrap();
+            if v["liveZeile"] == "Prüft: npm test" {
+                let p = PathBuf::from(v["arbeitskopie"].as_str().unwrap());
+                fs::rename(&p, p.with_extension("weg")).unwrap();
+            }
+            tx.send(j).unwrap();
+        },
+        |a, w, p| {
+            fs::write(p.join("package.json"), r#"{"scripts":{"test":"node -e 0"}}"#).unwrap();
+            start::starten(&Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &[], ..*a }, w, p)
+        },
+    )
+    .unwrap();
+    let letzte = loop {
+        let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        assert_ne!(v["zustand"], "Fertig");
+        if v["zustand"] == "Problem" {
+            break v;
+        }
+    };
+    assert!(!letzte["liveZeile"].as_str().unwrap().is_empty());
+    assert_eq!(letzte["tests"]["gruen"], 0);
+    assert_eq!(letzte["tests"]["gesamt"], 0);
+    team.laeufe_mut()[0].warten().unwrap();
+    assert!(matches!(rx.recv_timeout(Duration::from_secs(10)), Err(mpsc::RecvTimeoutError::Disconnected)));
+}
+
+#[test]
+fn anhalten_wartet_nicht_auf_tests_und_verwirft_spaetes_ergebnis() {
+    let repo = Repo::neu();
+    let (mut team, rx) = datei_team(&repo, "eins", &[], |p| {
+        fs::write(p.join("package.json"), r#"{"scripts":{"test":"node test.js"}}"#).unwrap();
+        fs::write(p.join("test.js"), "require('fs').writeFileSync('prueft', ''); const t=setInterval(()=>{if(require('fs').existsSync('weiter'))clearInterval(t)},10)").unwrap();
+    });
+    loop {
+        let j: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        assert_ne!(j["zustand"], "Fertig");
+        if j["liveZeile"] == "Prüft: npm test" {
+            break;
+        }
+    }
+    let frist = std::time::Instant::now() + Duration::from_secs(10);
+    while !team.ordner()[0].join("prueft").exists() {
+        assert!(std::time::Instant::now() < frist);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(team.laeuft() && !team.ersetzbar());
+    let start = std::time::Instant::now();
+    let bericht = team.anhalten(None, Duration::from_secs(2)).unwrap();
+    assert!(start.elapsed() < Duration::from_secs(2));
+    fs::write(team.ordner()[0].join("weiter"), "").unwrap();
+    assert!(bericht.lauffehler.is_empty());
+    assert!(!team.laeuft());
+    assert!(matches!(rx.recv_timeout(Duration::from_secs(10)), Err(mpsc::RecvTimeoutError::Disconnected)));
+}
+
+#[test]
+fn testbefehl_erkennen() {
+    let repo = Repo::neu();
+    let erkennen = || projectb_kern::pruefung::testbefehl(&repo.0);
+    assert_eq!(erkennen(), None);
+    for inhalt in ["{}", r#"{"scripts":{"test":false}}"#, "kaputt"] {
+        fs::write(repo.0.join("package.json"), inhalt).unwrap();
+        assert_eq!(erkennen(), None);
+    }
+    fs::write(repo.0.join("package.json"), r#"{"scripts":{"test":"node test.js"}}"#).unwrap();
+    assert_eq!(erkennen(), Some(vec!["npm", "test"]));
+    fs::write(repo.0.join("Cargo.toml"), "").unwrap();
+    assert_eq!(erkennen(), Some(vec!["cargo", "test"]));
 }

@@ -23,7 +23,8 @@ pub struct AgentZustand {
     problem: bool,
     start: Option<Instant>,
     ende: Option<Instant>,
-    letzte_antwort: String,
+    prueft: bool,
+    tests: Option<Value>,
     dateien: Vec<Value>,
 }
 
@@ -38,7 +39,8 @@ impl AgentZustand {
             problem: false,
             start: None,
             ende: None,
-            letzte_antwort: String::new(),
+            prueft: false,
+            tests: None,
             dateien: Vec::new(),
         }
     }
@@ -82,10 +84,32 @@ impl AgentZustand {
         self.dateien = dateien;
     }
 
+    pub(crate) fn erfolgreich(&self) -> bool {
+        self.ergebnis_ok && self.beendet_ok && !self.problem
+    }
+
+    pub(crate) fn pruefung_starten(&mut self, befehl: &str) {
+        self.prueft = true;
+        self.zeilen(&format!("Prüft: {befehl}"));
+    }
+
+    pub(crate) fn pruefung_beenden(&mut self, ergebnis: Option<&crate::pruefung::Ergebnis>) {
+        self.prueft = false;
+        let Some(ergebnis) = ergebnis else {
+            self.zeilen("Keine Tests gefunden");
+            return;
+        };
+        let (gruen, gesamt) = (ergebnis.gruen.unwrap_or(0), ergebnis.gesamt.unwrap_or(0));
+        self.tests = Some(json!({"gruenSeit": null, "gruen": gruen, "gesamt": gesamt, "verlauf": []}));
+        self.problem |= !ergebnis.erfolgreich;
+        self.zeilen(&if ergebnis.erfolgreich {
+            format!("Tests grün: {gruen} von {gesamt}")
+        } else {
+            ergebnis.fehler.clone().unwrap_or_else(|| format!("Tests rot: {gruen} von {gesamt} grün"))
+        });
+    }
+
     fn antwort(&mut self, text: &str) {
-        if !text.trim().is_empty() {
-            self.letzte_antwort = text.trim_end().lines().last().unwrap_or_default().to_owned();
-        }
         self.zeilen(text);
     }
 
@@ -108,12 +132,8 @@ impl AgentZustand {
     pub fn als_json_um(&self, jetzt: Instant) -> Value {
         let zustand = if self.problem {
             "Problem"
-        } else if self.ergebnis_ok && self.beendet_ok {
-            if self.letzte_antwort.ends_with('?') {
-                "Wartet auf dich"
-            } else {
-                "Fertig"
-            }
+        } else if self.ergebnis_ok && self.beendet_ok && !self.prueft {
+            "Wartet auf dich"
         } else {
             "Arbeitet"
         };
@@ -125,7 +145,7 @@ impl AgentZustand {
             "effort": self.stammdaten.effort, "arbeitskopie": self.stammdaten.arbeitskopie,
             "zustand": zustand, "liveZeile": self.live_zeile, "letzteZeilen": self.letzte_zeilen,
             "tokens": 0, "laufzeitSekunden": laufzeit, "fortschritt": 0,
-            "phasen": [], "dateien": self.dateien, "tests": null, "schaetzung": null,
+            "phasen": [], "dateien": self.dateien, "tests": self.tests, "schaetzung": null,
         })
     }
 }
