@@ -14,6 +14,9 @@ use std::{
     time::Duration,
 };
 
+// Auf frischen Windows-Runnern braucht der erste `npm test` 5–10 s; 10 s Wartezeit reichten nicht immer.
+const FRIST: Duration = Duration::from_secs(30);
+
 struct Repo(PathBuf);
 impl Repo {
     fn neu() -> Self {
@@ -45,7 +48,11 @@ impl Repo {
 }
 impl Drop for Repo {
     fn drop(&mut self) {
-        fs::remove_dir_all(&self.0).unwrap();
+        let weg = fs::remove_dir_all(&self.0);
+        // Beim Abwickeln nicht erneut panicen: das bräche den Prozess ab (0xc0000409), der Testfehler ginge verloren.
+        if !std::thread::panicking() {
+            weg.unwrap();
+        }
     }
 }
 
@@ -83,7 +90,7 @@ fn starten(repo: &Repo, namen: &[&str]) -> (Team, mpsc::Receiver<String>) {
 fn bis_fertig(rx: &mpsc::Receiver<String>, ordner: &[PathBuf], anzahl: usize) -> Vec<Value> {
     let mut meldungen = Vec::new();
     while meldungen.iter().filter(|v: &&Value| v["zustand"] == "Wartet auf dich").count() < anzahl {
-        let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        let v: Value = serde_json::from_str(&rx.recv_timeout(FRIST).unwrap()).unwrap();
         if v["liveZeile"] == "Auftrag: weiter" {
             let pfad = PathBuf::from(v["arbeitskopie"].as_str().unwrap());
             assert!(ordner.contains(&pfad));
@@ -109,7 +116,7 @@ fn dateien_werden_live_gemeldet_und_laufzeit_tickert() {
     let (mut team, rx) = starten(&repo, &["eins"]);
     let mut tick = false;
     loop {
-        let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        let v: Value = serde_json::from_str(&rx.recv_timeout(FRIST).unwrap()).unwrap();
         if !tick && v["laufzeitSekunden"].as_u64().unwrap() >= 2 {
             assert_eq!(v["zustand"], "Arbeitet");
             fs::write(team.ordner()[0].join("weiter"), "live bestätigt").unwrap();
@@ -154,7 +161,7 @@ fn gitfehler_erhalten_den_letzten_stand() {
     });
     let erwartet = serde_json::json!([{"pfad":"vorher", "hinzugefuegt":1, "entfernt":0}]);
     loop {
-        let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        let v: Value = serde_json::from_str(&rx.recv_timeout(FRIST).unwrap()).unwrap();
         if v["dateien"] == erwartet {
             assert_eq!(v["zustand"], "Arbeitet");
             fs::write(team.ordner()[0].join(".git"), "ungültig").unwrap();
@@ -524,7 +531,7 @@ fn team_prueft_nur_erfolgreiche_agenten_und_meldet_der_reihe_nach() {
         .unwrap();
         let mut meldungen = Vec::new();
         loop {
-            match rx.recv_timeout(Duration::from_secs(10)) {
+            match rx.recv_timeout(FRIST) {
                 Ok(j) => meldungen.push(serde_json::from_str::<Value>(&j).unwrap()),
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 Err(e) => panic!("Team-Thread endet nicht: {e}"),
@@ -574,7 +581,7 @@ fn teststartfehler_wird_als_problem_gemeldet() {
     )
     .unwrap();
     let letzte = loop {
-        let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        let v: Value = serde_json::from_str(&rx.recv_timeout(FRIST).unwrap()).unwrap();
         assert_ne!(v["zustand"], "Fertig");
         if v["zustand"] == "Problem" {
             break v;
@@ -584,7 +591,7 @@ fn teststartfehler_wird_als_problem_gemeldet() {
     assert_eq!(letzte["tests"]["gruen"], 0);
     assert_eq!(letzte["tests"]["gesamt"], 0);
     team.laeufe_mut()[0].warten().unwrap();
-    assert!(matches!(rx.recv_timeout(Duration::from_secs(10)), Err(mpsc::RecvTimeoutError::Disconnected)));
+    assert!(matches!(rx.recv_timeout(FRIST), Err(mpsc::RecvTimeoutError::Disconnected)));
 }
 
 #[test]
@@ -595,13 +602,13 @@ fn anhalten_wartet_nicht_auf_tests_und_verwirft_spaetes_ergebnis() {
         fs::write(p.join("test.js"), "require('fs').writeFileSync('prueft', ''); const t=setInterval(()=>{if(require('fs').existsSync('weiter'))clearInterval(t)},10)").unwrap();
     });
     loop {
-        let j: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        let j: Value = serde_json::from_str(&rx.recv_timeout(FRIST).unwrap()).unwrap();
         assert_ne!(j["zustand"], "Fertig");
         if j["liveZeile"] == "Prüft: npm test" {
             break;
         }
     }
-    let frist = std::time::Instant::now() + Duration::from_secs(10);
+    let frist = std::time::Instant::now() + FRIST;
     while !team.ordner()[0].join("prueft").exists() {
         assert!(std::time::Instant::now() < frist);
         std::thread::sleep(Duration::from_millis(10));
@@ -613,7 +620,7 @@ fn anhalten_wartet_nicht_auf_tests_und_verwirft_spaetes_ergebnis() {
     fs::write(team.ordner()[0].join("weiter"), "").unwrap();
     assert!(bericht.lauffehler.is_empty());
     assert!(!team.laeuft());
-    assert!(matches!(rx.recv_timeout(Duration::from_secs(10)), Err(mpsc::RecvTimeoutError::Disconnected)));
+    assert!(matches!(rx.recv_timeout(FRIST), Err(mpsc::RecvTimeoutError::Disconnected)));
 }
 
 #[test]
@@ -721,7 +728,7 @@ fn review_team(
 fn alle(rx: &mpsc::Receiver<String>) -> Vec<Value> {
     let mut meldungen = Vec::new();
     loop {
-        match rx.recv_timeout(Duration::from_secs(10)) {
+        match rx.recv_timeout(FRIST) {
             Ok(j) => meldungen.push(serde_json::from_str::<Value>(&j).unwrap()),
             Err(mpsc::RecvTimeoutError::Disconnected) => return meldungen,
             Err(e) => panic!("Team-Thread endet nicht: {e}"),
@@ -779,7 +786,7 @@ fn anhalten_vor_pr_legt_keinen_pr_an() {
     let repo = Repo::neu();
     let skript = "require('fs').writeFileSync('prueft', ''); const t=setInterval(()=>{if(require('fs').existsSync('weiter'))clearInterval(t)},10)";
     let (mut team, rx) = pr_team(&repo, skript, (SAUBER, pr_ok));
-    let frist = std::time::Instant::now() + Duration::from_secs(10);
+    let frist = std::time::Instant::now() + FRIST;
     while !team.ordner()[0].join("prueft").exists() {
         assert!(std::time::Instant::now() < frist);
         std::thread::sleep(Duration::from_millis(10));
@@ -863,7 +870,7 @@ fn anhalten_trifft_pruefer_und_verwirft_spaetes_review() {
     let repo = Repo::neu();
     let (mut team, rx) = review_team(&repo, "process.exit(0)", (SAUBER, pr_ok), false, "URTEIL: OK", &["--haengen"]);
     loop {
-        let v: Value = serde_json::from_str(&rx.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        let v: Value = serde_json::from_str(&rx.recv_timeout(FRIST).unwrap()).unwrap();
         assert_ne!(v["zustand"], "Fertig");
         if v["liveZeile"] == "Review durch Codex …" {
             break;

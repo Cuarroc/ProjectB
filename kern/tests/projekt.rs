@@ -26,7 +26,10 @@ impl Ordner {
 }
 impl Drop for Ordner {
     fn drop(&mut self) {
-        fs::remove_dir_all(&self.0).unwrap();
+        let weg = fs::remove_dir_all(&self.0);
+        if !std::thread::panicking() {
+            weg.unwrap();
+        }
     }
 }
 
