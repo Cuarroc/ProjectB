@@ -46,14 +46,24 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
     return () => { anfrage.current++; if (liste) { liste.style.scrollPaddingTop = ""; liste.style.paddingBottom = ""; } };
   }, [agent.id]);
   const scrolleVorschau = () => {
+    if (vorschauBereich.current) vorschauBereich.current.style.marginBottom = "";
     vorschauBereich.current?.scrollIntoView({ block: "nearest" });
-    if (!echt || !bereich.current) return;
-    const oben = bereich.current.getBoundingClientRect().top;
+    if (!echt || !bereich.current || !vorschauBereich.current) return;
+    const sichtbar = bereich.current.getBoundingClientRect(), oben = sichtbar.top;
     const angeschnitten = [...bereich.current.querySelectorAll<HTMLElement>(".tm-det-kopf, .tm-det-leiste, .tm-dkarte")].find(el => {
       const box = el.getBoundingClientRect(); return box.top < oben && box.bottom > oben;
     });
-    // Beim automatischen Scrollen am Anfang eines ganzen Inhaltsblocks bleiben.
-    if (angeschnitten) bereich.current.scrollTop -= oben - angeschnitten.getBoundingClientRect().top;
+    // Ganze Inhaltsblöcke zeigen, ohne die angeforderte Vorschau aus dem Blick zu schieben.
+    if (angeschnitten) {
+      const delta = oben - angeschnitten.getBoundingClientRect().top;
+      const vorschau = vorschauBereich.current.getBoundingClientRect();
+      if (vorschau.bottom + delta <= sichtbar.bottom) bereich.current.scrollTop -= delta;
+      else {
+        // Auch am Scrollende muss die Vorschau den oberen Rand erreichen können.
+        vorschauBereich.current.style.marginBottom = `${Math.max(0, sichtbar.height - vorschau.height)}px`;
+        bereich.current.scrollTop += vorschau.top - oben;
+      }
+    }
   };
   useLayoutEffect(() => { if (vorschau) { scrolleVorschau(); vorschauBereich.current?.focus({ preventScroll: true }); } }, [vorschau]);
   useLayoutEffect(() => {

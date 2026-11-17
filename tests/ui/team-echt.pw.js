@@ -217,6 +217,29 @@ test.describe("Echte Dateivorschau", () => {
     }
   });
 
+  test("kurze Vorschau bleibt bei vielen Dateien im sichtbaren Detailbereich", async ({ page }, testInfo) => {
+    const dateien = Array.from({ length: 25 }, (_, i) => ({ pfad: `bild-${i + 1}.png`, hinzugefuegt: 0, entfernt: 0 }));
+    await page.evaluate(a => window.agentSenden(a), { ...dateiAgent, dateien });
+    const details = page.locator(".team-details");
+    const dateikachel = details.locator(".tm-dkarte").filter({ has: page.getByRole("heading", { name: "Dateien", exact: true }) });
+    expect((await dateikachel.boundingBox()).height).toBeGreaterThan((await details.boundingBox()).height);
+    await details.getByRole("button", { name: "Ansehen", exact: true }).last().click();
+    await page.evaluate(() => window.dateiAnfragen[0].resolve("Binärdatei, keine Vorschau."));
+    const vorschau = details.getByRole("region", { name: "Vorschau" });
+    await expect(vorschau.locator("pre")).toHaveText("Binärdatei, keine Vorschau.");
+    await expect(vorschau).toBeFocused();
+    const sichtbar = await details.boundingBox(), box = await vorschau.boundingBox();
+    expect(box.y).toBeGreaterThanOrEqual(sichtbar.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(sichtbar.y + sichtbar.height);
+    expect(box.y - sichtbar.y).toBeLessThanOrEqual(1);
+    const dateibox = await dateikachel.boundingBox();
+    expect(dateibox.y + dateibox.height).toBeLessThanOrEqual(sichtbar.y);
+    if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53h_viele-dateien_1440x900.png`, animations: "disabled" });
+    }
+  });
+
   test("Angehalten hat keinen goldenen Rand; Wartet auf dich behält ihn", async ({ page }, testInfo) => {
     await page.locator(".team-details").press("Escape");
     await page.evaluate(a => {
