@@ -762,7 +762,7 @@ fn pruefe_pfadschutz(pfad: &str, modus: &str) {
     fs::create_dir_all(repo.0.join(Path::new(pfad).parent().unwrap())).unwrap();
     if modus == "ignoriert" {
         fs::write(repo.0.join(".gitignore"), pfad).unwrap();
-    } else if modus != "neu" {
+    } else if modus != "neu" && modus != "zurueck" {
         fs::write(repo.0.join(pfad), if modus == "umbenannt" { "Agentenarbeit" } else { "vorher" }).unwrap();
     }
     git(&repo.0, &["add", "-A"]);
@@ -778,6 +778,7 @@ fn pruefe_pfadschutz(pfad: &str, modus: &str) {
         if(m==='index'||m==='commit')git('add',p);
         if(m==='commit')git('commit','-m','Agent ändert');
         if(m==='umbenannt'){{git('mv',p,'harmlos.txt');git('commit','-m','Agent benennt um');}}
+        if(m==='zurueck'){{git('add',p);git('commit','-m','Agent ändert');git('rm','-q',p);git('commit','-m','Agent nimmt zurück');}}
         fs.writeFileSync('stand-head',git('rev-parse','HEAD'));
         fs.writeFileSync('stand-index',git('diff','--cached','--binary'));
         fs.writeFileSync('stand-arbeit',git('diff','--binary'));"
@@ -792,10 +793,12 @@ fn pruefe_pfadschutz(pfad: &str, modus: &str) {
     assert!(meldungen.iter().all(|v| v["zustand"] != "Fertig"));
     let ordner = &team.ordner()[0];
     assert!(!ordner.join("pr-aufruf").exists());
-    assert_eq!(
-        fs::read_to_string(ordner.join(if modus == "umbenannt" { "harmlos.txt" } else { pfad })).unwrap(),
-        "Agentenarbeit"
-    );
+    if modus != "zurueck" {
+        assert_eq!(
+            fs::read_to_string(ordner.join(if modus == "umbenannt" { "harmlos.txt" } else { pfad })).unwrap(),
+            "Agentenarbeit"
+        );
+    }
     for (datei, args) in [
         ("stand-head", vec!["rev-parse", "HEAD"]),
         ("stand-index", vec!["diff", "--cached", "--binary"]),
@@ -808,7 +811,7 @@ fn pruefe_pfadschutz(pfad: &str, modus: &str) {
 
 #[test]
 fn pfadschutz_github_vor_pr() {
-    for modus in ["arbeit", "index", "commit", "umbenannt"] {
+    for modus in ["arbeit", "index", "commit", "umbenannt", "zurueck"] {
         pruefe_pfadschutz(".github/workflows/x.yml", modus);
     }
 }

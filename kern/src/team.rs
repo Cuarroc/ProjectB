@@ -65,13 +65,14 @@ fn freigabepfade(ordner: &Path, basis: &str) -> Result<Vec<String>, String> {
     let mut pfade = std::collections::BTreeSet::new();
     // Ohne Rename-Erkennung erscheinen alter und neuer Name getrennt; NUL erhält auch Sonderzeichen.
     for args in [
-        vec!["diff", "--name-only", "--no-renames", "-z", &format!("{basis}..HEAD"), "--"],
+        // Jeder Commit einzeln: auch eine angelegte und wieder entfernte Datei würde mitgepusht.
+        vec!["log", "--format=", "--name-only", "--no-renames", "-z", &format!("{basis}..HEAD"), "--"],
         vec!["diff", "--cached", "--name-only", "--no-renames", "-z", "--"],
         vec!["diff", "--name-only", "--no-renames", "-z", "--"],
         vec!["ls-files", "--others", "-z"],
     ] {
         let ausgabe = anhalten::git(ordner, &args)?;
-        for pfad in ausgabe.split('\0').filter(|p| !p.is_empty()) {
+        for pfad in ausgabe.split('\0').map(str::trim_start).filter(|p| !p.is_empty()) {
             let ort = pfad.split('/').next().unwrap_or_default().to_ascii_lowercase();
             if matches!(ort.as_str(), ".github" | ".mergify.yml" | ".mcp.json" | ".claude" | ".agents") {
                 pfade.insert(pfad.to_owned());
