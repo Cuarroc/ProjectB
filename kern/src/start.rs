@@ -58,12 +58,7 @@ impl Berechtigung {
     }
 
     pub fn aus_text(text: &str) -> Option<Self> {
-        match text {
-            "Vorsichtig" => Some(Self::Vorsichtig),
-            "Nur bei Wichtigem" => Some(Self::NurBeiWichtigem),
-            "Autonom" => Some(Self::Autonom),
-            _ => None,
-        }
+        [Self::Vorsichtig, Self::NurBeiWichtigem, Self::Autonom].into_iter().find(|stufe| stufe.text() == text)
     }
 }
 
@@ -74,7 +69,7 @@ pub struct Startwunsch {
     pub effort: Option<Effort>,
     pub fortsetzen: Option<String>,
     pub nur_lesen: bool,
-    pub berechtigung: Berechtigung,
+    pub berechtigung: Option<Berechtigung>,
     pub auftrag: String,
 }
 
@@ -154,47 +149,65 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
             _ => unreachable!("unbekannte Schalter zuvor abgelehnt"),
         }
     }
-    // Geprüft: Claude Code 2.1.314 --help: --permission-mode, --allowedTools, --disallowedTools.
-    // Muster und Grenzen: https://code.claude.com/docs/en/permissions (keine Shell-Sandbox).
-    if anbieter.name == "claude" {
-        let modus = if wunsch.nur_lesen {
-            "plan"
-        } else if wunsch.berechtigung == Berechtigung::Autonom {
-            "bypassPermissions"
-        } else {
-            "acceptEdits"
-        };
-        args.extend(["--permission-mode".into(), modus.into()]);
-        let mut sperren = concat!(
-            "Bash(git push *),Bash(git tag *),Bash(git remote *),Bash(git config *),Bash(gh *),",
-            "Bash(npm publish *),Bash(npm install -g *),Bash(cargo install *),Bash(rm *),",
-            "Edit(.github/**),Edit(.mergify.yml),Edit(.mcp.json),Edit(.claude/**),Edit(.agents/**)"
-        )
-        .to_owned();
-        if wunsch.nur_lesen {
-            args.extend(["--settings".into(), r#"{"useAutoModeDuringPlan":false}"#.into()]);
-            sperren.push_str(",ExitPlanMode");
-        } else if wunsch.berechtigung != Berechtigung::Autonom {
-            let mut erlaubt = "Bash(git status *),Bash(git diff *),Bash(git log *),Bash(cargo test *),Bash(npm test *),Bash(npm run test *)".to_owned();
-            if wunsch.berechtigung == Berechtigung::NurBeiWichtigem {
-                erlaubt.push_str(",Bash(cargo build *),Bash(npm run build *),Bash(git add *),Bash(git commit *)");
+    if let Some(berechtigung) = wunsch.berechtigung {
+        // Geprüft: Claude Code 2.1.314 --help: --permission-mode, --allowedTools, --disallowedTools.
+        // Muster und Grenzen: https://code.claude.com/docs/en/permissions (keine Shell-Sandbox).
+        if anbieter.name == "claude" {
+            let modus = if wunsch.nur_lesen { "plan" } else { "acceptEdits" };
+            args.extend(["--permission-mode".into(), modus.into()]);
+            let mut sperren = concat!(
+                "Bash(git push *),Bash(git tag *),Bash(git remote *),Bash(git config *),Bash(gh *),",
+                // permissions#Wildcard-patterns: mittiges * erlaubt; mehrere * brauchen auch die Form ohne Schlussargument.
+                "Bash(git * push),Bash(git * push *),Bash(git * tag),Bash(git * tag *),",
+                "Bash(git * remote),Bash(git * remote *),Bash(git * config),Bash(git * config *),",
+                "Bash(npm publish *),Bash(npm install -g *),Bash(cargo install *),Bash(rm *),",
+                "Edit(.github/**),Edit(.mergify.yml),Edit(.mcp.json),Edit(.claude/**),Edit(.agents/**)"
+            )
+            .to_owned();
+            // permissions#powershell: dieselben Befehlsmuster wie bei Bash.
+            let powershell: Vec<_> =
+                sperren.split(',').filter_map(|r| r.strip_prefix("Bash")).map(|r| format!("PowerShell{r}")).collect();
+            sperren.push(',');
+            sperren.push_str(&powershell.join(","));
+            if wunsch.nur_lesen {
+                args.extend(["--settings".into(), r#"{"useAutoModeDuringPlan":false}"#.into()]);
+                sperren.push_str(",ExitPlanMode");
+            } else if berechtigung == Berechtigung::Autonom {
+                args.push("--allowedTools=Bash".into());
+            } else {
+                let mut erlaubt = "Bash(git status *),Bash(git diff *),Bash(git log *),Bash(cargo test *),Bash(npm test *),Bash(npm run test *)".to_owned();
+                if berechtigung == Berechtigung::NurBeiWichtigem {
+                    erlaubt.push_str(",Bash(cargo build *),Bash(npm run build *),Bash(git add *),Bash(git commit *)");
+                }
+                args.push(format!("--allowedTools={erlaubt}"));
             }
-            args.push(format!("--allowedTools={erlaubt}"));
+            args.push(format!("--disallowedTools={sperren}"));
+        } else if anbieter.name == "codex" {
+            // Geprüft: codex-cli 0.166.0, exec/resume --help: -c <key=value>, verschachtelte TOML-Werte.
+            // Schlüssel: https://learn.chatgpt.com/docs/config-file/config-reference
+            let sandbox = if wunsch.nur_lesen { "read-only" } else { "workspace-write" };
+            let netz = !wunsch.nur_lesen && berechtigung == Berechtigung::Autonom;
+            args.extend([
+                "-c".into(),
+                format!("sandbox_mode=\"{sandbox}\""),
+                "-c".into(),
+                "approval_policy=\"never\"".into(),
+                "-c".into(),
+                format!("sandbox_workspace_write.network_access={netz}"),
+            ]);
         }
-        args.push(format!("--disallowedTools={sperren}"));
-    } else if anbieter.name == "codex" {
-        // Geprüft: codex-cli 0.166.0, exec/resume --help: -c <key=value>, verschachtelte TOML-Werte.
-        // Schlüssel: https://learn.chatgpt.com/docs/config-file/config-reference
-        let sandbox = if wunsch.nur_lesen { "read-only" } else { "workspace-write" };
-        let netz = !wunsch.nur_lesen && wunsch.berechtigung == Berechtigung::Autonom;
-        args.extend([
-            "-c".into(),
-            format!("sandbox_mode=\"{sandbox}\""),
-            "-c".into(),
-            "approval_policy=\"never\"".into(),
-            "-c".into(),
-            format!("sandbox_workspace_write.network_access={netz}"),
-        ]);
+    } else if wunsch.nur_lesen {
+        match anbieter.name {
+            "claude" => args.extend([
+                "--permission-mode".into(),
+                "plan".into(),
+                "--settings".into(),
+                r#"{"useAutoModeDuringPlan":false}"#.into(),
+                "--disallowedTools=ExitPlanMode".into(),
+            ]),
+            "codex" => args.extend(["-c".into(), "sandbox_mode=\"read-only\"".into()]),
+            _ => unreachable!("unbekannte Schalter zuvor abgelehnt"),
+        }
     }
     if stdin_marker {
         args.push("-".into());
@@ -224,12 +237,42 @@ pub fn starten(anbieter: &Anbieter, wunsch: &Startwunsch, ordner: &Path) -> Resu
     Lauf::starten(&anbieter, &wunsch.prompt(), ordner)
 }
 
+pub fn agenten_umgebung(gh_ordner: &Path) -> Vec<(String, Option<std::ffi::OsString>)> {
+    // git help config: ENVIRONMENT (COUNT/KEY_n/VALUE_n), url.<base>.pushInsteadOf (nur Push).
+    // https://git-scm.com/docs/git-config: explizites pushurl umgeht die Umschreibung, git -c hat Vorrang.
+    let mut env = vec![("GIT_CONFIG_COUNT".into(), Some("4".into()))];
+    for (i, protokoll) in ["https://", "http://", "ssh://", "git@"].into_iter().enumerate() {
+        env.push((format!("GIT_CONFIG_KEY_{i}"), Some("url.projectb-no-push://.pushInsteadOf".into())));
+        env.push((format!("GIT_CONFIG_VALUE_{i}"), Some(protokoll.into())));
+    }
+    // https://cli.github.com/manual/gh_help_environment: Token-Vorrang und Konfigurationsordner.
+    env.extend([
+        ("GH_TOKEN".into(), None),
+        ("GITHUB_TOKEN".into(), None),
+        ("GH_CONFIG_DIR".into(), Some(gh_ordner.as_os_str().into())),
+    ]);
+    env
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{CLAUDE, CODEX};
 
     const STUFEN: [Berechtigung; 3] = [Berechtigung::Vorsichtig, Berechtigung::NurBeiWichtigem, Berechtigung::Autonom];
+
+    #[test]
+    fn agenten_umgebung_sperrt_push_und_entfernt_gh_anmeldung() {
+        let env: HashMap<_, _> = agenten_umgebung(Path::new("leeres-gh")).into_iter().collect();
+        assert_eq!(env["GIT_CONFIG_COUNT"], Some("4".into()));
+        for (i, protokoll) in ["https://", "http://", "ssh://", "git@"].into_iter().enumerate() {
+            assert_eq!(env[&format!("GIT_CONFIG_KEY_{i}")], Some("url.projectb-no-push://.pushInsteadOf".into()));
+            assert_eq!(env[&format!("GIT_CONFIG_VALUE_{i}")], Some(protokoll.into()));
+        }
+        assert_eq!(env["GH_TOKEN"], None);
+        assert_eq!(env["GITHUB_TOKEN"], None);
+        assert_eq!(env["GH_CONFIG_DIR"], Some("leeres-gh".into()));
+    }
 
     #[test]
     fn berechtigung_verwendet_die_json_namen_der_oberflaeche() {
@@ -246,10 +289,10 @@ mod tests {
     fn berechtigungsstufen_werden_fuer_beide_anbieter_uebersetzt() {
         assert_eq!(Berechtigung::default(), Berechtigung::NurBeiWichtigem);
         for stufe in STUFEN {
-            let w = Startwunsch { berechtigung: stufe, fortsetzen: None, ..fortsetzung() };
+            let w = Startwunsch { berechtigung: Some(stufe), fortsetzen: None, ..fortsetzung() };
             let claude = argumente(&CLAUDE, &w).unwrap();
-            let modus = if stufe == Berechtigung::Autonom { "bypassPermissions" } else { "acceptEdits" };
-            assert!(claude.windows(2).any(|p| p == ["--permission-mode", modus]), "{claude:?}");
+            assert!(claude.windows(2).any(|p| p == ["--permission-mode", "acceptEdits"]), "{claude:?}");
+            assert!(!claude.iter().any(|a| a.contains("bypassPermissions")));
             let erlaubt = claude.iter().find_map(|a| a.strip_prefix("--allowedTools=")).unwrap_or("");
             for befehl in ["git status", "git diff", "git log", "cargo test", "npm test", "npm run test"] {
                 assert_eq!(erlaubt.contains(&format!("Bash({befehl} *)")), stufe != Berechtigung::Autonom);
@@ -257,33 +300,23 @@ mod tests {
             for befehl in ["cargo build", "npm run build", "git add", "git commit"] {
                 assert_eq!(erlaubt.contains(&format!("Bash({befehl} *)")), stufe == Berechtigung::NurBeiWichtigem);
             }
+            if stufe == Berechtigung::Autonom {
+                assert_eq!(erlaubt, "Bash");
+            }
             let codex = argumente(&CODEX, &w).unwrap();
             let netz = format!("sandbox_workspace_write.network_access={}", stufe == Berechtigung::Autonom);
-            assert_eq!(
-                codex,
-                [
-                    "exec",
-                    "--json",
-                    "-c",
-                    "sandbox_mode=\"workspace-write\"",
-                    "-c",
-                    "approval_policy=\"never\"",
-                    "-c",
-                    &netz,
-                    "-"
-                ]
-            );
+            let sandbox = "sandbox_mode=\"workspace-write\"";
+            let freigabe = "approval_policy=\"never\"";
+            assert_eq!(codex, ["exec", "--json", "-c", sandbox, "-c", freigabe, "-c", &netz, "-"]);
             assert_eq!(
                 erlaubt.split(',').filter(|r| !r.is_empty()).count(),
                 match stufe {
                     Berechtigung::Vorsichtig => 6,
                     Berechtigung::NurBeiWichtigem => 10,
-                    Berechtigung::Autonom => 0,
+                    Berechtigung::Autonom => 1,
                 }
             );
-            for args in [&claude, &codex] {
-                assert!(!args.iter().any(|a| a.contains("danger-full-access")));
-            }
+            assert!(!claude.iter().chain(&codex).any(|a| a.contains("danger-full-access")));
         }
     }
 
@@ -291,10 +324,18 @@ mod tests {
     fn nur_lesen_ignoriert_jede_stufe_auch_beim_fortsetzen() {
         for anbieter in [&CLAUDE, &CODEX] {
             for fortsetzen in [None, Some("sitzung".into())] {
-                let w = Startwunsch { nur_lesen: true, fortsetzen, ..fortsetzung() };
+                let w = Startwunsch {
+                    berechtigung: Some(Berechtigung::Vorsichtig),
+                    nur_lesen: true,
+                    fortsetzen,
+                    ..fortsetzung()
+                };
                 let erwartet = argumente(anbieter, &w).unwrap();
                 for berechtigung in STUFEN {
-                    assert_eq!(argumente(anbieter, &Startwunsch { berechtigung, ..w.clone() }).unwrap(), erwartet);
+                    assert_eq!(
+                        argumente(anbieter, &Startwunsch { berechtigung: Some(berechtigung), ..w.clone() }).unwrap(),
+                        erwartet
+                    );
                 }
                 if anbieter.name == "claude" {
                     assert!(erwartet.windows(2).any(|p| p == ["--permission-mode", "plan"]));
@@ -314,26 +355,28 @@ mod tests {
     fn claude_sperrliste_gilt_in_jeder_stufe_auch_nur_lesend() {
         for berechtigung in STUFEN {
             for nur_lesen in [false, true] {
-                let w = Startwunsch { berechtigung, nur_lesen, ..fortsetzung() };
+                let w = Startwunsch { berechtigung: Some(berechtigung), nur_lesen, ..fortsetzung() };
                 let args = argumente(&CLAUDE, &w).unwrap();
                 let sperren = args.iter().find_map(|a| a.strip_prefix("--disallowedTools=")).unwrap_or("");
-                for regel in [
-                    "Bash(git push *)",
-                    "Bash(git tag *)",
-                    "Bash(git remote *)",
-                    "Bash(git config *)",
-                    "Bash(gh *)",
-                    "Bash(npm publish *)",
-                    "Bash(npm install -g *)",
-                    "Bash(cargo install *)",
-                    "Bash(rm *)",
-                    "Edit(.github/**)",
-                    "Edit(.mergify.yml)",
-                    "Edit(.mcp.json)",
-                    "Edit(.claude/**)",
-                    "Edit(.agents/**)",
-                ] {
+                let mut regeln = vec!["Bash(gh *)".to_owned(), "Bash(rm *)".to_owned()];
+                for befehl in ["push", "tag", "remote", "config"] {
+                    regeln.extend([
+                        format!("Bash(git {befehl} *)"),
+                        format!("Bash(git * {befehl})"),
+                        format!("Bash(git * {befehl} *)"),
+                    ]);
+                }
+                for befehl in ["npm publish", "npm install -g", "cargo install"] {
+                    regeln.push(format!("Bash({befehl} *)"));
+                }
+                for pfad in [".github/**", ".mergify.yml", ".mcp.json", ".claude/**", ".agents/**"] {
+                    regeln.push(format!("Edit({pfad})"));
+                }
+                for regel in regeln {
                     assert!(sperren.split(',').any(|r| r == regel), "{regel}: {sperren}");
+                    if let Some(muster) = regel.strip_prefix("Bash") {
+                        assert!(sperren.split(',').any(|r| r == format!("PowerShell{muster}")), "{regel}");
+                    }
                 }
             }
         }
@@ -346,7 +389,7 @@ mod tests {
             modell: Some("modell-test".into()),
             effort: Some(Effort::Hoch),
             fortsetzen: None,
-            berechtigung: Default::default(),
+            berechtigung: None,
             nur_lesen: false,
             auftrag: "Test".into(),
         };
@@ -366,7 +409,7 @@ mod tests {
             modell: None,
             effort: None,
             fortsetzen: Some("AZaz09_-".into()),
-            berechtigung: Default::default(),
+            berechtigung: None,
             nur_lesen: false,
             auftrag: "Weiter".into(),
         }
@@ -376,18 +419,18 @@ mod tests {
     fn fortsetzen_beider_anbieter_mit_prompt_von_stdin() {
         let w = fortsetzung();
         assert_eq!(
-            &argumente(&CLAUDE, &w).unwrap()[..6],
+            argumente(&CLAUDE, &w).unwrap(),
             ["-p", "--output-format", "stream-json", "--verbose", "--resume", "AZaz09_-"]
         );
-        assert_eq!(&argumente(&CODEX, &w).unwrap()[..4], ["exec", "resume", "AZaz09_-", "--json"]);
+        assert_eq!(argumente(&CODEX, &w).unwrap(), ["exec", "resume", "AZaz09_-", "--json", "-"]);
         assert_eq!(w.prompt(), "Weiter");
         let w = Startwunsch { modell: Some("modell".into()), effort: Some(Effort::Hoch), ..w };
         assert_eq!(
-            &argumente(&CODEX, &w).unwrap()[..8],
-            ["exec", "resume", "AZaz09_-", "--json", "--model", "modell", "-c", "model_reasoning_effort=\"high\""]
+            argumente(&CODEX, &w).unwrap(),
+            ["exec", "resume", "AZaz09_-", "--json", "--model", "modell", "-c", "model_reasoning_effort=\"high\"", "-"]
         );
         assert_eq!(
-            &argumente(&CLAUDE, &w).unwrap()[..10],
+            argumente(&CLAUDE, &w).unwrap(),
             [
                 "-p",
                 "--output-format",

@@ -20,7 +20,7 @@ fn claude_modell_und_alle_efforts() {
     for (effort, wert) in [(Effort::Niedrig, "low"), (Effort::Mittel, "medium"), (Effort::Hoch, "high")] {
         let w = Startwunsch { modell: Some("claude-opus-5-5".into()), effort: Some(effort), ..wunsch() };
         assert_eq!(
-            &argumente(&CLAUDE, &w).unwrap()[..8],
+            argumente(&CLAUDE, &w).unwrap(),
             ["-p", "--output-format", "stream-json", "--verbose", "--model", "claude-opus-5-5", "--effort", wert]
         );
     }
@@ -31,8 +31,8 @@ fn codex_modell_und_alle_efforts() {
     for (effort, wert) in [(Effort::Niedrig, "low"), (Effort::Mittel, "medium"), (Effort::Hoch, "high")] {
         let w = Startwunsch { modell: Some("gpt-6.1-sol".into()), effort: Some(effort), ..wunsch() };
         assert_eq!(
-            &argumente(&CODEX, &w).unwrap()[..6],
-            ["exec", "--json", "--model", "gpt-6.1-sol", "-c", &format!("model_reasoning_effort=\"{wert}\"")]
+            argumente(&CODEX, &w).unwrap(),
+            ["exec", "--json", "--model", "gpt-6.1-sol", "-c", &format!("model_reasoning_effort=\"{wert}\""), "-"]
         );
     }
 }
@@ -52,9 +52,7 @@ fn ungueltige_modellnamen_werden_abgelehnt() {
 #[test]
 fn gueltige_modellzeichen_und_einzelne_optionen() {
     for a in [&CLAUDE, &CODEX] {
-        assert!(argumente(a, &wunsch()).unwrap().starts_with(
-            &a.argumente[..if a.name == "codex" { 2 } else { 4 }].iter().map(|s| s.to_string()).collect::<Vec<_>>()
-        ));
+        assert_eq!(argumente(a, &wunsch()).unwrap(), a.argumente);
         let w = Startwunsch { modell: Some("AZaz09._:-".into()), ..wunsch() };
         assert!(argumente(a, &w).unwrap().contains(&"AZaz09._:-".into()));
         let w = Startwunsch { effort: Some(Effort::Mittel), ..wunsch() };
@@ -72,7 +70,7 @@ fn rolle_und_auftrag_sind_nur_prompt_text() {
     assert_eq!(w.prompt(), "Prüfer\n--model fremd; & echo \"Test\"\n\n--effort high\nPrüfe C:\\Projekt.");
     assert_eq!(wunsch().prompt(), "Prüfe den Code.");
     for a in [&CLAUDE, &CODEX] {
-        assert_eq!(argumente(a, &w).unwrap(), argumente(a, &wunsch()).unwrap());
+        assert_eq!(argumente(a, &w).unwrap(), a.argumente);
     }
 }
 
@@ -101,10 +99,10 @@ fn startweg_validiert_und_verwendet_lauf_ohne_echte_cli() {
 fn sehr_hoch_wird_fuer_beide_clis_uebersetzt() {
     let w = Startwunsch { effort: Some(Effort::SehrHoch), ..wunsch() };
     assert_eq!(
-        &argumente(&CLAUDE, &w).unwrap()[..6],
+        argumente(&CLAUDE, &w).unwrap(),
         ["-p", "--output-format", "stream-json", "--verbose", "--effort", "xhigh"]
     );
-    assert_eq!(&argumente(&CODEX, &w).unwrap()[..4], ["exec", "--json", "-c", "model_reasoning_effort=\"xhigh\""]);
+    assert_eq!(argumente(&CODEX, &w).unwrap(), ["exec", "--json", "-c", "model_reasoning_effort=\"xhigh\"", "-"]);
 }
 
 #[test]
@@ -145,4 +143,39 @@ fn unbekannter_anbieter_darf_nicht_still_schreibend_starten() {
     let a = Anbieter { name: "unbekannt", ..CLAUDE };
     let w = Startwunsch { nur_lesen: true, ..wunsch() };
     assert_eq!(argumente(&a, &w).unwrap_err().kind(), ErrorKind::Unsupported);
+}
+
+#[test]
+fn git_push_mit_optionen_scheitert_nur_mit_agenten_umgebung() {
+    use std::{fs, process::Command};
+    let git = |pfad: &Path, args: &[&str]| {
+        let aus = Command::new("git").arg("-C").arg(pfad).args(args).output().unwrap();
+        assert!(aus.status.success(), "{}", String::from_utf8_lossy(&aus.stderr));
+        String::from_utf8(aus.stdout)
+    };
+    let zeit = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+    let pfad = std::env::temp_dir().join(format!("projectb-push-test-{zeit}"));
+    fs::create_dir(&pfad).unwrap();
+    git(&pfad, &["init", "."]).unwrap();
+    git(&pfad, &["init", "--bare", "remote.git"]).unwrap();
+    git(
+        &pfad,
+        &["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "Test"],
+    )
+    .unwrap();
+    for protokoll in ["https://", "http://", "ssh://", "git@"] {
+        let url = format!("{protokoll}example.invalid/repo");
+        git(&pfad, &["config", "--add", "url.remote.git.insteadOf", &url]).unwrap();
+        git(&pfad, &["config", "remote.origin.url", &url]).unwrap();
+        let agent =
+            Anbieter { programm: "git", argumente: &["-C", ".", "push", "origin", "HEAD:refs/heads/test"], ..CLAUDE };
+        let mut lauf = projectb_kern::Lauf::starten(&agent, "", &pfad).unwrap();
+        assert!(!lauf.warten().unwrap().success(), "Push darf nicht gelingen: {protokoll}");
+        git(&pfad, &["-C", ".", "push", "origin", "HEAD:refs/heads/test"]).unwrap();
+        assert_eq!(
+            git(&pfad.join("remote.git"), &["rev-parse", "test"]).unwrap(),
+            git(&pfad, &["rev-parse", "HEAD"]).unwrap()
+        );
+    }
+    fs::remove_dir_all(pfad).unwrap();
 }
