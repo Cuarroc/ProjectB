@@ -1,5 +1,7 @@
 use crate::{
-    anhalten, arbeitskopie, chat, pruefung, start, verbrauch,
+    anhalten, arbeitskopie, chat,
+    pr::{self, Autor, PrInfo},
+    pruefung, start, verbrauch,
     zustand::{AgentZustand, Stammdaten},
     Anbieter, Ereignis, Lauf,
 };
@@ -10,6 +12,50 @@ use std::{
     thread,
     time::Duration,
 };
+
+/// Gleiche Argumente wie `pr::anlegen`: Ordner, Titel, Text, Autor, Branch.
+pub type PrAnlegen = fn(&Path, &str, &str, Autor, &str) -> io::Result<PrInfo>;
+
+/// Produktion: Branch pushen, dann PR über `gh` anlegen.
+pub fn pr_anlegen(ordner: &Path, titel: &str, text: &str, autor: Autor, branch: &str) -> io::Result<PrInfo> {
+    anhalten::git(ordner, &["push", "-u", "origin", branch]).map_err(io::Error::other)?;
+    pr::anlegen(ordner, titel, text, autor, branch)
+}
+
+fn pr_schritt(
+    ordner: &Path,
+    name: &str,
+    anbieter: &str,
+    branch: &str,
+    ergebnis: &pruefung::Ergebnis,
+    pr_anlegen: PrAnlegen,
+) -> Result<PrInfo, String> {
+    let autor = if anbieter.eq_ignore_ascii_case("codex") { Autor::Codex } else { Autor::Claude };
+    let (gruen, gesamt) = (ergebnis.gruen.unwrap_or(0), ergebnis.gesamt.unwrap_or(0));
+    let text = format!("Team-Agent {name}: Tests in der Arbeitskopie grün ({gruen} von {gesamt}).");
+    (|| {
+        if !anhalten::git(ordner, &["status", "--porcelain", "--untracked-files=all"])?.is_empty() {
+            anhalten::git(ordner, &["add", "-A"])?;
+            anhalten::git(ordner, &["commit", "-m", &format!("{name}: Stand für PR")])?;
+        }
+        pr_anlegen(ordner, name, &text, autor, branch).map_err(|e| e.to_string())
+    })()
+    .map_err(|fehler| ohne_zugangsdaten(&fehler))
+}
+
+/// Entfernt Zugangsdaten aus URLs (`https://name:token@host` wird `https://host`).
+fn ohne_zugangsdaten(text: &str) -> String {
+    let (mut aus, mut rest) = (String::new(), text);
+    while let Some(i) = rest.find("://") {
+        aus.push_str(&rest[..i + 3]);
+        rest = &rest[i + 3..];
+        let ende = rest.find(|c: char| c.is_whitespace() || c == '/').unwrap_or(rest.len());
+        if let Some(at) = rest[..ende].rfind('@') {
+            rest = &rest[at + 1..];
+        }
+    }
+    aus + rest
+}
 
 pub struct TeamAuftrag {
     pub name: String,
@@ -34,25 +80,27 @@ impl Team {
         auftraege: Vec<TeamAuftrag>,
         melden: impl Fn(String) + Send + Sync + 'static,
     ) -> io::Result<Self> {
-        Self::starten_mit(projekt, auftraege, melden, start::starten)
+        Self::starten_mit_kontingent(projekt, auftraege, None, melden, start::starten, Some(pr_anlegen))
     }
 
-    /// Austauschbarer Prozessstart für Tests; Produktion verwendet `start::starten`.
+    /// Austauschbarer Prozessstart für Tests, ohne PR-Schritt; Produktion verwendet `start::starten`.
     pub fn starten_mit(
         projekt: &Path,
         auftraege: Vec<TeamAuftrag>,
         melden: impl Fn(String) + Send + Sync + 'static,
         starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf>,
     ) -> io::Result<Self> {
-        Self::starten_mit_kontingent(projekt, auftraege, None, melden, starten)
+        Self::starten_mit_kontingent(projekt, auftraege, None, melden, starten, None)
     }
 
+    /// `pr_anlegen` läuft nach grünen Tests; `None` lässt den PR-Schritt aus.
     pub fn starten_mit_kontingent(
         projekt: &Path,
         auftraege: Vec<TeamAuftrag>,
         kontingent: Option<&Path>,
         melden: impl Fn(String) + Send + Sync + 'static,
         starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf>,
+        pr_anlegen: Option<PrAnlegen>,
     ) -> io::Result<Self> {
         if auftraege.is_empty() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "Mindestens ein Auftrag"));
@@ -99,12 +147,13 @@ impl Team {
                 team.ordner.push(kopie.pfad.clone());
                 team.ordnernamen.push(auftrag.name.clone());
                 team.basis.push(basis.clone());
-                starten(anbieter, &wunsch, &kopie.pfad).map(|lauf| (lauf, basis))
+                let branch = kopie.branch.clone().unwrap_or_default();
+                starten(anbieter, &wunsch, &kopie.pfad).map(|lauf| (lauf, basis, branch))
             })();
             let arbeitskopie = PathBuf::from(&stammdaten.arbeitskopie);
             let mut zustand = AgentZustand::neu(stammdaten);
             match lauf {
-                Ok((mut lauf, basis)) => {
+                Ok((mut lauf, basis, branch)) => {
                     // Nur den Empfänger abgeben: der Lauf samt Job-Objekt bleibt für Anhalten erreichbar.
                     let ereignisse = std::mem::replace(&mut lauf.ereignisse, mpsc::channel().1);
                     team.laeufe.push((auftrag.name.clone(), lauf));
@@ -147,6 +196,26 @@ impl Team {
                                     // shortcut: eigener Test-Job läuft nach Anhalten weiter; später abbrechbar an den Lauf binden.
                                     let ergebnis = pruefung::ausfuehren(&arbeitskopie, &befehl);
                                     zustand.pruefung_beenden(Some(&ergebnis));
+                                    if let (true, Some(pr_anlegen)) = (ergebnis.erfolgreich, pr_anlegen) {
+                                        {
+                                            let aktiv = aktiv.lock().unwrap();
+                                            if !*aktiv {
+                                                break;
+                                            }
+                                            zustand.pr_starten();
+                                            melden(zustand.als_json().to_string());
+                                        }
+                                        // shortcut: Anhalten während Push/gh bricht die PR-Anlage nicht ab; später an den Lauf binden.
+                                        let pr = pr_schritt(
+                                            &arbeitskopie,
+                                            &auftrag.name,
+                                            &auftrag.anbieter,
+                                            &branch,
+                                            &ergebnis,
+                                            pr_anlegen,
+                                        );
+                                        zustand.pr_beenden(&auftrag.name, pr);
+                                    }
                                 } else {
                                     zustand.pruefung_beenden(None);
                                 }

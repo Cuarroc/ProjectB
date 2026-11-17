@@ -25,6 +25,7 @@ pub struct AgentZustand {
     ende: Option<Instant>,
     prueft: bool,
     tests: Option<Value>,
+    beleg: Option<Value>,
     dateien: Vec<Value>,
 }
 
@@ -41,6 +42,7 @@ impl AgentZustand {
             ende: None,
             prueft: false,
             tests: None,
+            beleg: None,
             dateien: Vec::new(),
         }
     }
@@ -109,6 +111,25 @@ impl AgentZustand {
         });
     }
 
+    pub(crate) fn pr_starten(&mut self) {
+        self.prueft = true;
+        self.zeilen("Legt PR an …");
+    }
+
+    pub(crate) fn pr_beenden(&mut self, titel: &str, pr: Result<crate::pr::PrInfo, String>) {
+        self.prueft = false;
+        match pr {
+            Ok(pr) => {
+                self.beleg = Some(json!({"titel": titel, "prLink": pr.url}));
+                self.zeilen(&format!("PR #{} angelegt", pr.nummer));
+            }
+            Err(fehler) => {
+                self.problem = true;
+                self.zeilen(&format!("PR fehlgeschlagen: {fehler}"));
+            }
+        }
+    }
+
     fn antwort(&mut self, text: &str) {
         self.zeilen(text);
     }
@@ -145,7 +166,7 @@ impl AgentZustand {
             "effort": self.stammdaten.effort, "arbeitskopie": self.stammdaten.arbeitskopie,
             "zustand": zustand, "liveZeile": self.live_zeile, "letzteZeilen": self.letzte_zeilen,
             "tokens": 0, "laufzeitSekunden": laufzeit, "fortschritt": 0,
-            "phasen": [], "dateien": self.dateien, "tests": self.tests, "schaetzung": null,
+            "phasen": [], "dateien": self.dateien, "tests": self.tests, "beleg": self.beleg, "schaetzung": null,
         })
     }
 }

@@ -71,7 +71,7 @@ fn sichern(ordner: &Path) -> Result<Ordnerstatus, String> {
     Ok(Ordnerstatus::Gesichert { sha })
 }
 
-fn git(ordner: &Path, argumente: &[&str]) -> Result<String, String> {
+pub(crate) fn git(ordner: &Path, argumente: &[&str]) -> Result<String, String> {
     let mut befehl = Command::new("git");
     befehl.arg("-C").arg(ordner).args(argumente).env("GIT_TERMINAL_PROMPT", "0");
     #[cfg(windows)]
