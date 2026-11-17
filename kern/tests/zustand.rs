@@ -164,6 +164,7 @@ fn json_hat_genau_die_agent_felder() {
         "letzteZeilen",
         "tests",
         "beleg",
+        "review",
         "schaetzung",
     ];
     schluessel.sort();
