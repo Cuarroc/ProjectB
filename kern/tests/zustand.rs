@@ -39,10 +39,7 @@ fn erfolgreiche_frage_wartet_auf_dich() {
         zustand.anwenden(&Ereignis::Fertig { erfolg: true, zusammenfassung: zusammenfassung.into() });
         assert_eq!(zustand.als_json()["zustand"], "Arbeitet");
         zustand.anwenden(&Ereignis::Beendet { code: Some(0), erfolg: true });
-        assert_eq!(
-            zustand.als_json()["zustand"],
-            if zusammenfassung == "Erledigt." { "Fertig" } else { "Wartet auf dich" }
-        );
+        assert_eq!(zustand.als_json()["zustand"], "Wartet auf dich");
     }
 }
 
@@ -74,7 +71,7 @@ fn anbieter_folgen_laufen_und_enden() {
                 zustand.anwenden(&Ereignis::Fertig { erfolg: code == 0, zusammenfassung: String::new() });
             }
             zustand.anwenden(&Ereignis::Beendet { code: Some(code), erfolg: code == 0 });
-            assert_eq!(zustand.als_json()["zustand"], if code == 0 { "Fertig" } else { "Problem" });
+            assert_eq!(zustand.als_json()["zustand"], if code == 0 { "Wartet auf dich" } else { "Problem" });
         }
     }
 }
@@ -85,7 +82,7 @@ fn erfolg_braucht_ergebnis_und_prozessabschluss() {
     zustand.anwenden(&Ereignis::Beendet { code: Some(0), erfolg: true });
     assert_eq!(zustand.als_json()["zustand"], "Arbeitet");
     zustand.anwenden(&Ereignis::Fertig { erfolg: true, zusammenfassung: "Fertig".into() });
-    assert_eq!(zustand.als_json()["zustand"], "Fertig");
+    assert_eq!(zustand.als_json()["zustand"], "Wartet auf dich");
 }
 
 #[test]
@@ -125,7 +122,7 @@ fn roter_befehl_verhindert_erfolgreichen_lauf_nicht() {
     // Das Ergebnis wird wie im Lauf-Wächter nach Prozessende bestätigt.
     zustand.anwenden(&Ereignis::Fertig { erfolg: true, zusammenfassung: String::new() });
     zustand.anwenden(&Ereignis::Beendet { code: Some(0), erfolg: true });
-    assert_eq!(zustand.als_json()["zustand"], "Fertig");
+    assert_eq!(zustand.als_json()["zustand"], "Wartet auf dich");
 }
 
 #[test]

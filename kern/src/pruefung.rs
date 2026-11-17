@@ -16,6 +16,15 @@ pub struct Ergebnis {
     pub fehler: Option<String>,
 }
 
+pub fn testbefehl(ordner: &Path) -> Option<Vec<&'static str>> {
+    if ordner.join("Cargo.toml").is_file() {
+        return Some(vec!["cargo", "test"]);
+    }
+    let paket: serde_json::Value = serde_json::from_slice(&std::fs::read(ordner.join("package.json")).ok()?).ok()?;
+    paket.pointer("/scripts/test")?.as_str()?;
+    Some(vec!["npm", "test"])
+}
+
 /// Führt Programm und Argumente im angegebenen Arbeitsordner aus, ohne eigene Shell.
 pub fn ausfuehren(ordner: &Path, befehl: &[&str]) -> Ergebnis {
     let start = Instant::now();
