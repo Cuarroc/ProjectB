@@ -35,7 +35,15 @@
 .team-liste .ak-meta{display:inline-flex;align-items:center;gap:var(--abstand-1)}
 
 .team-echt .team-kopf .team-chip{display:inline}
-.team-echt:has(.team-details) .team-liste{flex:none;max-height:40%;padding-bottom:var(--abstand-4)}
+.team-echt:has(.team-details) .team-liste{box-sizing:border-box;flex:none;max-height:40%;padding-bottom:var(--abstand-4)}
 .team-echt .team-details{flex:0 1 auto;max-height:none}
 .team-echt .tm-det-raster{grid-template-columns:minmax(0,1fr)}
 .team-liste .ak>a{color:var(--akzent-text);font:var(--schrift-klein)}
+
+.team-echt .tm-dateien{max-height:calc(var(--steuer-hoehe) * 2);overflow:auto}
+
+.team-echt .tm-zellen{grid-template-columns:repeat(4,minmax(0,1fr))}
+.team-echt .tm-zellen>div{padding:var(--abstand-2)}
+
+.team-echt .tm-det{gap:var(--abstand-2)}
+.team-echt .tm-tests{flex-direction:row;align-items:center;flex-wrap:wrap}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Check, ChevronRight, Circle, Copy, MessageCircleQuestion, Users } from "lucide-react";
 import { BeispielQuelle } from "../daten/quelle";
 import { chatAnlegen } from "../daten/chats";
@@ -14,6 +14,8 @@ import { planKommentare, markdownKlartext } from "../daten/plan";
 import Interview, { type InterviewZustand } from "./Interview";
 import { AnhalteHinweis, useAnhalten } from "./anhalten";
 
+import { teamLauf } from "../daten/tauri";
+
 const standardQuelle = new BeispielQuelle();
 const LaufSymbol = statusDefinitionen.arbeitet.Symbol;
 const zustaende: Record<Planschritt["zustand"], Zustand> = {
@@ -28,6 +30,7 @@ type Props = {
 
 export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, onAntwort, onAktion }: Props) {
   const pause = useAnhalten();
+  const teamLaeuft = useSyncExternalStore(teamLauf.abonnieren, teamLauf.lesen, teamLauf.lesen);
   const [daten, setDaten] = useState(() => quelle.lesen());
   const [interviews, setInterviews] = useState<Record<string, InterviewZustand>>({});
   const [antworten, setAntworten] = useState<Record<string, string>>({});
@@ -120,7 +123,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
                 <div className="r-antworten">{frage.antwortknoepfe.map(a => <Knopf key={a.id} text={a.text} variante="antwort" aria-pressed={antworten[frage.id] === a.id}
                   onClick={() => { setAntworten(v => ({ ...v, [frage.id]: a.id })); onAntwort?.(frage.id, a.id); }} />)}</div>
               </section>}
-              {(n.aktionen.length > 0 || n.plan) && <div className="r-aktionen">{n.aktionen.map(a => <Knopf key={a.id} text={a.text} aria-label={a.antwort === undefined ? undefined : markdownKlartext(a.antwort)} variante={a.id === "plan-freigeben" ? "haupt" : a.id.startsWith("antwort-") ? "antwort" : "zweit"} disabled={!onAktion || !!chat.gestartetUm} onClick={() => onAktion?.(n.id, a.id)} />)}
+              {(n.aktionen.length > 0 || n.plan) && <div className="r-aktionen">{n.aktionen.map(a => <Knopf key={a.id} text={a.text} aria-label={a.antwort === undefined ? undefined : markdownKlartext(a.antwort)} variante={a.id === "plan-freigeben" ? "haupt" : a.id.startsWith("antwort-") ? "antwort" : "zweit"} disabled={!onAktion || !!chat.gestartetUm || (a.id === "plan-freigeben" && teamLaeuft)} grund={a.id === "plan-freigeben" && teamLaeuft ? "Das letzte Team läuft noch oder ist nicht gesichert." : undefined} onClick={() => onAktion?.(n.id, a.id)} />)}
                 {n.plan && <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen({ plan: n.plan!, echt: true }); onPlanOeffnen?.(n.plan!.id); }} />}
               </div>}
             </article>
@@ -129,7 +132,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
       </ol>
     </div>
     <div className="chat-meldung" role="status">{meldung}</div>
-    {planOffen && <Planfenster daten={daten} laeuft={!!chat?.gestartetUm} plan={planOffen.echt ? planOffen.plan : undefined} entscheidbar={!planOffen.echt || (!!onAktion && !chat?.gestartetUm && !!chat?.verlauf.find(n => n.id === planOffen.plan.id)?.aktionen.length)} gespeicherteMarken={planMarken[planOffen.plan.id] ?? {}} onSchliessen={() => setPlanOffen(null)} onEntscheiden={(plan, marken, stil) => {
+    {planOffen && <Planfenster daten={daten} laeuft={!!chat?.gestartetUm || teamLaeuft} plan={planOffen.echt ? planOffen.plan : undefined} entscheidbar={!planOffen.echt || (!!onAktion && !chat?.gestartetUm && !teamLaeuft && !!chat?.verlauf.find(n => n.id === planOffen.plan.id)?.aktionen.length)} gespeicherteMarken={planMarken[planOffen.plan.id] ?? {}} onSchliessen={() => setPlanOffen(null)} onEntscheiden={(plan, marken, stil) => {
       if (planOffen.echt) { onAktion?.(plan.id, plan.freigabe === "Freigegeben" ? "plan-freigeben" : "plan-kommentieren", planKommentare(plan, stil, marken)); return; }
       if (quelle instanceof BeispielQuelle) quelle.aktualisieren({ ...quelle.lesen(), plan });
       else setDaten(d => ({ ...d, plan }));

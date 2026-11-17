@@ -97,6 +97,12 @@ const dateiAgent = { id: "datei-kern", name: "Datei-Kern", anbieter: "Codex", mo
   fortschritt: 0, phasen: [], dateien: [{ pfad: "src/csv.rs", hinzugefuegt: 1, entfernt: 1 }, { pfad: "bild.png", hinzugefuegt: 0, entfernt: 0 }], tests: null, schaetzung: null };
 const dateiDiff = "diff --git a/src/csv.rs b/src/csv.rs\nindex 1234567..abcdef0 100644\n--- a/src/csv.rs\n+++ b/src/csv.rs\n@@ -1,2 +1,2 @@\n Kontext\n-alt\n+neu\n… gekürzt";
 
+async function ganzImBereich(inhalt, bereich) {
+  const box = await inhalt.boundingBox(), sichtbar = await bereich.boundingBox();
+  expect(box.y).toBeGreaterThanOrEqual(sichtbar.y);
+  expect(box.y + box.height).toBeLessThanOrEqual(sichtbar.y + sichtbar.height);
+}
+
 test.describe("Echte Team-Details", () => {
   test.beforeEach(async ({ page }) => {
     test.skip(process.env.UI_BASELINE === "1", "Die Dateivorschau wird am Kandidaten geprüft.");
@@ -166,30 +172,34 @@ test.describe("Echte Team-Details", () => {
     }
     const funde = { ...dateiAgent, id: "funde", name: "CSV-Funde", zustand: "Wartet auf dich",
       tests: { gruenSeit: null, gruen: 5, gesamt: 5, verlauf: [] },
-      review: { familie: "Codex", urteil: "FUNDE", text: "P2: Leere CSV wird nicht abgefangen.\nBitte Eingabe prüfen." } };
+      review: { familie: "Claude", urteil: "FUNDE", text: "P2: Leere CSV wird nicht abgefangen.\nBitte Eingabe prüfen." } };
     await page.evaluate(a => window.agentSenden(a), funde);
     await page.locator('[data-agent="funde"] .ak-kopf').click();
     await expect(details.locator(".tm-status")).toHaveText("Wartet auf dich");
-    await expect(review).toContainText("Codex");
+    await ganzImBereich(details.locator(".tm-det-kopf"), details);
+    await reviewImBild();
+    await details.evaluate(el => { el.scrollTop = 0; });
+    await ganzImBereich(details.locator(".tm-det-kopf"), details);
+    await expect(review).toContainText("Claude");
     await expect(review.locator(".mk-wartet")).toHaveText("Funde");
     await expect(review.locator("pre")).toHaveText(funde.review.text);
     await expect(details).toContainText("5 von 5 grün");
     if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
       await page.mouse.move(0, 0);
-      await reviewImBild();
+      await ganzImBereich(details.locator(".tm-det-kopf"), details);
       await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p64_funde_1440x900.png`, animations: "disabled" });
     }
     expect((await new AxeBuilder({ page }).include(".team-spalte").analyze()).violations).toEqual([]);
     await page.evaluate(a => window.agentSenden({ ...a, zustand: "Arbeitet", review: { ...a.review, urteil: null, text: "" } }), funde);
-    await expect(review).toContainText("Review durch Codex läuft");
+    await expect(review).toContainText("Review durch Claude läuft");
     await page.evaluate(a => window.agentSenden({ ...a, review: null }), funde);
     await expect(review).toHaveCount(0);
   });
 
-  test("Details stehen direkt unter einem oder zwei Agenten und öffnen oben", async ({ page }) => {
+  test("Details stehen direkt unter 1, 2 oder 3 Agenten und öffnen oben", async ({ page }) => {
     const details = page.locator("#team-details"), liste = page.locator(".team-echt .team-liste");
-    for (const anzahl of [1, 2]) {
-      const agent = { ...dateiAgent, id: anzahl === 1 ? dateiAgent.id : "zweiter", name: `Agent ${anzahl}`, zustand: "Fertig",
+    for (const anzahl of [1, 2, 3]) {
+      const agent = { ...dateiAgent, id: anzahl === 1 ? dateiAgent.id : `agent-${anzahl}`, name: `Agent ${anzahl}`, zustand: "Fertig",
         beleg: { titel: "CSV-Export geprüft", prLink: "https://github.com/Cuarroc/ProjectB/pull/250" },
         review: { familie: "Claude", urteil: "FUNDE", text: "P2: Bitte Eingabe prüfen.\n".repeat(20) } };
       await details.evaluate(el => { el.scrollTop = 200; });
@@ -197,11 +207,13 @@ test.describe("Echte Team-Details", () => {
       if (anzahl === 1) await details.press("Escape");
       await page.locator(`[data-agent="${agent.id}"] .ak-kopf`).click();
       await expect(details).toBeFocused();
-      const ende = await liste.locator("[data-agent]").last().boundingBox(), box = await details.boundingBox();
+      const ende = await liste.boundingBox(), box = await details.boundingBox();
       expect(box.y - ende.y - ende.height).toBeGreaterThanOrEqual(0);
       expect(box.y - ende.y - ende.height).toBeLessThanOrEqual(24);
       expect(await details.evaluate(el => el.scrollTop)).toBe(0);
-      await expect(details.locator(".tm-det-kopf")).toBeInViewport({ ratio: 1 });
+      await ganzImBereich(details.locator(".tm-det-kopf"), details);
+      await ganzImBereich(details.locator(".tm-det-leiste").first(), details);
+      await ganzImBereich(details.getByRole("heading", { name: "Kennzahlen" }), details);
       await expect(details.locator(".tm-det-leiste").first()).toBeInViewport({ ratio: 1 });
       const geometrie = await details.evaluate(el => ({ sichtbar: el.clientHeight, inhalt: el.scrollHeight,
         abstand: el.closest(".team-bereich").getBoundingClientRect().bottom - el.getBoundingClientRect().bottom,
@@ -239,6 +251,7 @@ test.describe("Echte Team-Details", () => {
     await expect(vorschau.locator("pre")).toHaveText(dateiDiff);
     await expect(vorschau.locator(".tm-diff-plus")).toHaveText("+neu");
     await expect(vorschau.locator(".tm-diff-minus")).toHaveText("-alt");
+    await vorschau.locator(".tm-diff-plus").scrollIntoViewIfNeeded();
     await expect(vorschau.locator(".tm-diff-plus")).toBeInViewport();
     expect(await vorschau.locator(".tm-diff-plus").evaluate(el => getComputedStyle(el).color))
       .not.toBe(await vorschau.locator(".tm-diff-minus").evaluate(el => getComputedStyle(el).color));
@@ -320,18 +333,24 @@ test.describe("Echte Team-Details", () => {
     await page.evaluate(a => window.agentSenden(a), { ...dateiAgent, dateien });
     const details = page.locator(".team-details");
     const dateikachel = details.locator(".tm-dkarte").filter({ has: page.getByRole("heading", { name: "Dateien", exact: true }) });
-    expect((await dateikachel.boundingBox()).height).toBeGreaterThan((await details.boundingBox()).height);
+    const liste = details.locator(".tm-dateien");
+    const masse = await liste.evaluate(el => ({ hoehe: el.clientHeight, inhalt: el.scrollHeight }));
+    expect(masse.inhalt).toBeGreaterThan(masse.hoehe);
     await details.getByRole("button", { name: "Ansehen", exact: true }).last().click();
     await page.evaluate(() => window.dateiAnfragen[0].resolve("Binärdatei, keine Vorschau."));
     const vorschau = details.getByRole("region", { name: "Vorschau" });
     await expect(vorschau.locator("pre")).toHaveText("Binärdatei, keine Vorschau.");
     await expect(vorschau).toBeFocused();
-    const sichtbar = await details.boundingBox(), box = await vorschau.boundingBox();
-    expect(box.y).toBeGreaterThanOrEqual(sichtbar.y);
-    expect(box.y + box.height).toBeLessThanOrEqual(sichtbar.y + sichtbar.height);
-    expect(box.y - sichtbar.y).toBeLessThanOrEqual(1);
-    const dateibox = await dateikachel.boundingBox();
-    expect(dateibox.y + dateibox.height).toBeLessThanOrEqual(sichtbar.y);
+    await ganzImBereich(details.locator(".tm-det-kopf"), details);
+    await ganzImBereich(details.locator(".tm-det-leiste"), details);
+    await ganzImBereich(details.getByRole("heading", { name: "Kennzahlen" }), details);
+    await ganzImBereich(dateikachel, details);
+    expect(await details.evaluate(el => el.scrollTop)).toBe(0);
+    const ende = await details.locator(".tm-det").boundingBox();
+    const innen = await details.evaluate(el => parseFloat(getComputedStyle(el).paddingBottom));
+    const inhalt = await details.evaluate(el => el.scrollHeight);
+    expect(Math.abs(inhalt - ende.height - innen * 2)).toBeLessThanOrEqual(1);
+    if (page.viewportSize().height === 900) await ganzImBereich(vorschau, details);
     if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
       await page.mouse.move(0, 0);
       await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53h_viele-dateien_1440x900.png`, animations: "disabled" });
