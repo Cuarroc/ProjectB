@@ -33,6 +33,7 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
   const testX = (zeit: string) => 20 + (testzeit(zeit) - testzeit(testpunkte[0]?.zeit ?? zeit)) / Math.max(1, testzeit(testpunkte.at(-1)?.zeit ?? zeit) - testzeit(testpunkte[0]?.zeit ?? zeit)) * 195;
   useLayoutEffect(() => {
     zeige(null); setDatei(null);
+    if (echt) bereich.current?.scrollTo({ top: 0 });
     const spalte = bereich.current?.closest(".team-bereich");
     const karte = [...spalte?.querySelectorAll<HTMLElement>(`[data-agent="${agent.id}"]`) ?? []].find(el => el.getClientRects().length);
     const liste = karte?.closest<HTMLElement>(".team-liste"), achse = liste?.querySelector<HTMLElement>(".team-achse");
@@ -44,9 +45,19 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
     bereich.current?.focus({ preventScroll: true });
     return () => { anfrage.current++; if (liste) { liste.style.scrollPaddingTop = ""; liste.style.paddingBottom = ""; } };
   }, [agent.id]);
-  useLayoutEffect(() => { if (vorschau) { vorschauBereich.current?.scrollIntoView({ block: "nearest" }); vorschauBereich.current?.focus({ preventScroll: true }); } }, [vorschau]);
+  const scrolleVorschau = () => {
+    vorschauBereich.current?.scrollIntoView({ block: "nearest" });
+    if (!echt || !bereich.current) return;
+    const oben = bereich.current.getBoundingClientRect().top;
+    const angeschnitten = [...bereich.current.querySelectorAll<HTMLElement>(".tm-det-kopf, .tm-det-leiste, .tm-dkarte")].find(el => {
+      const box = el.getBoundingClientRect(); return box.top < oben && box.bottom > oben;
+    });
+    // Beim automatischen Scrollen am Anfang eines ganzen Inhaltsblocks bleiben.
+    if (angeschnitten) bereich.current.scrollTop -= oben - angeschnitten.getBoundingClientRect().top;
+  };
+  useLayoutEffect(() => { if (vorschau) { scrolleVorschau(); vorschauBereich.current?.focus({ preventScroll: true }); } }, [vorschau]);
   useLayoutEffect(() => {
-    if (datei && !datei.laedt && document.activeElement === vorschauBereich.current) vorschauBereich.current?.scrollIntoView({ block: "nearest" });
+    if (datei && !datei.laedt && document.activeElement === vorschauBereich.current) scrolleVorschau();
   }, [datei]);
   const zu = () => {
     const knopf = [...bereich.current?.closest(".team-bereich")?.querySelectorAll<HTMLElement>(`[data-agent="${agent.id}"] [aria-expanded="true"]`) ?? []].find(el => el.getClientRects().length);
