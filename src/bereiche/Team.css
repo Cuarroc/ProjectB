@@ -16,7 +16,7 @@
 .team-diagramm-zeiten{display:flex;justify-content:space-between}.team-diagramm-zeiten>span:last-child{color:var(--jetzt-text);background:var(--jetzt-glas);border-radius:var(--rund-voll);padding-inline:var(--abstand-1)}
 .team-tokens{display:flex;height:var(--abstand-1);gap:calc(var(--abstand-1) / 2);border-radius:var(--rund-voll);overflow:hidden;margin-top:auto}.team-tokens span:first-child{background:var(--reihe-agenten)}.team-tokens span+span{background:var(--reihe-orchestrator)}
 .ak-avatar{display:grid;place-items:center;flex:none;width:calc(var(--steuer-hoehe) + var(--abstand-4));height:calc(var(--steuer-hoehe) + var(--abstand-4));border-radius:var(--rund-voll);color:var(--akzent-tinte);background:var(--reihe-orchestrator)}
-.team-liste .ak.wartet{box-shadow:var(--schatten-leuchten-wartet),var(--schatten-kante)}
+.team-liste .ak.wartet:not(:has(.pause-marke)){box-shadow:var(--schatten-leuchten-wartet),var(--schatten-kante)}
 .team-liste{min-height:0;overflow:auto;padding:0 var(--abstand-6) var(--abstand-6);display:flex;flex-direction:column;gap:var(--abstand-3);flex:1}
 .team-liste .ak{width:100%;padding:var(--abstand-4);gap:var(--abstand-3)}
 .team-liste .ak-name b{font:var(--schrift-ueberschrift)}.team-liste .ak-name span{overflow-wrap:anywhere}
@@ -35,3 +35,6 @@
 .team-liste .ak-meta{display:inline-flex;align-items:center;gap:var(--abstand-1)}
 
 .team-echt .team-kopf .team-chip{display:inline}
+.team-echt:has(.team-details) .team-liste{flex:none;max-height:40%;padding-bottom:var(--abstand-4)}
+.team-echt .team-details{flex:0 1 auto;max-height:none}
+.team-echt .tm-det-raster{grid-template-columns:minmax(0,1fr)}
