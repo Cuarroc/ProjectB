@@ -8,6 +8,7 @@ use crate::{
 use std::{
     io,
     path::{Path, PathBuf},
+    process::{Command, Stdio},
     sync::{mpsc, Arc, Mutex},
     thread,
     time::Duration,
@@ -22,13 +23,44 @@ pub fn pr_anlegen(ordner: &Path, titel: &str, text: &str, autor: Autor, branch: 
     pr::anlegen(ordner, titel, text, autor, branch)
 }
 
+/// Secret-Scan: `None` prüft den Index, `Some(basis)` die Commits seit `basis`.
+pub type Scannen = fn(&Path, Option<&str>) -> Result<(), String>;
+/// Scan und PR-Anlage; Tests ersetzen beide.
+pub type PrWeg = (Scannen, PrAnlegen);
+pub const PR_WEG: PrWeg = (scannen, pr_anlegen);
+
+/// Produktion: gitleaks ohne Shell; nur Exit 0 ohne Fehlerausgabe gilt als sauber.
+pub fn scannen(ordner: &Path, seit: Option<&str>) -> Result<(), String> {
+    let mut befehl = Command::new(crate::finde_programm("gitleaks"));
+    befehl.args(["git", "--no-banner", "--redact", "--exit-code=99", "--log-level=error"]);
+    match seit {
+        None => befehl.arg("--staged"),
+        Some(basis) => befehl.arg(format!("--log-opts={basis}..HEAD")),
+    };
+    befehl.arg(".").current_dir(ordner).stdin(Stdio::null()).stdout(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
+        befehl.creation_flags(CREATE_NO_WINDOW);
+    }
+    let ausgabe = befehl.output().map_err(|e| format!("Secret-Scan nicht möglich: {e}"))?;
+    match ausgabe.status.code() {
+        Some(99) => Err("Secret-Scan: Fund, nichts übertragen".into()),
+        // gitleaks endet bei Git-Fehlern (z. B. unbekannte Basis) mit 0; dann steht nur etwas in stderr.
+        Some(0) if ausgabe.stderr.is_empty() => Ok(()),
+        _ => Err(format!("Secret-Scan nicht möglich: gitleaks endete mit {}", ausgabe.status)),
+    }
+}
+
 fn pr_schritt(
     ordner: &Path,
     name: &str,
     anbieter: &str,
     branch: &str,
+    basis: &str,
     ergebnis: &pruefung::Ergebnis,
-    pr_anlegen: PrAnlegen,
+    (scannen, pr_anlegen): PrWeg,
 ) -> Result<PrInfo, String> {
     let autor = if anbieter.eq_ignore_ascii_case("codex") { Autor::Codex } else { Autor::Claude };
     let (gruen, gesamt) = (ergebnis.gruen.unwrap_or(0), ergebnis.gesamt.unwrap_or(0));
@@ -36,8 +68,16 @@ fn pr_schritt(
     (|| {
         if !anhalten::git(ordner, &["status", "--porcelain", "--untracked-files=all"])?.is_empty() {
             anhalten::git(ordner, &["add", "-A"])?;
+            if let Err(fehler) = scannen(ordner, None) {
+                // Nur den Index leeren; die Dateien bleiben unverändert.
+                return Err(match anhalten::git(ordner, &["reset", "-q"]) {
+                    Ok(_) => fehler,
+                    Err(reset) => format!("{fehler}; Index nicht geleert: {reset}"),
+                });
+            }
             anhalten::git(ordner, &["commit", "-m", &format!("{name}: Stand für PR")])?;
         }
+        scannen(ordner, Some(basis))?;
         pr_anlegen(ordner, name, &text, autor, branch).map_err(|e| e.to_string())
     })()
     .map_err(|fehler| ohne_zugangsdaten(&fehler))
@@ -80,7 +120,7 @@ impl Team {
         auftraege: Vec<TeamAuftrag>,
         melden: impl Fn(String) + Send + Sync + 'static,
     ) -> io::Result<Self> {
-        Self::starten_mit_kontingent(projekt, auftraege, None, melden, start::starten, Some(pr_anlegen))
+        Self::starten_mit_kontingent(projekt, auftraege, None, melden, start::starten, Some(PR_WEG))
     }
 
     /// Austauschbarer Prozessstart für Tests, ohne PR-Schritt; Produktion verwendet `start::starten`.
@@ -93,14 +133,14 @@ impl Team {
         Self::starten_mit_kontingent(projekt, auftraege, None, melden, starten, None)
     }
 
-    /// `pr_anlegen` läuft nach grünen Tests; `None` lässt den PR-Schritt aus.
+    /// `pr_weg` läuft nach grünen Tests; `None` lässt den PR-Schritt aus.
     pub fn starten_mit_kontingent(
         projekt: &Path,
         auftraege: Vec<TeamAuftrag>,
         kontingent: Option<&Path>,
         melden: impl Fn(String) + Send + Sync + 'static,
         starten: impl Fn(&Anbieter, &start::Startwunsch, &Path) -> io::Result<Lauf>,
-        pr_anlegen: Option<PrAnlegen>,
+        pr_weg: Option<PrWeg>,
     ) -> io::Result<Self> {
         if auftraege.is_empty() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "Mindestens ein Auftrag"));
@@ -196,7 +236,7 @@ impl Team {
                                     // shortcut: eigener Test-Job läuft nach Anhalten weiter; später abbrechbar an den Lauf binden.
                                     let ergebnis = pruefung::ausfuehren(&arbeitskopie, &befehl);
                                     zustand.pruefung_beenden(Some(&ergebnis));
-                                    if let (true, Some(pr_anlegen)) = (ergebnis.erfolgreich, pr_anlegen) {
+                                    if let (true, Some(pr_weg)) = (ergebnis.erfolgreich, pr_weg) {
                                         {
                                             let aktiv = aktiv.lock().unwrap();
                                             if !*aktiv {
@@ -211,8 +251,9 @@ impl Team {
                                             &auftrag.name,
                                             &auftrag.anbieter,
                                             &branch,
+                                            &basis,
                                             &ergebnis,
-                                            pr_anlegen,
+                                            pr_weg,
                                         );
                                         zustand.pr_beenden(&auftrag.name, pr);
                                     }

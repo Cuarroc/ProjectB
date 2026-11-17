@@ -2,7 +2,7 @@ use projectb_kern::{
     anhalten::Ordnerstatus,
     pr::{Autor, PrInfo},
     start,
-    team::{PrAnlegen, Team, TeamAuftrag},
+    team::{PrAnlegen, PrWeg, Scannen, Team, TeamAuftrag},
     Anbieter,
 };
 use serde_json::Value;
@@ -643,7 +643,13 @@ fn pr_fehler(ordner: &Path, _: &str, _: &str, _: Autor, _: &str) -> std::io::Res
     Err(std::io::Error::other("Push abgelehnt: https://x:geheim@github.com/o/r"))
 }
 
-fn pr_team(repo: &Repo, skript: &'static str, pr: PrAnlegen) -> (Team, mpsc::Receiver<String>) {
+const SAUBER: Scannen = |_, _| Ok(());
+const FUND: Scannen = |_, _| Err("Secret-Scan: Fund, nichts übertragen".into());
+// Fund nur beim Scan der Commits seit der Team-Basis, also vor dem PR-Commit.
+const FUND_IN_COMMITS: Scannen =
+    |o, seit| if seit.is_some_and(|b| b == git(o, &["rev-parse", "HEAD~1"])) { FUND(o, seit) } else { Ok(()) };
+
+fn pr_team(repo: &Repo, skript: &'static str, pr: PrWeg) -> (Team, mpsc::Receiver<String>) {
     for (schluessel, wert) in
         [("user.name", "Test"), ("user.email", "test@example.invalid"), ("commit.gpgSign", "false")]
     {
@@ -681,7 +687,7 @@ fn alle(rx: &mpsc::Receiver<String>) -> Vec<Value> {
 #[test]
 fn gruene_tests_legen_pr_mit_beleg_an() {
     let repo = Repo::neu();
-    let (mut team, rx) = pr_team(&repo, "console.log('Tests 2 passed (2)')", pr_ok);
+    let (mut team, rx) = pr_team(&repo, "console.log('Tests 2 passed (2)')", (SAUBER, pr_ok));
     let meldungen = alle(&rx);
     let legt_an = meldungen.iter().position(|v| v["liveZeile"] == "Legt PR an …").unwrap();
     assert_eq!(meldungen[legt_an]["zustand"], "Arbeitet");
@@ -702,11 +708,16 @@ fn rote_tests_oder_pr_fehler_geben_problem_ohne_beleg() {
     for (skript, pr, aufruf, zeile) in [
         (
             "console.log('Tests 1 passed | 1 failed (2)'); process.exit(1)",
-            pr_ok as PrAnlegen,
+            (SAUBER, pr_ok as PrAnlegen),
             "pr-aufruf",
             "Tests rot: 1 von 2 grün",
         ),
-        ("process.exit(0)", pr_fehler, "pr-fehler", "PR fehlgeschlagen: Push abgelehnt: https://github.com/o/r"),
+        (
+            "process.exit(0)",
+            (SAUBER, pr_fehler),
+            "pr-fehler",
+            "PR fehlgeschlagen: Push abgelehnt: https://github.com/o/r",
+        ),
     ] {
         let repo = Repo::neu();
         let (mut team, rx) = pr_team(&repo, skript, pr);
@@ -723,7 +734,7 @@ fn rote_tests_oder_pr_fehler_geben_problem_ohne_beleg() {
 fn anhalten_vor_pr_legt_keinen_pr_an() {
     let repo = Repo::neu();
     let skript = "require('fs').writeFileSync('prueft', ''); const t=setInterval(()=>{if(require('fs').existsSync('weiter'))clearInterval(t)},10)";
-    let (mut team, rx) = pr_team(&repo, skript, pr_ok);
+    let (mut team, rx) = pr_team(&repo, skript, (SAUBER, pr_ok));
     let frist = std::time::Instant::now() + Duration::from_secs(10);
     while !team.ordner()[0].join("prueft").exists() {
         assert!(std::time::Instant::now() < frist);
@@ -733,4 +744,21 @@ fn anhalten_vor_pr_legt_keinen_pr_an() {
     fs::write(team.ordner()[0].join("weiter"), "").unwrap();
     assert_eq!(alle(&rx).last().unwrap()["liveZeile"], "Prüft: npm test");
     assert!(!team.ordner()[0].join("pr-aufruf").exists());
+}
+
+#[test]
+fn secret_fund_verhindert_commit_und_pr() {
+    for (scan, betreff) in [(FUND, "Start"), (FUND_IN_COMMITS, "eins: Stand für PR")] {
+        let repo = Repo::neu();
+        let (mut team, rx) = pr_team(&repo, "process.exit(0)", (scan, pr_ok));
+        let letzte = alle(&rx).pop().unwrap();
+        assert_eq!(letzte["zustand"], "Problem");
+        assert_eq!(letzte["liveZeile"], "PR fehlgeschlagen: Secret-Scan: Fund, nichts übertragen");
+        let ordner = &team.ordner()[0];
+        assert!(!ordner.join("pr-aufruf").exists());
+        assert_eq!(git(ordner, &["log", "-1", "--format=%s"]), betreff);
+        assert_eq!(git(ordner, &["diff", "--cached", "--name-only"]), "");
+        assert!(ordner.join("package.json").exists());
+        team.laeufe_mut()[0].warten().unwrap();
+    }
 }
