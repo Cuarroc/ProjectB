@@ -132,6 +132,11 @@ impl AgentZustand {
         }
     }
 
+    pub(crate) fn freigabe_abwarten(&mut self, zeile: &str) {
+        self.prueft = false;
+        self.zeilen(zeile);
+    }
+
     pub(crate) fn review_starten(&mut self, familie: &str) {
         self.prueft = true;
         self.review = Some(json!({"familie": familie, "urteil": null, "text": ""}));

@@ -35,6 +35,8 @@ pub fn ausfuehren(ordner: &Path, befehl: &[&str]) -> Ergebnis {
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Testbefehl ist leer"))?;
         let mut kommando = Command::new(crate::finde_programm(programm));
         kommando.args(argumente).current_dir(ordner);
+        // Agenten-Code läuft auch in den Tests: dieselbe Sperre wie beim Agenten.
+        crate::start::agenten_umgebung_setzen(&mut kommando)?;
         kommando.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
         #[cfg(windows)]
         let (tx, rx) = std::sync::mpsc::channel();
@@ -204,6 +206,16 @@ error: test failed, to rerun pass `--lib`\n";
         } else {
             ausfuehren(ordner, &["sh", "-c", unix])
         }
+    }
+
+    #[test]
+    fn tests_laufen_mit_push_sperre_und_ohne_gh_anmeldung() {
+        let ergebnis = shell(
+            Path::new(env!("CARGO_MANIFEST_DIR")),
+            "(if not \"%GIT_CONFIG_COUNT%\"==\"4\" exit /b 1) & (if not defined GH_CONFIG_DIR exit /b 2) & (if defined GH_TOKEN exit /b 3) & exit /b 0",
+            "test \"$GIT_CONFIG_COUNT\" = 4 && test -n \"$GH_CONFIG_DIR\" && test -z \"${GH_TOKEN+x}\"",
+        );
+        assert!(ergebnis.erfolgreich, "{:?}", ergebnis.exit_code);
     }
 
     #[test]

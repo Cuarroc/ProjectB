@@ -169,6 +169,8 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
                 sperren.split(',').filter_map(|r| r.strip_prefix("Bash")).map(|r| format!("PowerShell{r}")).collect();
             sperren.push(',');
             sperren.push_str(&powershell.join(","));
+            // Dass PowerShell(rm *) auch das Cmdlet hinter dem Alias trifft, ist nicht belegt.
+            sperren.push_str(",PowerShell(Remove-Item *)");
             if wunsch.nur_lesen {
                 args.extend(["--settings".into(), r#"{"useAutoModeDuringPlan":false}"#.into()]);
                 sperren.push_str(",ExitPlanMode");
@@ -237,6 +239,21 @@ pub fn starten(anbieter: &Anbieter, wunsch: &Startwunsch, ordner: &Path) -> Resu
     Lauf::starten(&anbieter, &wunsch.prompt(), ordner)
 }
 
+/// Push-Sperre und gh ohne Anmeldung für Agenten und ihre Tests.
+pub fn agenten_umgebung_setzen(befehl: &mut std::process::Command) -> std::io::Result<()> {
+    // Ein leerer gh-Ordner je App-Prozess statt je Start, damit sich im Temp nichts ansammelt.
+    let gh_ordner = std::env::temp_dir().join(format!("projectb-gh-{}", std::process::id()));
+    std::fs::create_dir_all(&gh_ordner)?;
+    for (key, value) in agenten_umgebung(&gh_ordner) {
+        if let Some(value) = value {
+            befehl.env(key, value);
+        } else {
+            befehl.env_remove(key);
+        }
+    }
+    Ok(())
+}
+
 pub fn agenten_umgebung(gh_ordner: &Path) -> Vec<(String, Option<std::ffi::OsString>)> {
     // git help config: ENVIRONMENT (COUNT/KEY_n/VALUE_n), url.<base>.pushInsteadOf (nur Push).
     // https://git-scm.com/docs/git-config: explizites pushurl umgeht die Umschreibung, git -c hat Vorrang.
@@ -293,6 +310,9 @@ mod tests {
             let claude = argumente(&CLAUDE, &w).unwrap();
             assert!(claude.windows(2).any(|p| p == ["--permission-mode", "acceptEdits"]), "{claude:?}");
             assert!(!claude.iter().any(|a| a.contains("bypassPermissions")));
+            assert!(claude
+                .iter()
+                .any(|a| a.starts_with("--disallowedTools=") && a.contains("PowerShell(Remove-Item *)")));
             let erlaubt = claude.iter().find_map(|a| a.strip_prefix("--allowedTools=")).unwrap_or("");
             for befehl in ["git status", "git diff", "git log", "cargo test", "npm test", "npm run test"] {
                 assert_eq!(erlaubt.contains(&format!("Bash({befehl} *)")), stufe != Berechtigung::Autonom);
