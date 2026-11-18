@@ -1,8 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Check, ChevronRight, Circle, Copy, MessageCircleQuestion, Users } from "lucide-react";
 import { BeispielQuelle } from "../daten/quelle";
-import { isTauri } from "@tauri-apps/api/core";
-import { chatAnlegen } from "../daten/chats";
+import { chatAnlegen, neuerChatGesperrt } from "../daten/chats";
 import { Knopf } from "../bausteine/Knopf";
 import { Fortschrittsring } from "../bausteine/Fortschrittsring";
 import { Statusmarke, zustaende as statusDefinitionen, type Zustand } from "../bausteine/Statusmarke";
@@ -74,9 +73,9 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
       <h2 id="chat">Chat</h2>
       <span className="chat-empfaenger">An <span className="r-avatar"><Users size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /></span><strong>Orchestrator</strong></span>
       {chat?.gestartetUm && <span className="chat-laufzeit statusmarke" role="timer" aria-live="off" data-zustand="arbeitet">
-        <LaufSymbol size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />Läuft seit {laufzeit < 1 ? "weniger als 1 min" : `${laufzeit} min`}
+        <LaufSymbol size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />Läuft seit {laufzeit < 1 ? "weniger als 1 min" : laufzeit < 60 ? `${laufzeit} min` : `${Math.floor(laufzeit / 60)} h${laufzeit % 60 ? ` ${laufzeit % 60} min` : ""}`}
       </span>}
-      <Knopf text="Neuer Chat" disabled={!daten.chats.length || (isTauri() && daten.rollenPfad !== daten.kopf.pfad)} onClick={() => chatAnlegen(quelle)} />
+      <Knopf text="Neuer Chat" disabled={!daten.chats.length || neuerChatGesperrt(daten)} onClick={() => chatAnlegen(quelle)} />
     </header>
     <AnhalteHinweis pause={pause} />
     <div className="chat-verlauf" role="log" aria-label="Chatverlauf" aria-relevant="additions text">

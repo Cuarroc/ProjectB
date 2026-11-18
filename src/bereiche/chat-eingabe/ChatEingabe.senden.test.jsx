@@ -171,3 +171,7 @@ it("sendet im leeren Chat keinen Kontextblock", async () => {
   await ansicht().props.senden("Erste Nachricht");
   expect(auftragSenden).toHaveBeenLastCalledWith(expect.objectContaining({ text: "Erste Nachricht" }));
 });
+it("sperrt /neu bis die Rollen zum aktuellen Projekt geladen sind", () => {
+  expect(ansicht().props.neuGesperrt).toBe(true); const d = quelle.lesen(); d.rollenPfad = d.kopf.pfad; quelle.aktualisieren(d);
+  expect(ansicht().props.neuGesperrt).toBe(false);
+});

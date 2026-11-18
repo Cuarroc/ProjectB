@@ -28,6 +28,21 @@
 :root[data-bewegung=reduziert] .ein-menue { animation: none; }
 @media (prefers-reduced-motion: reduce) { :root:not([data-bewegung=voll]) .ein-menue { animation: none; } }
 .ein-menue button:focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); outline-offset: calc(var(--abstand-1) / 2); }
+.ein-befehle-anker { position: relative; }
+.ein-befehle { box-sizing: border-box; min-width: 0; width: min(100%, calc(var(--chat-max-breite) * .7)); }
+.ein-befehle header { display: flex; justify-content: space-between; padding: var(--abstand-2) var(--abstand-3); }
+.ein-befehle header, .ein-befehle footer, .ein-befehle small, .ein-befehle p { color: var(--text-2); font: var(--schrift-klein); }
+.ein-befehle button { display: flex; align-items: center; gap: var(--abstand-3); padding: var(--abstand-3); }
+.ein-befehle button > span:nth-child(2) { flex: 1; }
+.ein-befehle code, .ein-befehle small { display: block; }
+.ein-befehle code { font: var(--schrift-text); font-family: var(--familie-mono); }
+.ein-befehl-symbol { display: grid; place-items: center; flex: none; width: var(--steuer-hoehe); height: var(--steuer-hoehe); background: var(--flaeche-3); border-radius: var(--rund-knopf); box-shadow: var(--schatten-kante); }
+.ein-befehle button[aria-selected=true] { background: var(--akzent-grund); box-shadow: inset 0 0 0 1px var(--akzent); }
+.ein-befehle button:disabled { color: var(--text-aus); cursor: not-allowed; }
+.ein-befehle button:disabled small { color: inherit; }
+.ein-befehle button:hover:not(:disabled) { background: var(--akzent-grund); }
+.ein-befehle footer { padding: var(--abstand-2) var(--abstand-3); border-top: 1px solid var(--flaeche-4); white-space: nowrap; }
+.ein-befehle kbd { font: inherit; font-family: var(--familie-mono); background: var(--flaeche-3); border-radius: var(--rund-segment); padding: 0 var(--abstand-1); }
 @container chat-eingabe (width < calc(41.25 * 1rem)) { .chat-eingabe .wort { display: none; } }
 @container chat-eingabe (width < calc(35.625 * 1rem)) {
   .chat-eingabe .lang, .chat-eingabe .pfeil { display: none; }

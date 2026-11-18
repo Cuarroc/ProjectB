@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import type { KeyboardEvent, ReactNode, TextareaHTMLAttributes } from "react";
 import { ArrowUp, CircleX, Plus } from "lucide-react";
 import "./Eingabefeld.css";
 
@@ -14,19 +14,21 @@ type Props = {
   werkzeuge?: ReactNode;
   beschreibungId?: string;
   ohneAnhaengen?: boolean;
+  feld?: TextareaHTMLAttributes<HTMLTextAreaElement>;
 };
 
-export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, sendet = false, fehler, kopf, werkzeuge, beschreibungId, ohneAnhaengen }: Props) {
+export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, sendet = false, fehler, kopf, werkzeuge, beschreibungId, ohneAnhaengen, feld }: Props) {
   const senden = () => { if (!sendet && text.trim()) onSenden(text); };
   const tastatur = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    feld?.onKeyDown?.(event); if (event.defaultPrevented) return;
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;
     event.preventDefault();
     senden();
   };
   return <form className="ein" onSubmit={event => { event.preventDefault(); senden(); }}>
     <>{kopf}<label htmlFor={id} className="ein-sr">Nachricht an den Orchestrator</label></>
-    <textarea id={id} rows={2} placeholder="Schreib, was gebaut werden soll …" value={text}
-      onChange={event => onTextAendern(event.target.value)} onKeyDown={tastatur}
+    <textarea {...feld} id={id} rows={2} placeholder="Schreib, was gebaut werden soll …" value={text}
+      onChange={event => { feld?.onChange?.(event); onTextAendern(event.target.value); }} onKeyDown={tastatur}
       aria-describedby={[beschreibungId, fehler ? `${id}-meldung` : undefined].filter(Boolean).join(" ") || undefined} />
     <div className="ein-leiste">
       {!ohneAnhaengen && <button type="button" className="kn kn-leise kn-symbol" aria-label="Bild oder Datei anhängen"

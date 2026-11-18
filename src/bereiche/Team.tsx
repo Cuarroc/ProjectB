@@ -87,7 +87,8 @@ function TeamEcht() {
   const [angehalten, setAngehalten] = useState(() => new Set<string>());
   useEffect(() => {
     // Nur „Arbeitet“ hat einen laufenden Prozess; „Wartet auf dich“ und „Problem“ sind beendet, der Kern nimmt dann einen neuen Start an.
-    teamLauf.laeuft = !pause && agenten.some(a => a.zustand === "Arbeitet" && !angehalten.has(a.name));
+    teamLauf.anzahl = pause ? 0 : agenten.filter(a => a.zustand === "Arbeitet" && !angehalten.has(a.name)).length;
+    teamLauf.laeuft = teamLauf.anzahl > 0;
   }, [agenten, pause, angehalten]);
   const angefordert = useAnhalten();
   const [meldungen] = useState(() => new ToastSpeicher());
