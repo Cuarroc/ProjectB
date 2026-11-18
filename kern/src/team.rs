@@ -203,6 +203,15 @@ impl Team {
             if auftraege[..i].iter().any(|vorher| vorher.name == auftrag.name) {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, "Agentennamen müssen eindeutig sein"));
             }
+            // Team-Aufträge starten zum Ausführen; nur lesende Reviewer starten später getrennt.
+            if auftrag.berechtigung == start::Berechtigung::Vorsichtig
+                && start::modell(&auftrag.modell).is_some_and(|(anbieter, _)| anbieter == "codex")
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("In der Stufe „Vorsichtig“ arbeitet Codex nur lesend. Gib die Teilaufgabe „{}“ einem Claude-Agenten oder wähle eine andere Stufe.", auftrag.name),
+                ));
+            }
         }
         let melden = Arc::new(melden);
         let starten = Arc::new(starten);

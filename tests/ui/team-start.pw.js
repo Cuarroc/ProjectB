@@ -232,15 +232,18 @@ test("Beendete Agenten mit Problem oder Frage lassen einen neuen Start zu", asyn
   await expect.poll(() => page.evaluate(() => window.starts.length)).toBe(2);
 });
 
-test("Kern lehnt Teamstart ab und zeigt den Sperrgrund", async ({ page }) => {
+for (const grund of [
+  "Das letzte Team läuft noch oder ist nicht gesichert.",
+  "In der Stufe „Vorsichtig“ arbeitet Codex nur lesend. Gib die Teilaufgabe „csv-export“ einem Claude-Agenten oder wähle eine andere Stufe.",
+]) test(`Kern lehnt Teamstart ab und zeigt den Sperrgrund: ${grund}`, async ({ page }) => {
   test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");
   await page.goto("/");
-  await page.evaluate(() => {
+  await page.evaluate(grund => {
     const invoke = window.__TAURI_INTERNALS__.invoke;
     window.__TAURI_INTERNALS__.invoke = (cmd, args) => cmd === "team_starten"
-      ? Promise.reject("Das letzte Team läuft noch oder ist nicht gesichert.") : invoke(cmd, args);
-  });
+      ? Promise.reject(grund) : invoke(cmd, args);
+  }, grund);
   await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
-  await expect(page.getByText("Das letzte Team läuft noch oder ist nicht gesichert.", { exact: true })).toBeVisible();
+  await expect(page.getByText(grund, { exact: true })).toBeVisible();
   await expect(page.locator(".team-echt [data-agent]")).toHaveCount(0);
 });

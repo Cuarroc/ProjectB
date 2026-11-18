@@ -1002,6 +1002,36 @@ fn anhalten_trifft_pruefer_und_verwirft_spaetes_review() {
 }
 
 #[test]
+fn vorsichtig_lehnt_codex_vor_jedem_prozessstart_ab() {
+    for codex_zuerst in [true, false] {
+        let repo = Repo::neu();
+        let mut codex = auftrag("csv-export");
+        codex.anbieter = "Codex".into();
+        codex.modell = "gpt-6.1-sol".into();
+        codex.berechtigung = start::Berechtigung::Vorsichtig;
+        let mut claude = auftrag("claude");
+        claude.berechtigung = start::Berechtigung::Vorsichtig;
+        let auftraege = if codex_zuerst { vec![codex, claude] } else { vec![claude, codex] };
+        let starts = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let zaehler = starts.clone();
+        let ergebnis = Team::starten_mit(
+            &repo.0,
+            auftraege,
+            |_| {},
+            move |_, _, _| {
+                zaehler.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                Err(std::io::Error::other("Kein Prozess im Ablehnungstest"))
+            },
+        );
+        assert_eq!(starts.load(std::sync::atomic::Ordering::Relaxed), 0);
+        assert!(!repo.0.join(".worktrees").exists());
+        let fehler = ergebnis.err().expect("Teamstart muss abgelehnt werden");
+        assert_eq!(fehler.kind(), std::io::ErrorKind::InvalidInput);
+        assert_eq!(fehler.to_string(), "In der Stufe „Vorsichtig“ arbeitet Codex nur lesend. Gib die Teilaufgabe „csv-export“ einem Claude-Agenten oder wähle eine andere Stufe.");
+    }
+}
+
+#[test]
 fn vorsichtig_erreicht_die_worker_argumente() {
     let repo = Repo::neu();
     let mut auftrag = auftrag("vorsichtig");
@@ -1040,6 +1070,9 @@ fn reviewer_nutzt_das_gespeicherte_modell_und_den_effort() {
         let delta = serde_json::json!({"rollen": {"reviewer": {familie: {"modell": modell, "effort": effort}}}});
         projectb_kern::einstellungen::aendern(&datei, &delta).unwrap();
         let mut arbeit = auftrag("rollen");
+        if worker == "claude" {
+            arbeit.berechtigung = start::Berechtigung::Vorsichtig;
+        }
         arbeit.rollen = projectb_kern::einstellungen::laden(&datei).rollen;
         arbeit.anbieter = worker.into();
         arbeit.modell = if worker == "codex" { "gpt-6.1-sol" } else { "Opus 5.5" }.into();
@@ -1054,6 +1087,9 @@ fn reviewer_nutzt_das_gespeicherte_modell_und_den_effort() {
                     if w.nur_lesen {
                         assert_eq!(a.name, familie);
                         let args = start::argumente(a, w)?;
+                        if familie == "codex" {
+                            assert!(args.contains(&"sandbox_mode=\"read-only\"".into()));
+                        }
                         assert!(args.windows(2).any(|paar| paar == ["--model", cli_modell]));
                         let schalter = if familie == "claude" { "--effort" } else { "-c" };
                         assert!(args.windows(2).any(|paar| paar == [schalter, effort_arg]));
