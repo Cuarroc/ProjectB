@@ -244,6 +244,38 @@ fn aendern_bewahrt_lesefehler_und_andere_felder() {
 }
 
 #[test]
+fn gleichzeitige_aenderungen_bleiben_alle_erhalten() {
+    let datei = Datei::neu();
+    let aenderungen = [
+        json!({"berechtigung": "Vorsichtig"}),
+        json!({"ausfuehren": {"agentenGleichzeitig": "einer"}}),
+        json!({"ausfuehren": {"pruefungDurch": "gleicheFamilie"}}),
+        json!({"ausfuehren": {"pruefrundenHoechstens": "eins"}}),
+        json!({"planen": {"plan": "kurz"}}),
+        json!({"planen": {"dauerUndTokensSchaetzen": "aus"}}),
+        json!({"planen": {"beiUnklaremNachfragen": "aus"}}),
+    ];
+    let mut erwartet = als_json(&Einstellungen::default());
+    for delta in &aenderungen {
+        erwartet = als_json(&aendern(&datei.0, delta).unwrap());
+    }
+    for runde in 0..100 {
+        speichern(&datei.0, &Einstellungen::default()).unwrap();
+        let start = std::sync::Barrier::new(aenderungen.len());
+        std::thread::scope(|threads| {
+            for delta in &aenderungen {
+                let (pfad, start) = (&datei.0, &start);
+                threads.spawn(move || {
+                    start.wait();
+                    aendern(pfad, delta).unwrap();
+                });
+            }
+        });
+        assert_eq!(serde_json::from_slice::<Value>(&fs::read(&datei.0).unwrap()).unwrap(), erwartet, "Runde {runde}");
+    }
+}
+
+#[test]
 fn berechtigung_je_projekt_und_nur_gueltige_aenderungen() {
     let datei = Datei::neu();
     let basis = datei.0.parent().unwrap();

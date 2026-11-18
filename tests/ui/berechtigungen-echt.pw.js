@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("Berechtigungen im Tauri-Betrieb: laden, übernehmen, neu laden und Speicherfehler", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Neue Paketoberfläche fehlt im Basisstand.");
   await page.addInitScript(() => {
     window.isTauri = true; window.aenderungen = [];
     const geladen = new Promise(resolve => { window.ladenFortsetzen = resolve; });
@@ -27,6 +28,8 @@ test("Berechtigungen im Tauri-Betrieb: laden, übernehmen, neu laden und Speiche
   expect(await page.evaluate(() => window.aenderungen)).toEqual([{ projekt: expect.any(String), werte: { berechtigung: "Autonom" } }]);
   await page.reload(); await page.evaluate(() => window.ladenFortsetzen()); await expect(knopf).toHaveAccessibleName("Berechtigungen: Autonom");
   await knopf.click(); await dialog.getByRole("radio", { name: /Vorsichtig/ }).click();
+  await expect(dialog.getByRole("listitem").filter({ hasText: "Claude: Build, git add und git commit" })).toContainText("Nie");
+  await expect(dialog.getByRole("listitem").filter({ hasText: "Codex: alles in der Arbeitskopie, Netz nur bei Autonom" })).toContainText("Allein");
   await page.evaluate(() => { window.speicherFehler = true; });
   await dialog.getByRole("button", { name: "Übernehmen" }).click();
   await expect(dialog.locator("#ber-meldung")).toHaveText("Nicht gespeichert: Kein Zugriff");

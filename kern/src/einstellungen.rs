@@ -6,7 +6,10 @@ use std::{
     fs::{self, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Mutex,
+    },
 };
 
 macro_rules! auswahl {
@@ -73,6 +76,8 @@ pub fn laden(pfad: impl AsRef<Path>) -> Einstellungen {
 
 /// Ändert nur übergebene Felder; Lesefehler außer „fehlt“ verhindern jedes Schreiben.
 pub fn aendern(pfad: impl AsRef<Path>, aenderung: &Value) -> io::Result<Einstellungen> {
+    static SPERRE: Mutex<()> = Mutex::new(());
+    let _sperre = SPERRE.lock().map_err(|_| io::Error::other("Einstellungssperre beschädigt"))?;
     let pfad = pfad.as_ref();
     let basis = match fs::read(pfad) {
         Ok(daten) => serde_json::from_slice(&daten).unwrap_or_default(),

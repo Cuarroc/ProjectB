@@ -92,15 +92,16 @@ export const beispiel: Datenstand = {
   berechtigungen: {
     aktuell: "Nur bei Wichtigem",
     stufen: [
-      { name: "Vorsichtig", beschreibung: "Darf Dateien in der Arbeitskopie ändern." },
-      { name: "Nur bei Wichtigem", beschreibung: "Arbeitet allein in der Arbeitskopie." },
-      { name: "Autonom", beschreibung: "Arbeitet mit den meisten Freiheiten." },
+      { name: "Vorsichtig", beschreibung: "Codex: alles in der Arbeitskopie, ohne Netz." },
+      { name: "Nur bei Wichtigem", beschreibung: "Codex: alles in der Arbeitskopie, ohne Netz." },
+      { name: "Autonom", beschreibung: "Codex: alles in der Arbeitskopie, mit Netz." },
     ],
     regeln: [
       ...["Dateien in seiner Arbeitskopie ändern", "Tests in der Arbeitskopie ausführen"].map(text => ({ text,
         stufen: { Vorsichtig: "Allein", "Nur bei Wichtigem": "Allein", Autonom: "Allein" } as const })),
-      { text: "Bash: Build, git add und git commit", stufen: { Vorsichtig: "Nie", "Nur bei Wichtigem": "Allein", Autonom: "Allein" } },
-      { text: "Bash ohne Beschränkung auf Lesen, Tests und Build", stufen: { Vorsichtig: "Nie", "Nur bei Wichtigem": "Nie", Autonom: "Allein" } },
+      { text: "Claude: Build, git add und git commit", stufen: { Vorsichtig: "Nie", "Nur bei Wichtigem": "Allein", Autonom: "Allein" } },
+      { text: "Claude: Bash ohne Beschränkung auf Lesen, Tests und Build", stufen: { Vorsichtig: "Nie", "Nur bei Wichtigem": "Nie", Autonom: "Allein" } },
+      { text: "Codex: alles in der Arbeitskopie, Netz nur bei Autonom", stufen: { Vorsichtig: "Allein", "Nur bei Wichtigem": "Allein", Autonom: "Allein" } },
       { text: "Netz für Codex", stufen: { Vorsichtig: "Nie", "Nur bei Wichtigem": "Nie", Autonom: "Allein" } },
       ...["Browser steuern, mit deinen Anmeldungen", "Werkzeuge außerhalb des Projekts", "Programme installieren"].map(text => ({ text,
         stufen: { Vorsichtig: "Nie", "Nur bei Wichtigem": "Fragt dich", Autonom: "Legt es dir hin" } as const })),
