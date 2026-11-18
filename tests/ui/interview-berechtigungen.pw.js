@@ -17,7 +17,7 @@ test("Interview und Berechtigungen: bild-und-axe, Fokus und Beispielzustand", as
   const grenzen = await dialog.evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && el.scrollWidth <= el.clientWidth; });
   expect(grenzen).toBe(true);
   await page.evaluate(async () => { const { chatEingabeQuelle: q } = await import("/src/bereiche/ChatEingabe.tsx"); const d = q.lesen(); d.berechtigungen.regeln.pop(); q.aktualisieren(d); });
-  await expect.soft(dialog.locator(".ber-achse > span").nth(1)).toHaveText("4");
+  await expect.soft(dialog.locator(".ber-achse > span").nth(1)).toHaveText("5");
   await page.goto("/?beispielFehler"); await knopf.click();
   await dialog.getByRole("radio", { name: /Vorsichtig/ }).click();
   const nieFarbe = await dialog.locator('.ber-legende [data-art="Nie"] i').evaluate(el => getComputedStyle(el).backgroundColor);

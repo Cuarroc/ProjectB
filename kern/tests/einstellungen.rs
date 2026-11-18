@@ -50,6 +50,7 @@ fn speichern_laden_rundreise_und_ersetzen() {
         (AgentenGleichzeitig::BisZu5, Pruefrunden::Zwei, Plan::Ausfuehrlich),
     ] {
         let e = Einstellungen {
+            berechtigung: Default::default(),
             ausfuehren: Ausfuehren {
                 agenten_gleichzeitig: agenten,
                 pruefung_durch: PruefungDurch::GleicheFamilie,
@@ -131,6 +132,7 @@ fn json_rundreise_aller_wertekombinationen() {
                     for schaetzen in [Schalter::An, Schalter::Aus] {
                         for nachfragen in [Schalter::An, Schalter::Aus] {
                             let e = Einstellungen {
+                                berechtigung: Default::default(),
                                 ausfuehren: Ausfuehren {
                                     agenten_gleichzeitig: agenten,
                                     pruefung_durch: pruefung,
@@ -155,11 +157,13 @@ fn json_rundreise_aller_wertekombinationen() {
 fn json_schluessel_und_rueckfall_je_feld_wie_beim_laden() {
     let datei = Datei::neu();
     let gueltig = json!({
+        "berechtigung": "Nur bei Wichtigem",
         "ausfuehren": {"agentenGleichzeitig": "einer", "pruefungDurch": "gleicheFamilie", "pruefrundenHoechstens": "zwei"},
         "planen": {"plan": "ausfuehrlich", "dauerUndTokensSchaetzen": "aus", "beiUnklaremNachfragen": "aus"}
     });
     assert_eq!(als_json(&aus_json(&gueltig)), gueltig);
     let empfohlen = json!({
+        "berechtigung": "Nur bei Wichtigem",
         "ausfuehren": {"agentenGleichzeitig": "bisZu3", "pruefungDurch": "andereModellfamilie", "pruefrundenHoechstens": "drei"},
         "planen": {"plan": "normal", "dauerUndTokensSchaetzen": "an", "beiUnklaremNachfragen": "an"}
     });
@@ -237,4 +241,60 @@ fn aendern_bewahrt_lesefehler_und_andere_felder() {
     let e = aendern(&datei.0, &json!({"planen": {"plan": 42}})).unwrap();
     assert_eq!(e.planen.plan, Plan::Normal);
     assert_eq!(e.ausfuehren.pruefrunden_hoechstens, Pruefrunden::Zwei);
+}
+
+#[test]
+fn gleichzeitige_aenderungen_bleiben_alle_erhalten() {
+    let datei = Datei::neu();
+    let aenderungen = [
+        json!({"berechtigung": "Vorsichtig"}),
+        json!({"ausfuehren": {"agentenGleichzeitig": "einer"}}),
+        json!({"ausfuehren": {"pruefungDurch": "gleicheFamilie"}}),
+        json!({"ausfuehren": {"pruefrundenHoechstens": "eins"}}),
+        json!({"planen": {"plan": "kurz"}}),
+        json!({"planen": {"dauerUndTokensSchaetzen": "aus"}}),
+        json!({"planen": {"beiUnklaremNachfragen": "aus"}}),
+    ];
+    let mut erwartet = als_json(&Einstellungen::default());
+    for delta in &aenderungen {
+        erwartet = als_json(&aendern(&datei.0, delta).unwrap());
+    }
+    for runde in 0..100 {
+        speichern(&datei.0, &Einstellungen::default()).unwrap();
+        let start = std::sync::Barrier::new(aenderungen.len());
+        std::thread::scope(|threads| {
+            for delta in &aenderungen {
+                let (pfad, start) = (&datei.0, &start);
+                threads.spawn(move || {
+                    start.wait();
+                    aendern(pfad, delta).unwrap();
+                });
+            }
+        });
+        assert_eq!(serde_json::from_slice::<Value>(&fs::read(&datei.0).unwrap()).unwrap(), erwartet, "Runde {runde}");
+    }
+}
+
+#[test]
+fn berechtigung_je_projekt_und_nur_gueltige_aenderungen() {
+    let datei = Datei::neu();
+    let basis = datei.0.parent().unwrap();
+    let a = datei_fuer(basis, "projekt-a");
+    let b = datei_fuer(basis, "projekt-b");
+    fs::create_dir_all(a.parent().unwrap()).unwrap();
+    for stufe in ["Vorsichtig", "Nur bei Wichtigem", "Autonom"] {
+        let e = aendern(&a, &json!({"berechtigung": stufe, "planen": {"plan": "kurz"}})).unwrap();
+        assert_eq!(als_json(&laden(&a))["berechtigung"], stufe);
+        assert_eq!(laden(&b), Einstellungen::default());
+        for unsinn in [json!("falsch"), json!(42), Value::Null] {
+            assert_eq!(aendern(&a, &json!({"berechtigung": unsinn})).unwrap(), e);
+            assert_eq!(laden(&a).planen.plan, Plan::Kurz);
+            assert_eq!(als_json(&aus_json(&json!({"berechtigung": unsinn})))["berechtigung"], "Nur bei Wichtigem");
+        }
+        assert_eq!(
+            aendern(&a, &json!({"ausfuehren": {"pruefrundenHoechstens": "zwei"}})).unwrap().berechtigung,
+            e.berechtigung
+        );
+    }
+    assert_eq!(als_json(&laden(&b))["berechtigung"], "Nur bei Wichtigem");
 }
