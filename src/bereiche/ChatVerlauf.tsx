@@ -74,7 +74,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
       <h2 id="chat">Chat</h2>
       <span className="chat-empfaenger">An <span className="r-avatar"><Users size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /></span><strong>Orchestrator</strong></span>
       {chat?.gestartetUm && <span className="chat-laufzeit statusmarke" role="timer" aria-live="off" data-zustand="arbeitet">
-        <LaufSymbol size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />Läuft seit {laufzeit < 1 ? "weniger als 1 min" : `${laufzeit} min`}
+        <LaufSymbol size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />Läuft seit {laufzeit < 1 ? "weniger als 1 min" : laufzeit < 60 ? `${laufzeit} min` : `${Math.floor(laufzeit / 60)} h${laufzeit % 60 ? ` ${laufzeit % 60} min` : ""}`}
       </span>}
       <Knopf text="Neuer Chat" disabled={!daten.chats.length || (isTauri() && daten.rollenPfad !== daten.kopf.pfad)} onClick={() => chatAnlegen(quelle)} />
     </header>

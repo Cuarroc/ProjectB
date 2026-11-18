@@ -1,5 +1,5 @@
 .planfenster{position:fixed;inset:var(--kopf-hoehe) var(--abstand-4) var(--abstand-4);margin:0;width:auto;max-width:none;height:auto;max-height:none;padding:0;border:0;background:var(--grund);color:var(--text-1);font:var(--schrift-text);overflow:hidden}
-.planfenster[open]{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr);gap:var(--abstand-3)}
+.planfenster[open]{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(calc(var(--steuer-hoehe) * 11),1fr);gap:var(--abstand-3)}
 .planfenster::backdrop{background:var(--grund);clip-path:inset(var(--kopf-hoehe) 0 0)}
 .pl-links,.pl-rechts{min-width:0;min-height:0;display:flex;flex-direction:column;border-radius:var(--rund-bereich);background:linear-gradient(var(--flaeche-1-oben),var(--flaeche-1))}
 .pl-kopf{display:flex;align-items:center;gap:var(--abstand-4);padding:var(--abstand-4) var(--abstand-7);min-height:calc(var(--kopf-hoehe) + var(--abstand-7));box-sizing:border-box}
@@ -26,7 +26,7 @@
 .planfenster mark,.pl-marke,.pl-streifen span{transition:background-color var(--dauer-kurz) var(--kurve-raus),color var(--dauer-kurz) var(--kurve-raus),opacity var(--dauer-kurz) var(--kurve-raus)}
 .pl-werkzeuge{display:flex;flex-direction:column;gap:var(--abstand-3);overflow:auto;min-height:0;padding:var(--abstand-4) var(--abstand-6)}.pl-karte h3{font:var(--schrift-ueberschrift);margin:0}.pl-hinweis{margin:0;padding:var(--abstand-2) var(--abstand-3);border-radius:var(--rund-liste);background:var(--flaeche-1);color:var(--text-2);font:var(--schrift-klein)}
 .pl-stilknopf{border:1px solid var(--flaeche-4);border-radius:var(--rund-voll)}.pl-stilknopf[aria-pressed=true]{background:var(--akzent-grund);color:var(--akzent-text);border-color:var(--akzent)}
-.pl-fuss{display:flex;flex-direction:column;gap:var(--abstand-2);padding:var(--abstand-4) var(--abstand-6) var(--abstand-6)}.pl-fuss p{margin:0;font:var(--schrift-klein);color:var(--text-2)}.pl-fuss p:empty{display:none}.pl-fuss .knopf{min-height:calc(var(--steuer-hoehe) + var(--abstand-2));white-space:normal}
+.pl-fuss{display:flex;flex-direction:column;gap:var(--abstand-2);padding:var(--abstand-4) var(--abstand-6) var(--abstand-6)}.pl-fuss p{margin:0;font:var(--schrift-klein);color:var(--text-2)}.pl-fuss p:empty{display:none}.pl-fuss .knopf{min-height:calc(var(--steuer-hoehe) + var(--abstand-2))}
 .pl-aktionen button:hover:not(:disabled):not([aria-pressed=true]),.pl-stilknopf:hover:not(:disabled):not([aria-pressed=true]){background:var(--flaeche-3);color:var(--text-1)}.planfenster :focus-visible{outline:calc(var(--abstand-1) / 2) solid var(--akzent);outline-offset:calc(var(--abstand-1) / 2)}
 .pl-aktionen button:disabled,.pl-stilknopf:disabled{background:var(--flaeche-3);color:var(--text-aus);box-shadow:none;cursor:not-allowed;transition:none;border-color:var(--flaeche-3)}
 .pl-aktionen button:disabled svg{color:inherit}

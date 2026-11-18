@@ -1,6 +1,17 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test("Planfenster: Zurückgeben bleibt einzeilig", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Einzeiliger Knopf wird am Kandidaten geprüft.");
+  await page.goto("/"); await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();
+  const knopf = page.getByRole("button", { name: /^Mit Kommentaren zurückgeben,/ });
+  expect(await knopf.evaluate(e => {
+    const r = document.createRange(); r.selectNode(e.firstChild); return r.getClientRects().length;
+  })).toBe(1);
+  if (process.env.BILD_ORDNER && info.project.name !== "1280x800")
+    await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-8-1_planfenster_${info.project.name}.png`, animations: "disabled" });
+});
+
 test("Planfenster: Zähler hat Abstand zum Text, auch am gesperrten Knopf", async ({ page }, testInfo) => {
   test.skip(process.env.UI_BASELINE === "1", "Der Zählerabstand wird am Kandidaten geprüft.");
   await page.goto("/"); await page.evaluate(() => document.fonts.ready);

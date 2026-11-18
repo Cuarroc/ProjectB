@@ -9,9 +9,13 @@ export type AnhalteBericht = {
   lauffehler: { pid: number; meldung: string }[]; fristUeberschritten: boolean;
 };
 let teamLaeuft = false;
+let teamAnzahl = 0;
 const laufAbos = new Set<() => void>();
 export const teamLauf = {
   neu: false,
+  get anzahl() { return teamAnzahl; },
+  set anzahl(wert: number) { teamAnzahl = wert; for (const abo of laufAbos) abo(); },
+  anzahlLesen: () => teamAnzahl,
   get laeuft() { return teamLaeuft; },
   set laeuft(wert: boolean) { teamLaeuft = wert; for (const abo of laufAbos) abo(); },
   lesen: () => teamLaeuft,
