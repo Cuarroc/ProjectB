@@ -184,10 +184,10 @@ test.describe("Echte Team-Details", () => {
     await expect(review.locator(".mk-wartet")).toHaveText("Funde");
     await expect(review.locator("pre")).toHaveText(funde.review.text);
     await expect(details).toContainText("5 von 5 grün");
-    if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+    if (["1440x900", "1024x700"].includes(testInfo.project.name) && process.env.BILD_ORDNER) {
       await page.mouse.move(0, 0);
       await ganzImBereich(details.locator(".tm-det-kopf"), details);
-      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p64_funde_1440x900.png`, animations: "disabled" });
+      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p64_funde_${testInfo.project.name}.png`, animations: "disabled" });
     }
     expect((await new AxeBuilder({ page }).include(".team-spalte").analyze()).violations).toEqual([]);
     await page.evaluate(a => window.agentSenden({ ...a, zustand: "Arbeitet", review: { ...a.review, urteil: null, text: "" } }), funde);
@@ -283,12 +283,14 @@ test.describe("Echte Team-Details", () => {
   });
 
   for (const nachAnsehen of [false, true]) {
-    test(`Details schneiden oben keine Kachel an (${nachAnsehen ? "nach Ansehen" : "geöffnet"})`, async ({ page }) => {
+    test(`Details zeigen ${nachAnsehen ? "die Vorschau ganz" : "oben keine angeschnittene Kachel"}`, async ({ page }) => {
       const details = page.locator(".team-details");
       if (nachAnsehen) {
         await details.getByRole("button", { name: "Ansehen", exact: true }).first().click();
         await page.evaluate(diff => window.dateiAnfragen[0].resolve(diff), dateiDiff);
         await expect(details.getByRole("region", { name: "Vorschau" })).toHaveAttribute("aria-busy", "false");
+        await ganzImBereich(details.getByRole("region", { name: "Vorschau" }), details);
+        return;
       }
       const sichtbar = await details.boundingBox();
       for (const kachel of await details.locator(".tm-det-kopf, .tm-det-leiste, .tm-dkarte").all()) {
@@ -328,33 +330,40 @@ test.describe("Echte Team-Details", () => {
     }
   });
 
-  test("kurze Vorschau bleibt bei vielen Dateien im sichtbaren Detailbereich", async ({ page }, testInfo) => {
+  test("zwei Dateien sind ohne Scrollen vollständig sichtbar", async ({ page }) => {
+    const liste = page.locator(".team-details .tm-dateien");
+    expect(await liste.evaluate(el => el.scrollHeight === el.clientHeight)).toBe(true);
+  });
+
+  for (const langesReview of [false, true]) test(`kurze Vorschau bleibt bei vielen Dateien sichtbar (${langesReview ? "langes Review" : "ohne Review"})`, async ({ page }, testInfo) => {
     const dateien = Array.from({ length: 25 }, (_, i) => ({ pfad: `bild-${i + 1}.png`, hinzugefuegt: 0, entfernt: 0 }));
-    await page.evaluate(a => window.agentSenden(a), { ...dateiAgent, dateien });
+    await page.evaluate(a => window.agentSenden(a), { ...dateiAgent, dateien, review: langesReview ? { familie: "Claude", urteil: "FUNDE", text: "P2: Eingabe prüfen.\n".repeat(30) } : null });
     const details = page.locator(".team-details");
-    const dateikachel = details.locator(".tm-dkarte").filter({ has: page.getByRole("heading", { name: "Dateien", exact: true }) });
     const liste = details.locator(".tm-dateien");
-    const masse = await liste.evaluate(el => ({ hoehe: el.clientHeight, inhalt: el.scrollHeight }));
+    const masse = await liste.evaluate(el => ({ hoehe: el.clientHeight, inhalt: el.scrollHeight,
+      zeile: el.firstElementChild.getBoundingClientRect().height, luecke: parseFloat(getComputedStyle(el).gap) }));
     expect(masse.inhalt).toBeGreaterThan(masse.hoehe);
+    expect((masse.hoehe + masse.luecke) % (masse.zeile + masse.luecke)).toBe(0);
+    await ganzImBereich(details.locator(".tm-det-kopf"), details);
+    expect(await details.evaluate(el => el.scrollTop)).toBe(0);
     await details.getByRole("button", { name: "Ansehen", exact: true }).last().click();
     await page.evaluate(() => window.dateiAnfragen[0].resolve("Binärdatei, keine Vorschau."));
     const vorschau = details.getByRole("region", { name: "Vorschau" });
     await expect(vorschau.locator("pre")).toHaveText("Binärdatei, keine Vorschau.");
     await expect(vorschau).toBeFocused();
-    await ganzImBereich(details.locator(".tm-det-kopf"), details);
-    await ganzImBereich(details.locator(".tm-det-leiste"), details);
-    await ganzImBereich(details.getByRole("heading", { name: "Kennzahlen" }), details);
-    await ganzImBereich(dateikachel, details);
-    expect(await details.evaluate(el => el.scrollTop)).toBe(0);
     const ende = await details.locator(".tm-det").boundingBox();
     const innen = await details.evaluate(el => parseFloat(getComputedStyle(el).paddingBottom));
     const inhalt = await details.evaluate(el => el.scrollHeight);
     expect(Math.abs(inhalt - ende.height - innen * 2)).toBeLessThanOrEqual(1);
-    if (page.viewportSize().height === 900) await ganzImBereich(vorschau, details);
-    if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+    await ganzImBereich(vorschau, details);
+    if (!langesReview && ["1440x900", "1024x700"].includes(testInfo.project.name) && process.env.BILD_ORDNER) {
       await page.mouse.move(0, 0);
-      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53h_viele-dateien_1440x900.png`, animations: "disabled" });
+      await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53h_viele-dateien_${testInfo.project.name}.png`, animations: "disabled" });
     }
+    await vorschau.getByRole("button", { name: "Vorschau schließen" }).click();
+    await details.getByRole("button", { name: "Protokoll öffnen" }).click();
+    await expect(vorschau).toBeFocused();
+    await ganzImBereich(vorschau, details);
   });
 
   test("Angehalten hat keinen goldenen Rand; Wartet auf dich behält ihn", async ({ page }, testInfo) => {

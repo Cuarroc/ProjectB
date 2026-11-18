@@ -197,10 +197,27 @@ test("Laufendes Team sperrt zweite Freigabe und behält Karten und Stoppmarken",
   await expect(freigabe).toBeDisabled();
   expect(await page.evaluate(async () => (await import("/src/daten/tauri.ts")).teamLauf.neu)).toBe(false);
   expect(await page.evaluate(() => JSON.parse(localStorage.planChats).chats[0].verlauf.at(-1).plan.freigabe)).toBe("Wartet auf dich");
-  if (testInfo.project.name === "1440x900" && process.env.BILD_ORDNER) {
+
+  await page.getByRole("button", { name: "Plan öffnen", exact: true }).last().click();
+  const dialog = page.getByRole("dialog"), bauen = dialog.getByRole("button", { name: "Freigeben und bauen", exact: true });
+  await expect(bauen).toBeDisabled();
+  await expect(bauen).toHaveAttribute("aria-disabled", "true");
+  await expect(bauen).toHaveAttribute("title", "Das letzte Team läuft noch oder ist nicht gesichert.");
+  const schritt = dialog.locator(".pl-schritt").first();
+  await schritt.getByRole("button", { name: "Kommentar, Silbergrau", exact: true }).click();
+  await schritt.getByRole("textbox").fill("Bitte Eingabe prüfen.");
+  await schritt.getByRole("button", { name: "Simpler, Türkis", exact: true }).click();
+  await expect(schritt.getByRole("button", { name: "Simpler, Türkis", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await dialog.locator(".pl-stilknopf").filter({ hasText: "Vorsichtiger" }).click();
+  await expect(dialog.getByRole("button", { name: "Neu schreiben lassen", exact: true })).toBeEnabled();
+  if (["1440x900", "1024x700"].includes(testInfo.project.name) && process.env.BILD_ORDNER) {
     await page.evaluate(() => document.fonts.ready);
-    await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53e2_startsperre_1440x900.png`, animations: "disabled" });
+    await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53e2_startsperre_${testInfo.project.name}.png`, animations: "disabled" });
   }
+  await dialog.getByRole("button", { name: /^Mit Kommentaren zurückgeben/ }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText(/Bitte Eingabe prüfen\./).last()).toBeVisible();
+  expect(await page.evaluate(() => window.starts.length)).toBe(1);
   await page.locator(".team-echt").getByRole("button", { name: "Alles anhalten", exact: true }).click();
   await expect(freigabe).toBeEnabled();
 });
@@ -213,4 +230,17 @@ test("Beendete Agenten mit Problem oder Frage lassen einen neuen Start zu", asyn
   const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" }); await feld.fill("Plane neu"); await feld.press("Enter");
   await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.starts.length)).toBe(2);
+});
+
+test("Kern lehnt Teamstart ab und zeigt den Sperrgrund", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Teamstart wird am Kandidaten geprüft.");
+  await page.goto("/");
+  await page.evaluate(() => {
+    const invoke = window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke = (cmd, args) => cmd === "team_starten"
+      ? Promise.reject("Das letzte Team läuft noch oder ist nicht gesichert.") : invoke(cmd, args);
+  });
+  await page.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  await expect(page.getByText("Das letzte Team läuft noch oder ist nicht gesichert.", { exact: true })).toBeVisible();
+  await expect(page.locator(".team-echt [data-agent]")).toHaveCount(0);
 });

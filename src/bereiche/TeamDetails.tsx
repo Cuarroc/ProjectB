@@ -49,10 +49,9 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
   }, [agent.id]);
   useLayoutEffect(() => {
     if (!vorschau) return;
-    if (echt) bereich.current?.scrollTo({ top: 0 });
-    else vorschauBereich.current?.scrollIntoView({ block: "nearest" });
+    vorschauBereich.current?.scrollIntoView({ block: "nearest" });
     vorschauBereich.current?.focus({ preventScroll: true });
-  }, [vorschau]);
+  }, [vorschau, datei]);
   const zu = () => {
     const knopf = [...bereich.current?.closest(".team-bereich")?.querySelectorAll<HTMLElement>(`[data-agent="${agent.id}"] [aria-expanded="true"]`) ?? []].find(el => el.getClientRects().length);
     schliessen(); knopf?.focus({ preventScroll: true });
