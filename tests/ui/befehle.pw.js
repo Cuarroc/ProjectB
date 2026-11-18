@@ -43,8 +43,8 @@ test("/interview mit Senden wechselt den Modus ohne neue Nachricht", async ({ pa
 });
 test("/neu legt einen Chat an; Liste, Tastatur und Bilder", async ({ page }, info) => {
   const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" }); await feld.fill("/");
-  const liste = page.getByRole("listbox", { name: "Befehle" }); await expect(liste.getByRole("option")).toHaveCount(4);
-  await expect(feld).toHaveAttribute("aria-activedescendant", "befehl-neu");
+  const liste = page.getByRole("listbox", { name: "Befehle" }); await expect(liste.getByRole("option")).toHaveCount(5);
+  await expect(feld).toHaveAttribute("aria-activedescendant", "befehl-kompakt");
   expect((await new AxeBuilder({ page }).include(".chat-eingabe").analyze()).violations).toEqual([]);
   const r = await page.locator(".ein-befehle").boundingBox(); expect(r.y).toBeGreaterThanOrEqual(0);
   expect(r.x + r.width).toBeLessThanOrEqual(info.project.use.viewport.width);
@@ -55,7 +55,7 @@ test("/neu legt einen Chat an; Liste, Tastatur und Bilder", async ({ page }, inf
   }
   await feld.press("Escape"); await expect(liste).toHaveCount(0); await feld.fill("/xyz");
   await expect(page.getByText("Kein Befehl gefunden")).toBeVisible();
-  await feld.fill("/"); await feld.press("ArrowDown"); await expect(feld).toHaveAttribute("aria-activedescendant", "befehl-planen");
+  await feld.fill("/"); await feld.press("ArrowDown"); await feld.press("ArrowDown"); await expect(feld).toHaveAttribute("aria-activedescendant", "befehl-planen");
   await feld.press("ArrowUp"); await feld.press("Enter"); await expect(feld).toHaveValue("");
   await expect(page.locator(".rand-chat")).toHaveCount(2); await expect(page.locator(".rand-chat").last()).toContainText("Neuer Chat");
 });
@@ -67,4 +67,27 @@ test("/anhalten ist ohne Lauf gesperrt und hält den echten Teamweg an", async (
   await page.evaluate(() => window.agent("Arbeitet")); await expect(option).toBeEnabled(); await expect(option).toContainText("1 laufen");
   await option.click(); await expect.poll(() => page.evaluate(() => window.stopps)).toEqual([{}]); await expect(feld).toHaveValue("");
   await feld.fill("/anhalten"); await expect(option).toBeDisabled();
+});
+
+test("/kompakt speichert die Zusammenfassung und gibt den Kontext frei", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Zusammenfassen fehlt im Basisstand.");
+  await page.evaluate(() => {
+    const invoke = window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
+      if (cmd !== "auftrag_senden") return invoke(cmd, args);
+      window.listener.forEach((event, id) => { if (event === "chat-nachricht") window.callbacks[id]({ event, id,
+        payload: { chat: args.chat, text: "Ziel: CSV-Export. Offen: Tests. Datei: export.rs." } }); });
+      return { erfolg: true, sitzung: { id: "kompakt", anbieter: "Claude", pfad: args.pfad } };
+    };
+  });
+  const feld = page.locator("#chat-nachricht"); await feld.fill("/");
+  const erste = page.getByRole("option").first(); await expect(erste).toContainText("/kompakt"); await expect(erste).toContainText(/\d+ % belegt/);
+  if (process.env.BILD_ORDNER && info.project.name !== "1280x800") {
+    await page.evaluate(() => document.fonts.ready); await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-8-2_kompakt_${info.project.name}.png`, animations: "disabled" });
+  }
+  await erste.click();
+  await expect(page.locator(".r-msg-name").last()).toHaveText("Zusammenfassung (Kontext freigegeben)");
+  await expect(page.locator(".r-msg-text").last()).toHaveText("Ziel: CSV-Export. Offen: Tests. Datei: export.rs.");
+  await expect(page.getByRole("button", { name: /^Kontext 0 % ·/ })).toBeVisible();
 });

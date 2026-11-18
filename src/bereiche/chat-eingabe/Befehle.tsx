@@ -1,17 +1,23 @@
 import { useState, useSyncExternalStore, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { ListChecks, MessageSquarePlus, MessagesSquare, OctagonPause } from "lucide-react";
+import { ListChecks, MessageSquarePlus, MessagesSquare, Minimize2, OctagonPause } from "lucide-react";
 import { teamLauf } from "../../daten/tauri";
+import type { Chat } from "../../daten/typen";
 import { useAnhalten } from "../anhalten";
 
+export const kompaktSperrgrund = (chat: Chat, laeuft: boolean, projektOffen: boolean) => laeuft || !!chat.gestartetUm
+  ? "Dieser Chat läuft bereits. Bitte warte auf die Antwort." : !chat.verlauf.some(n => n.von === "Orchestrator")
+    ? "Noch nichts zusammenzufassen" : !projektOffen ? "Bitte zuerst oben ein Projekt öffnen." : "";
+
 const befehle = [
+  { name: "kompakt", text: "Verlauf zusammenfassen, Kontext wird frei", Symbol: Minimize2 },
   { name: "neu", text: "Neuen Chat beginnen", Symbol: MessageSquarePlus },
   { name: "planen", text: "Zum Modus Planen wechseln", Symbol: ListChecks },
   { name: "interview", text: "Zum Modus Interview wechseln", Symbol: MessagesSquare },
   { name: "anhalten", text: "Alle Agenten anhalten", Symbol: OctagonPause },
 ];
-export function Befehle({ text, anzahl = 0, neuGesperrt = false, ausfuehren, children }: {
-  text: string; anzahl?: number; neuGesperrt?: boolean; ausfuehren: (name: string) => void;
+export function Befehle({ text, anzahl = 0, neuGesperrt = false, kompaktGrund = "", kontextProzent = 0, ausfuehren, children }: {
+  text: string; kompaktGrund?: string; kontextProzent?: number; anzahl?: number; neuGesperrt?: boolean; ausfuehren: (name: string) => void;
   children: (feld: TextareaHTMLAttributes<HTMLTextAreaElement>, abfangen: (text: string) => boolean, fehler: string) => ReactNode;
 }) {
   const [geschlossen, schliessen] = useState(false), [index, waehlen] = useState(0);
@@ -20,12 +26,12 @@ export function Befehle({ text, anzahl = 0, neuGesperrt = false, ausfuehren, chi
   const laufend = isTauri() ? echt : pause ? 0 : anzahl;
   const liste = befehle.filter(b => b.name.startsWith(text.slice(1).toLowerCase()));
   const offen = /^\/\S*$/.test(text) && !geschlossen;
-  const gesperrt = (name: string) => (name === "neu" && neuGesperrt) || (name === "anhalten" && !laufend);
+  const gesperrt = (name: string) => (name === "kompakt" && !!kompaktGrund) || (name === "neu" && neuGesperrt) || (name === "anhalten" && !laufend);
   const aktiv = liste[Math.min(index, liste.length - 1)];
   const auswahl = (inhalt: string) => {
     const befehl = befehle.find(b => `/${b.name}` === inhalt.trim().toLowerCase());
     if (!befehl) return false;
-    if (gesperrt(befehl.name)) melden(befehl.name === "neu" ? "Rollen laden …" : "Kein Agent läuft.");
+    if (gesperrt(befehl.name)) melden(befehl.name === "kompakt" ? kompaktGrund : befehl.name === "neu" ? "Rollen laden …" : "Kein Agent läuft.");
     else { melden(""); ausfuehren(befehl.name); schliessen(true); }
     return true;
   };
@@ -38,6 +44,7 @@ export function Befehle({ text, anzahl = 0, neuGesperrt = false, ausfuehren, chi
           aria-selected={aktiv?.name === name} disabled={gesperrt(name)} onMouseDown={e => e.preventDefault()} onClick={() => auswahl(`/${name}`)}>
           <span className="ein-befehl-symbol"><Symbol size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /></span>
           <span><code>/{name}</code><small>{text}</small></span>
+          {name === "kompakt" && <small>{kompaktGrund || `${Math.round(kontextProzent)} % belegt`}</small>}
           {name === "anhalten" && <small>{laufend ? `${laufend} laufen` : "Kein Agent läuft"}</small>}
           {name === "neu" && neuGesperrt && <small>Rollen laden …</small>}
         </button>)}
