@@ -251,7 +251,6 @@ test.describe("Echte Team-Details", () => {
     await expect(vorschau.locator("pre")).toHaveText(dateiDiff);
     await expect(vorschau.locator(".tm-diff-plus")).toHaveText("+neu");
     await expect(vorschau.locator(".tm-diff-minus")).toHaveText("-alt");
-    await vorschau.locator(".tm-diff-plus").scrollIntoViewIfNeeded();
     await expect(vorschau.locator(".tm-diff-plus")).toBeInViewport();
     expect(await vorschau.locator(".tm-diff-plus").evaluate(el => getComputedStyle(el).color))
       .not.toBe(await vorschau.locator(".tm-diff-minus").evaluate(el => getComputedStyle(el).color));
@@ -280,6 +279,19 @@ test.describe("Echte Team-Details", () => {
       await vorschau.getByRole("button", { name: "Vorschau schließen" }).click();
       await expect(knoepfe.first()).toBeFocused();
     }
+  });
+
+  test("späte Dateiinhalte lassen den Fokus im Chat", async ({ page }) => {
+    const details = page.locator("#team-details"), vorschau = details.getByRole("region", { name: "Vorschau" });
+    await details.getByRole("button", { name: "Ansehen", exact: true }).first().click();
+    await expect(vorschau).toBeFocused();
+    const eingabe = page.getByPlaceholder("Schreib, was gebaut werden soll …");
+    await eingabe.focus();
+    const scrollTop = await details.evaluate(el => el.scrollTop);
+    await page.evaluate(diff => window.dateiAnfragen[0].resolve(diff), dateiDiff);
+    await expect(vorschau.locator("pre")).toHaveText(dateiDiff);
+    await expect(eingabe).toBeFocused();
+    expect(await details.evaluate(el => el.scrollTop)).toBe(scrollTop);
   });
 
   for (const nachAnsehen of [false, true]) {
@@ -356,6 +368,8 @@ test.describe("Echte Team-Details", () => {
     const inhalt = await details.evaluate(el => el.scrollHeight);
     expect(Math.abs(inhalt - ende.height - innen * 2)).toBeLessThanOrEqual(1);
     await ganzImBereich(vorschau, details);
+    const kopf = await details.locator(".tm-det-kopf").boundingBox(), rand = await details.boundingBox();
+    expect(kopf.y < rand.y && kopf.y + kopf.height > rand.y, "Kopf am oberen Scrollrand angeschnitten").toBe(false);
     if (!langesReview && ["1440x900", "1024x700"].includes(testInfo.project.name) && process.env.BILD_ORDNER) {
       await page.mouse.move(0, 0);
       await page.screenshot({ path: `${process.env.BILD_ORDNER}/PR-p53h_viele-dateien_${testInfo.project.name}.png`, animations: "disabled" });

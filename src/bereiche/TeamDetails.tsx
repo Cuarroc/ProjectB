@@ -49,14 +49,18 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
   }, [agent.id]);
   useLayoutEffect(() => {
     if (!vorschau) return;
-    vorschauBereich.current?.scrollIntoView({ block: "nearest" });
     vorschauBereich.current?.focus({ preventScroll: true });
+  }, [vorschau]);
+  useLayoutEffect(() => {
+    if (vorschauBereich.current?.contains(document.activeElement)) {
+      vorschauBereich.current.scrollIntoView({ block: "nearest" });
+    }
   }, [vorschau, datei]);
   const zu = () => {
     const knopf = [...bereich.current?.closest(".team-bereich")?.querySelectorAll<HTMLElement>(`[data-agent="${agent.id}"] [aria-expanded="true"]`) ?? []].find(el => el.getClientRects().length);
     schliessen(); knopf?.focus({ preventScroll: true });
   };
-  const oeffnen = (e: React.MouseEvent<HTMLButtonElement>, inhalt: string) => { anfrage.current++; setDatei(null); vorschauKnopf.current = e.currentTarget; zeige(inhalt); };
+  const oeffnen = (e: React.MouseEvent<HTMLButtonElement>, inhalt: string) => { anfrage.current++; setDatei(null); vorschauKnopf.current = e.currentTarget; zeige(inhalt); vorschauBereich.current?.focus({ preventScroll: true }); };
   const ansehen = async (e: React.MouseEvent<HTMLButtonElement>, pfad: string) => {
     oeffnen(e, pfad);
     if (!echt) return;
@@ -94,7 +98,7 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
             <p>{agent.tests.gruen} von {agent.tests.gesamt} grün{rot && ` · Um ${rot.zeit} waren ${rot.rot} rot, der Agent hat sie repariert`}</p></> : <p>Noch keine Tests</p>}</section></>}
         {echt && <section className="tm-dkarte tm-tests"><h4>Tests</h4><p>{agent.tests ? `${agent.tests.gruen} von ${agent.tests.gesamt} grün` : "Noch keine Tests"}</p></section>}
         <section className="tm-dkarte"><h4>Dateien</h4><ul className="tm-dateien">{agent.dateien.map(d => <li key={d.pfad}><span><code>{d.pfad}</code><small>+{d.hinzugefuegt} −{d.entfernt}</small></span><Knopf text="Ansehen" onClick={e => ansehen(e, d.pfad)} /></li>)}</ul>{!agent.dateien.length && <p>Noch keine Dateien</p>}</section>
-        {!echt && <section className="tm-dkarte"><h4>Ausgaben</h4><ul className="tm-dateien">{ausgaben.map(a => <li key={a.id}><span>{a.name}<small>{a.pfad}</small></span><Knopf text="Ansehen" onClick={e => { vorschauKnopf.current = e.currentTarget; zeige(a.pfad); }} /></li>)}</ul>{!ausgaben.length && <p>Noch keine Ausgaben</p>}</section>}
+        {!echt && <section className="tm-dkarte"><h4>Ausgaben</h4><ul className="tm-dateien">{ausgaben.map(a => <li key={a.id}><span>{a.name}<small>{a.pfad}</small></span><Knopf text="Ansehen" onClick={e => oeffnen(e, a.pfad)} /></li>)}</ul>{!ausgaben.length && <p>Noch keine Ausgaben</p>}</section>}
         {beleg && agent.zustand === "Fertig" && <section className="tm-dkarte tm-breit"><h4>Beleg</h4><p>{beleg.titel}</p><PrLink url={beleg.prLink} /></section>}
         {agent.review && <section className="tm-dkarte tm-breit"><h4>Review</h4>
           <div className="tm-det-leiste"><span>{agent.review.familie}</span>{agent.review.urteil && <Statusmarke zustand={agent.review.urteil === "OK" ? "fertig" : "wartet"} wort={agent.review.urteil === "OK" ? "OK" : "Funde"} />}</div>
