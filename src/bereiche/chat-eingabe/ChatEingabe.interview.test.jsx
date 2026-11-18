@@ -12,7 +12,7 @@ vi.mock("react", async original => ({ ...await original(),
   useRef: initial => h.refs[h.r++] ??= { current: initial }, useEffect: fn => h.effekte.push(fn),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => true }));
-vi.mock("../../daten/tauri", () => ({ auftragSenden: vi.fn(), chatNachrichtenHoeren: vi.fn() }));
+vi.mock("../../daten/tauri", async original => ({ ...await original(), auftragSenden: vi.fn(), chatNachrichtenHoeren: vi.fn() }));
 let quelle, empfangen, aufraeumen, beenden;
 const ansicht = () => { h.i = 0; h.r = 0; h.effekte = []; return useChatEingabe(quelle); };
 const chat = () => quelle.lesen().chats[0];

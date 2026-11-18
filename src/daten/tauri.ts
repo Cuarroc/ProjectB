@@ -8,7 +8,15 @@ export type AnhalteBericht = {
   ordner: { ordner: string; status: "gesichert" | "sauber" | "fehler"; sha?: string; meldung?: string }[];
   lauffehler: { pid: number; meldung: string }[]; fristUeberschritten: boolean;
 };
-export const teamLauf = { neu: false, laeuft: false };
+let teamLaeuft = false;
+const laufAbos = new Set<() => void>();
+export const teamLauf = {
+  neu: false,
+  get laeuft() { return teamLaeuft; },
+  set laeuft(wert: boolean) { teamLaeuft = wert; for (const abo of laufAbos) abo(); },
+  lesen: () => teamLaeuft,
+  abonnieren: (abo: () => void) => { laufAbos.add(abo); return () => { laufAbos.delete(abo); }; },
+};
 export async function teamStarten(pfad: string, auftraege: TeamAuftrag[]): Promise<void> {
   if (!isTauri()) return;
   if (teamLauf.laeuft) throw new Error("Das letzte Team läuft noch oder ist nicht gesichert.");
