@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Check, ChevronRight, Circle, Copy, MessageCircleQuestion, Users } from "lucide-react";
 import { BeispielQuelle } from "../daten/quelle";
+import { isTauri } from "@tauri-apps/api/core";
 import { chatAnlegen } from "../daten/chats";
 import { Knopf } from "../bausteine/Knopf";
 import { Fortschrittsring } from "../bausteine/Fortschrittsring";
@@ -75,7 +76,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
       {chat?.gestartetUm && <span className="chat-laufzeit statusmarke" role="timer" aria-live="off" data-zustand="arbeitet">
         <LaufSymbol size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />Läuft seit {laufzeit < 1 ? "weniger als 1 min" : `${laufzeit} min`}
       </span>}
-      <Knopf text="Neuer Chat" disabled={!daten.chats.length} onClick={() => chatAnlegen(quelle)} />
+      <Knopf text="Neuer Chat" disabled={!daten.chats.length || (isTauri() && daten.rollenPfad !== daten.kopf.pfad)} onClick={() => chatAnlegen(quelle)} />
     </header>
     <AnhalteHinweis pause={pause} />
     <div className="chat-verlauf" role="log" aria-label="Chatverlauf" aria-relevant="additions text">

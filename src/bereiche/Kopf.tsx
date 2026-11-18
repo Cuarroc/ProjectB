@@ -8,6 +8,7 @@ import "../bausteine/Eingabefeld.css";
 import { PostfachKnopf } from "./PostfachKnopf";
 import "./Kopf.css";
 import Berechtigungen from "./Berechtigungen";
+import Rollen from "./Rollen";
 import { AnhalteKnopf, AnhalteMarke, useAnhalten } from "./anhalten";
 import { frageTon } from "./fragenHinweise";
 
@@ -22,7 +23,7 @@ function KopfMenue({ name, inhalt, children, klasse = "", beschriftung = name, f
   const zu = () => { zeige(false); if (ort.current?.contains(document.activeElement)) knopf.current?.focus(); };
   useEffect(() => {
     if (!offen) { beimSchliessen?.(); return; }
-    (ort.current?.querySelector<HTMLInputElement>("input") ?? ort.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]') ?? ort.current?.querySelector<HTMLButtonElement>('[role^=menuitem]'))?.focus();
+    (ort.current?.querySelector<HTMLElement>("input, select:not(:disabled)") ?? ort.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]') ?? ort.current?.querySelector<HTMLButtonElement>('[role^=menuitem]'))?.focus();
     const daneben = (e: PointerEvent) => { if (!ort.current?.contains(e.target as Node)) zeige(false); };
     document.addEventListener("pointerdown", daneben); return () => document.removeEventListener("pointerdown", daneben);
   }, [offen, formular]);
@@ -140,8 +141,8 @@ export default function Kopf() {
     <Berechtigungen daten={daten.berechtigungen} quelle={chatEingabeQuelle} />
     <PostfachKnopf daten={daten} quelle={chatEingabeQuelle} />
     <span className="anhalte-kopf">{pause && <AnhalteMarke />}<AnhalteKnopf pause={pause} /></span>
-    <KopfMenue name="Rollen" klasse="kopf-rollen" inhalt={<><IdCard {...symbol} /><span>Rollen</span></>}>
-      <h2 role="presentation">Rollen</h2>{["Orchestrator", "Arbeiter Codex", "Prüfer Claude"].map(r => <button type="button" role="menuitem" aria-disabled="true" tabIndex={-1} key={r}>{r}</button>)}
-    </KopfMenue>
+    <Rollen daten={daten} quelle={chatEingabeQuelle}>{inhalt => <KopfMenue name="Rollen" klasse="kopf-rollen" formular inhalt={<><IdCard {...symbol} /><span>Rollen</span></>}>
+      {inhalt}
+    </KopfMenue>}</Rollen>
   </header>;
 }
