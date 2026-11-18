@@ -9,9 +9,9 @@ import "./Berechtigungen.css";
 
 const symbol = { size: 16, strokeWidth: 1.5, absoluteStrokeWidth: true, "aria-hidden": true } as const;
 const hinweise = ["Claude: Bash nur zum Lesen und für Tests.", "Claude: Bash auch für Build, add und commit.", "Claude: Bash frei. Die Sperrliste bleibt."];
-const saetze = ["Codex: alles in der Arbeitskopie, ohne Netz.", "Codex: alles in der Arbeitskopie, ohne Netz.", "Codex: alles in der Arbeitskopie, mit Netz."];
+const saetze = ["Codex: nur lesen, ändert nichts.", "Codex: alles in der Arbeitskopie, ohne Netz.", "Codex: alles in der Arbeitskopie, mit Netz."];
 const technik = ["Claude-Bash: Lesen und Tests", "Claude-Bash: Lesen, Tests, Build, add und commit", "Claude-Bash: frei"].map((bash, i) =>
-  `Claude: acceptEdits, Sperrliste bleibt · ${bash} · Codex: workspace-write, approval never · Netz für Codex: ${i === 2 ? "an" : "aus"}`);
+  `Claude: acceptEdits, Sperrliste bleibt · ${bash} · Codex: ${i === 0 ? "read-only" : "workspace-write"}, approval never · Netz für Codex: ${i === 2 ? "an" : "aus"}`);
 const arten = ["Allein", "Fragt dich", "Legt es dir hin", "Nie"] as const;
 const symbole = { Allein: Check, "Fragt dich": Circle, "Legt es dir hin": Mail, Nie: Lock };
 export function stufeUebernehmen(quelle: BeispielQuelle, stufe: Berechtigungsstufe, probe: boolean) {

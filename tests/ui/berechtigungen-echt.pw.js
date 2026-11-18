@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("Berechtigungen im Tauri-Betrieb: laden, übernehmen, neu laden und Speicherfehler", async ({ page }, info) => {
-  test.skip(process.env.UI_BASELINE === "1", "Neue Paketoberfläche fehlt im Basisstand.");
+  test.skip(process.env.UI_BASELINE === "1", "Codex arbeitet in Vorsichtig erst seit Paket 5b nur lesend.");
   await page.addInitScript(() => {
     window.isTauri = true; window.aenderungen = [];
     const geladen = new Promise(resolve => { window.ladenFortsetzen = resolve; });
@@ -29,7 +29,14 @@ test("Berechtigungen im Tauri-Betrieb: laden, übernehmen, neu laden und Speiche
   await page.reload(); await page.evaluate(() => window.ladenFortsetzen()); await expect(knopf).toHaveAccessibleName("Berechtigungen: Autonom");
   await knopf.click(); await dialog.getByRole("radio", { name: /Vorsichtig/ }).click();
   await expect(dialog.getByRole("listitem").filter({ hasText: "Claude: Build, git add und git commit" })).toContainText("Nie");
-  await expect(dialog.getByRole("listitem").filter({ hasText: "Codex: alles in der Arbeitskopie, Netz nur bei Autonom" })).toContainText("Allein");
+  await expect(dialog.getByRole("radio", { name: /Vorsichtig/ })).toContainText("Codex: nur lesen, ändert nichts.");
+  await expect(dialog.getByRole("listitem").filter({ hasText: "Codex: alles in der Arbeitskopie, Netz nur bei Autonom" })).toContainText("Nie");
+  await expect(dialog.locator(".ber-technik")).toContainText("Codex: read-only, approval never");
+  await expect(dialog.locator(".ber-technik")).toContainText("Netz für Codex: aus");
+  if (process.env.BILD_ORDNER && info.project.name !== "1280x800") {
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-7-5b_vorsichtig_${info.project.name}.png`, animations: "disabled" });
+  }
   await page.evaluate(() => { window.speicherFehler = true; });
   await dialog.getByRole("button", { name: "Übernehmen" }).click();
   await expect(dialog.locator("#ber-meldung")).toHaveText("Nicht gespeichert: Kein Zugriff");
