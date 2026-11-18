@@ -9,6 +9,9 @@ import { Eingabefeld } from "../bausteine/Eingabefeld";
 import { Modi, Auswahl, Kontext, EffortSymbol, efforts, erklaerungen, modi } from "./chat-eingabe/Auswahlen";
 import "./chat-eingabe/ChatEingabe.css";
 import { Einstellungen } from "./chat-eingabe/Einstellungen";
+import { Befehle } from "./chat-eingabe/Befehle";
+import { chatAnlegen, neuerChatGesperrt } from "../daten/chats";
+import { allesAnhalten } from "./anhalten";
 
 export const chatEingabeQuelle = new BeispielQuelle();
 const planAktionen = [
@@ -64,15 +67,18 @@ function orchestratorNachricht(quelle: BeispielQuelle, id: string, text: string,
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Orchestrator", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
   quelle.aktualisieren(daten);
 }
-export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false, aendern, schreiben, senden }: {
+export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false, aendern, schreiben, senden, befehl = () => {}, anzahl = 0, neuGesperrt = false }: {
   chat: Chat; modelle: string[]; text: string; fehler: string;
   laeuft?: boolean;
+  befehl?: (name: string) => void; anzahl?: number; neuGesperrt?: boolean;
   aendern: (werte: Partial<Chat>) => void; schreiben: (text: string) => void; senden: (text: string) => void;
 }) {
   return <footer className="chat-eingabe">
     {laeuft && <p className="ein-arbeitet" id="chat-arbeitet" role="status">Orchestrator arbeitet … Bitte warte vor dem nächsten Senden.</p>}
     <span className="ein-sr" id="modus-hilfe">{erklaerungen[modi.indexOf(chat.modus)]}</span>
-    <Eingabefeld id="chat-nachricht" text={text} onTextAendern={schreiben} onSenden={senden} fehler={fehler}
+    <Befehle key={chat.id} text={text} anzahl={anzahl} neuGesperrt={neuGesperrt} ausfuehren={name => { befehl(name); schreiben(""); }}>{(feld, abfangen, befehlFehler) =>
+    <Eingabefeld feld={feld} id="chat-nachricht" text={text} onTextAendern={schreiben}
+      onSenden={inhalt => { if (!abfangen(inhalt)) senden(inhalt); }} fehler={befehlFehler || fehler}
       ohneAnhaengen sendet={laeuft} beschreibungId={laeuft ? "modus-hilfe chat-arbeitet" : "modus-hilfe"}
       kopf={<div className="ein-moduszeile"><Modi wert={chat.modus} aendern={modus => aendern({ modus: modus as Chat["modus"] })} /><Einstellungen modus={chat.modus} /></div>}
       werkzeuge={<>
@@ -83,7 +89,7 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false
           <EffortSymbol wert={chat.effort} /><span className="wort">Effort</span>{" "}{chat.effort}
         </Auswahl>
         <Kontext chat={chat} aendern={aendern} />
-      </>} />
+      </>} />}</Befehle>
   </footer>;
 }
 export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: BeispielQuelle }) {
@@ -181,6 +187,10 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (kommentar !== undefined) return senden(kommentar);
     schreiben(text.startsWith("Kommentare zum Plan: ") ? text : `Kommentare zum Plan: ${text}`); document.getElementById("chat-nachricht")?.focus();
   };
-  return { chat, modelle: ["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"],
+  return { chat, neuGesperrt: neuerChatGesperrt(daten), modelle: ["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"],
+    anzahl: daten.agenten.filter(a => a.zustand === "Arbeitet").length,
+    befehl: (name: string) => { if (name === "neu") chatAnlegen(quelle);
+      else if (name === "anhalten") allesAnhalten.setzen(true);
+      else if (name === "planen" || name === "interview") aendern({ modus: name === "planen" ? "Planen" : "Interview" }); },
     text, fehler, laeuft: laufende.current.has(chat.id), aendern, schreiben, senden, onAktion };
 }
