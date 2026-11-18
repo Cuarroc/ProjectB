@@ -25,6 +25,11 @@ test("Team-Details: Tastatur, Beleg, Vorschau, Bewegung und bild-und-axe", async
     expect(k.y - achse.y - achse.height).toBeLessThanOrEqual(12);
     expect(k.y).toBeGreaterThanOrEqual(achse.y + achse.height);
     await expect(details.locator(".tm-det-leiste")).toContainText("Arbeitet · testet");
+    expect(await details.locator(".tm-det-leiste, .tm-status").evaluateAll(zeilen => zeilen.every(el =>
+      el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight))).toBe(true);
+    if (modus === "reduziert" && process.env.BILD_ORDNER && testInfo.project.name !== "1280x800") {
+      await page.mouse.move(0, 0); await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-7-5_team-status_${testInfo.project.name}.png`, animations: "disabled" });
+    }
     await expect(details.getByRole("button", { name: "Protokoll öffnen" })).toBeVisible();
     await expect(details.getByRole("button", { name: "Agent fragen" })).toBeVisible();
     await expect(details.getByRole("img", { name: /Testverlauf/ })).toBeVisible();

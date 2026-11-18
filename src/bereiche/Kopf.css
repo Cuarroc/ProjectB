@@ -79,3 +79,6 @@
 .rollen-zeile select:focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); }
 .rollen-formular p { grid-column: 1 / -1; margin: 0; max-width: calc(16 * var(--abstand-8)); color: var(--text-2); }
 .rollen-formular #rollen-fehler:empty { display: none; }
+.rollen-formular #rollen-fehler:has(svg) { display: flex; align-items: center; gap: var(--abstand-2); color: var(--status-problem); }
+.rollen-formular #rollen-fehler svg { flex: none; width: var(--abstand-6); height: var(--abstand-6); }
+.rollen-formular #rollen-fehler span { min-width: 0; overflow-wrap: anywhere; }
