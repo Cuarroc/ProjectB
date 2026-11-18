@@ -56,7 +56,10 @@ export type Berechtigungen = {
   regeln: { text: string; stufen: Record<Berechtigungsstufe, "Allein" | "Fragt dich" | "Legt es dir hin" | "Nie"> }[];
   giltImmer: string[];
 };
+export type Rolle = Pick<Chat, "modell" | "effort">;
+export type Rollen = { orchestrator: Rolle; reviewer: { claude: Rolle; codex: Rolle } };
 export type Datenstand = {
+  rollen: Rollen; rollenPfad?: string;
   chats: Chat[]; aktiverChatId: string | null;
   agenten: Agent[]; plan: Plan; fragen: Frage[]; todos: Todo[];
   ausgaben: Ausgabe[]; belege: Beleg[]; kopf: Kopf; berechtigungen: Berechtigungen;

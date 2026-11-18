@@ -70,3 +70,12 @@
 .kopf-projekt > button > span, .kopf-zweig { max-width: calc(3 * var(--leiste-breite)); overflow: hidden; text-overflow: ellipsis; }
 
 .kopf .postfach-inhalt { max-height: calc(100dvh - 2 * var(--kopf-hoehe)); overflow-y: auto; }
+
+.rollen-formular { display: grid; grid-template-columns: repeat(3, max-content); gap: var(--abstand-4); font: var(--schrift-klein); }
+.rollen-zeile { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; gap: var(--abstand-4); align-items: center; }
+.rollen-zeile > strong { min-width: max-content; font-weight: 600; }
+.rollen-zeile label { display: grid; gap: var(--abstand-1); color: var(--text-2); }
+.rollen-zeile select { padding: var(--abstand-2); border: 0; border-radius: var(--rund-knopf); background: var(--flaeche-3); color: var(--text-1); font: var(--schrift-klein); }
+.rollen-zeile select:focus-visible { outline: calc(var(--abstand-1) / 2) solid var(--akzent); }
+.rollen-formular p { grid-column: 1 / -1; margin: 0; max-width: calc(16 * var(--abstand-8)); color: var(--text-2); }
+.rollen-formular #rollen-fehler:empty { display: none; }

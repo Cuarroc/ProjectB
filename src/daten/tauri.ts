@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beispiel, modusEinstellungen } from "./beispiel";
-import type { Agent, Berechtigungsstufe, Chat, Datenstand, Kontingent, Kopf } from "./typen";
+import type { Agent, Berechtigungsstufe, Chat, Datenstand, Kontingent, Kopf, Rollen } from "./typen";
 
 type TeamAuftrag = Pick<Agent, "name" | "anbieter" | "modell" | "effort"> & { text: string };
 export type AnhalteBericht = {
@@ -78,7 +78,7 @@ const felder = {
   Ausführen: [["agentenGleichzeitig", ["einer", "bisZu3", "bisZu5"]], ["pruefungDurch", ["andereModellfamilie", "gleicheFamilie"]], ["pruefrundenHoechstens", ["eins", "zwei", "drei"]]],
   Planen: [["plan", ["kurz", "normal", "ausfuehrlich"]], ["dauerUndTokensSchaetzen", ["an", "aus"]], ["beiUnklaremNachfragen", ["an", "aus"]]],
 } as const;
-type Kernwerte = { ausfuehren?: Record<string, string>; planen?: Record<string, string>; berechtigung?: Berechtigungsstufe };
+type Kernwerte = { rollen?: Rollen; ausfuehren?: Record<string, string>; planen?: Record<string, string>; berechtigung?: Berechtigungsstufe };
 const modusSchluessel = (modus: string) => modus === "Ausführen" ? "ausfuehren" : "planen";
 function anzeigen(daten: Kernwerte): Record<string, string[]> {
   return Object.fromEntries(Object.entries(felder).map(([modus, zeilen]) => [modus, zeilen.map(([feld, texte], i) => {
@@ -93,11 +93,11 @@ export function einstellungenAenderung(modus: string, werte: string[], index?: n
 }
 export async function einstellungenLaden(projekt: string) {
   const daten = await invoke<Kernwerte>("einstellungen_laden", { projekt });
-  return { werte: anzeigen(daten), berechtigung: daten.berechtigung ?? "Nur bei Wichtigem" };
+  return { werte: anzeigen(daten), berechtigung: daten.berechtigung ?? "Nur bei Wichtigem", rollen: daten.rollen ?? structuredClone(beispiel.rollen) };
 }
 export async function einstellungenAendern(projekt: string, werte: Kernwerte) {
   const daten = await invoke<Kernwerte>("einstellungen_speichern", { projekt, werte });
-  return { werte: anzeigen(daten), berechtigung: daten.berechtigung ?? "Nur bei Wichtigem" };
+  return { werte: anzeigen(daten), berechtigung: daten.berechtigung ?? "Nur bei Wichtigem", rollen: daten.rollen ?? structuredClone(beispiel.rollen) };
 }
 
 export async function teamDateiAnsehen(name: string, pfad: string): Promise<string> {

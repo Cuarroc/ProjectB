@@ -16,7 +16,7 @@ let quelle, aufraeumen, gespeichert;
 const ansicht = () => { h.i = 0; h.effekte = []; return ChatListe({ quelle, offen: true, umschalten() {} }); };
 const html = () => renderToStaticMarkup(ansicht());
 const warten = () => new Promise(resolve => setTimeout(resolve, 0));
-const auf = (pfad = "Projekt A") => { const d = quelle.lesen(); d.kopf = { ...d.kopf, geoeffnet: true, pfad }; quelle.aktualisieren(d); };
+const auf = (pfad = "Projekt A") => { const d = quelle.lesen(); d.kopf = { ...d.kopf, geoeffnet: true, pfad }; quelle.aktualisieren(d); quelle.aktualisieren({ ...quelle.lesen(), rollenPfad: pfad }); };
 const neu = () => { const d = quelle.lesen(); d.chats[0].titel = "Geändert"; quelle.aktualisieren(d); };
 const spaeter = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const finden = (node, passt) => !node || typeof node !== "object" ? undefined : passt(node.props) ? node : [node.props?.children].flat(Infinity).map(n => finden(n, passt)).find(Boolean);

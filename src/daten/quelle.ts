@@ -42,6 +42,7 @@ export class BeispielQuelle implements Datenquelle {
 
   // Nur die Beispielumsetzung: ermöglicht simulierte Änderungen ohne UI oder Backend.
   aktualisieren(daten: Datenstand): void {
+    if (daten.kopf.pfad !== this.daten.kopf.pfad) daten = { ...daten, rollenPfad: undefined };
     this.daten = structuredClone(daten);
     for (const abo of [...this.abos]) abo();
   }

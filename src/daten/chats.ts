@@ -1,16 +1,18 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { beispiel } from "./beispiel";
-import type { Chat } from "./typen";
+import type { Chat, Rolle } from "./typen";
 import type { BeispielQuelle } from "./quelle";
 import { chatsLaden, chatsSpeichern } from "./tauri";
 
-export function neuerChat(): Chat {
-  return { ...beispiel.chats[0], id: crypto.randomUUID(), titel: "Neuer Chat", modus: "Ausführen",
+export function neuerChat(rolle: Rolle = beispiel.rollen.orchestrator): Chat {
+  return { ...beispiel.chats[0], ...rolle, id: crypto.randomUUID(), titel: "Neuer Chat", modus: "Ausführen",
     verlauf: [], todos: [], sitzung: null, gestartetUm: null, kontextProzent: 0 };
 }
 
 export function chatAnlegen(quelle: BeispielQuelle) {
-  const daten = quelle.lesen(), chat = neuerChat();
+  const daten = quelle.lesen();
+  if (isTauri() && daten.rollenPfad !== daten.kopf.pfad) return;
+  const chat = neuerChat(daten.rollen.orchestrator);
   quelle.aktualisieren({ ...daten, chats: [...daten.chats, chat], aktiverChatId: chat.id });
 }
 
@@ -40,9 +42,6 @@ export function chatsVerbinden(quelle: BeispielQuelle, melden: (text: string) =>
         // Nach dem Laden läuft kein Auftrag, ein gespeichertes gestartetUm würde den Projektwechsel für immer sperren.
         geladen = { chats: geladen.chats.map(chat => ({ ...chat, gestartetUm: null })), aktiverChatId: geladen.aktiverChatId };
         stand.zuletzt = JSON.stringify(geladen);
-        if (!geladen.chats.length) {
-          const chat = neuerChat(); geladen = { chats: [chat], aktiverChatId: chat.id };
-        }
         stand.geladen = true;
         quelle.aktualisieren({ ...quelle.lesen(), chats: geladen.chats, aktiverChatId: geladen.aktiverChatId });
       }).catch(e => fehler(stand, "geladen", e));
@@ -50,6 +49,7 @@ export function chatsVerbinden(quelle: BeispielQuelle, melden: (text: string) =>
     }
     const stand = aktuell;
     if (!stand?.geladen) return;
+    if (!daten.chats.length && daten.rollenPfad === stand.pfad) { chatAnlegen(quelle); return; }
     const chats = { chats: daten.chats, aktiverChatId: daten.aktiverChatId }, vergleich = JSON.stringify(chats);
     if (vergleich === stand.zuletzt) return;
     stand.zuletzt = vergleich;

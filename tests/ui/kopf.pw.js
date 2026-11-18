@@ -10,7 +10,7 @@ test("Kopf: Soll-Bilder, Menüs, Bewegung und axe", async ({ page }, info) => {
   const grenzen = async locator => expect(await locator.evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; })).toBe(true);
   await grenzen(kopf); for (const knopf of await kopf.getByRole("button").all()) await grenzen(knopf); await bild("kopf");
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  for (const name of ["ProjectB", "Projekt wählen", "Rollen"]) {
+  for (const name of ["ProjectB", "Projekt wählen"]) {
     const knopf = kopf.getByRole("button", { name: new RegExp(`^${name}`) });
     await knopf.focus(); await page.keyboard.press("ArrowDown");
     const menue = kopf.getByRole("menu", { name, exact: true }), eintraege = menue.locator('[role^="menuitem"]');
@@ -24,7 +24,6 @@ test("Kopf: Soll-Bilder, Menüs, Bewegung und axe", async ({ page }, info) => {
       await expect.soft(menue.locator(".kopf-voll")).toHaveCSS("box-shadow", /1px.*inset/);
       expect.soft(await menue.locator(".kopf-voll .kopf-probe > span").evaluate(el => [getComputedStyle(el).animationName, getComputedStyle(el, "::before").animationName].every(n => n !== "none"))).toBe(true);
     }
-    if (name === "Rollen") for (const eintrag of await eintraege.all()) await expect.soft(eintrag).toHaveAttribute("aria-disabled", "true");
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.keyboard.press("Escape"); await expect(menue).toHaveCount(0); await expect(knopf).toBeFocused();
     await knopf.click(); await page.keyboard.press("Tab"); await expect(menue).toHaveCount(0);

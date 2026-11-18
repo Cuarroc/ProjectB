@@ -32,6 +32,8 @@ const schritt = (id: string, titel: string, agentId: string | null,
 });
 
 export const beispiel: Datenstand = {
+  rollen: { orchestrator: { modell: "Opus 5.5", effort: "Hoch" }, reviewer: {
+    claude: { modell: "Opus 5.5", effort: "Hoch" }, codex: { modell: "gpt-6.1-sol", effort: "Hoch" } } },
   aktiverChatId: "csv-export", chats: [{
     id: "csv-export", titel: "Paketliste als CSV exportieren", modus: "Ausführen",
     modell: "Opus 5.5", effort: "Hoch", kontextfenster: 1000000, kontextProzent: 10, gestartetUm: "14:30",
