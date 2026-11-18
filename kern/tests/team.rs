@@ -74,7 +74,7 @@ fn starten(repo: &Repo, namen: &[&str]) -> (Team, mpsc::Receiver<String>) {
         move |json| tx.send(json).unwrap(),
         |a, w, pfad| {
             assert!(!w.nur_lesen);
-            assert_eq!(w.berechtigung, None);
+            assert_eq!(w.berechtigung, Some(start::Berechtigung::NurBeiWichtigem));
             assert_eq!(w.modell.as_deref(), Some("claude-opus-5-5"));
             assert_eq!(w.effort, Some(start::Effort::Hoch));
             start::starten(
@@ -659,13 +659,13 @@ const FUND: Scannen = |_, _| Err("Secret-Scan: Fund, nichts übertragen".into())
 const FUND_IN_COMMITS: Scannen =
     |o, seit| if seit.is_some_and(|b| b == git(o, &["rev-parse", "HEAD~1"])) { FUND(o, seit) } else { Ok(()) };
 
-fn pr_team(repo: &Repo, skript: &'static str, pr: PrWeg) -> (Team, mpsc::Receiver<String>) {
+fn pr_team(repo: &Repo, skript: &str, pr: PrWeg) -> (Team, mpsc::Receiver<String>) {
     review_team(repo, skript, pr, false, "URTEIL: OK", &[])
 }
 
 fn review_team(
     repo: &Repo,
-    skript: &'static str,
+    skript: &str,
     pr: PrWeg,
     codex: bool,
     antwort: &'static str,
@@ -676,10 +676,12 @@ fn review_team(
     {
         git(&repo.0, &["config", schluessel, wert]);
     }
+    let skript = skript.to_owned();
     let (tx, rx) = mpsc::channel();
     let starten = move |a: &Anbieter, w: &start::Startwunsch, p: &Path| {
         let a = Anbieter { lesen: projectb_kern::lies_claude, ..*a };
         if w.nur_lesen {
+            assert_eq!(w.berechtigung, None);
             assert_eq!(a.name, if codex { "claude" } else { "codex" });
             assert_eq!(w.modell.as_deref(), Some(if codex { "claude-opus-5-5" } else { "gpt-6.1-sol" }));
             assert_eq!(w.effort, Some(start::Effort::Mittel));
@@ -706,7 +708,7 @@ fn review_team(
             return Ok(lauf);
         }
         fs::write(p.join("package.json"), r#"{"scripts":{"test":"node test.js"}}"#).unwrap();
-        fs::write(p.join("test.js"), skript).unwrap();
+        fs::write(p.join("test.js"), &skript).unwrap();
         start::starten(&Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &[], ..a }, w, p)
     };
     let mut arbeit = auftrag("eins");
@@ -752,6 +754,120 @@ fn gruene_tests_legen_pr_mit_beleg_an() {
         fs::read_to_string(team.ordner()[0].join("pr-aufruf")).unwrap(),
         "eins|agent/eins|Claude||eins: Stand für PR|Team-Agent eins: Tests in der Arbeitskopie grün (2 von 2)."
     );
+    team.laeufe_mut()[0].warten().unwrap();
+}
+
+fn pruefe_pfadschutz(pfad: &str, modus: &str) {
+    let repo = Repo::neu();
+    fs::create_dir_all(repo.0.join(Path::new(pfad).parent().unwrap())).unwrap();
+    if modus == "ignoriert" {
+        fs::write(repo.0.join(".gitignore"), pfad).unwrap();
+    } else if !["neu", "zurueck", "merge"].contains(&modus) {
+        fs::write(repo.0.join(pfad), if modus == "umbenannt" { "Agentenarbeit" } else { "vorher" }).unwrap();
+    }
+    git(&repo.0, &["add", "-A"]);
+    git(
+        &repo.0,
+        &["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "Basis"],
+    );
+    let skript = format!(
+        "const fs=require('fs'),git=(...a)=>require('child_process').execFileSync('git',['-C','.',...a]);
+        const p={pfad:?},m={modus:?};
+        fs.mkdirSync(require('path').dirname(p),{{recursive:true}});
+        fs.writeFileSync(p,'Agentenarbeit');
+        if(m==='index'||m==='commit')git('add',p);
+        if(m==='commit')git('commit','-m','Agent ändert');
+        if(m==='umbenannt'){{git('mv',p,'harmlos.txt');git('commit','-m','Agent benennt um');}}
+        if(m==='merge'){{fs.rmSync(p);const b=git('branch','--show-current').toString().trim();git('checkout','-q','-b','seite');fs.writeFileSync('harmlos.txt','x');git('add','harmlos.txt');git('commit','-q','-m','Seite');git('checkout','-q',b);git('merge','-q','--no-ff','--no-commit','seite');fs.writeFileSync(p,'Agentenarbeit');git('add',p);git('commit','-q','-m','Merge');}}
+        if(m==='zurueck'){{git('add',p);git('commit','-m','Agent ändert');git('rm','-q',p);git('commit','-m','Agent nimmt zurück');}}
+        fs.writeFileSync('stand-head',git('rev-parse','HEAD'));
+        fs.writeFileSync('stand-index',git('diff','--cached','--binary'));
+        fs.writeFileSync('stand-arbeit',git('diff','--binary'));"
+    );
+    // Der Pfadschutz muss sogar vor dem Scan greifen.
+    let (mut team, rx) = pr_team(&repo, &skript, (|_, _| panic!("Scan trotz Pfadsperre"), pr_ok));
+    let meldungen = alle(&rx);
+    let letzte = meldungen.last().unwrap();
+    assert_eq!(letzte["zustand"], "Wartet auf dich", "{pfad}: {modus}");
+    assert_eq!(letzte["liveZeile"], format!("Änderung an freigabepflichtigen Dateien ({pfad}): braucht Elias’ Ja"));
+    assert!(letzte["beleg"].is_null());
+    assert!(meldungen.iter().all(|v| v["zustand"] != "Fertig"));
+    let ordner = &team.ordner()[0];
+    assert!(!ordner.join("pr-aufruf").exists());
+    if modus != "zurueck" {
+        assert_eq!(
+            fs::read_to_string(ordner.join(if modus == "umbenannt" { "harmlos.txt" } else { pfad })).unwrap(),
+            "Agentenarbeit"
+        );
+    }
+    for (datei, args) in [
+        ("stand-head", vec!["rev-parse", "HEAD"]),
+        ("stand-index", vec!["diff", "--cached", "--binary"]),
+        ("stand-arbeit", vec!["diff", "--binary"]),
+    ] {
+        assert_eq!(git(ordner, &args), fs::read_to_string(ordner.join(datei)).unwrap().trim());
+    }
+    team.laeufe_mut()[0].warten().unwrap();
+}
+
+#[test]
+fn pfadschutz_github_vor_pr() {
+    for modus in ["arbeit", "index", "commit", "umbenannt", "zurueck", "merge"] {
+        pruefe_pfadschutz(".github/workflows/x.yml", modus);
+    }
+}
+
+#[test]
+fn pfadschutz_claude_grossgeschrieben_vor_pr() {
+    pruefe_pfadschutz(".Claude/settings.json", "neu");
+}
+
+#[test]
+fn pfadschutz_weitere_orte_auch_ignoriert() {
+    for (pfad, modus) in [
+        (".mergify.yml", "index"),
+        (".mcp.json", "ignoriert"),
+        (".MCP.JSON", "neu"),
+        (".agents/x", "commit"),
+        (".claude/settings.json", "neu"),
+    ] {
+        pruefe_pfadschutz(pfad, modus);
+    }
+}
+
+#[test]
+fn pfadschutz_auch_in_unterordnern() {
+    for pfad in ["app/.claude/settings.json", "app/.MCP.json", "a/b/.agents/x"] {
+        pruefe_pfadschutz(pfad, "neu");
+    }
+}
+
+#[test]
+fn pfadschutz_zeigt_hoechstens_drei_pfade() {
+    let repo = Repo::neu();
+    let (mut team, rx) = pr_team(&repo,
+        "const fs=require('fs');fs.mkdirSync('.agents');for(const p of ['.agents/x','.mcp.json','.mergify.yml','.agents/y'])fs.writeFileSync(p,'Agentenarbeit')",
+        (|_, _| panic!("Scan trotz Pfadsperre"), pr_ok));
+    let letzte = alle(&rx).pop().unwrap();
+    assert_eq!(letzte["zustand"], "Wartet auf dich");
+    assert_eq!(
+        letzte["liveZeile"],
+        "Änderung an freigabepflichtigen Dateien (.agents/x, .agents/y, .mcp.json): braucht Elias’ Ja"
+    );
+    assert!(!team.ordner()[0].join("pr-aufruf").exists());
+    team.laeufe_mut()[0].warten().unwrap();
+}
+
+#[test]
+fn pfadschutz_docs_github_erlaubt_pr() {
+    let repo = Repo::neu();
+    let (mut team, rx) = pr_team(
+        &repo,
+        "require('fs').mkdirSync('docs');require('fs').writeFileSync('docs/github.md','Agentenarbeit')",
+        (SAUBER, pr_ok),
+    );
+    assert_eq!(alle(&rx).last().unwrap()["zustand"], "Fertig");
+    assert!(team.ordner()[0].join("pr-aufruf").exists());
     team.laeufe_mut()[0].warten().unwrap();
 }
 
