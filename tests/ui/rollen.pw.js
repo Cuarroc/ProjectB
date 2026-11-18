@@ -29,7 +29,7 @@ test("Rollen: Tauri lädt je Projekt, zeigt Kernantworten und behält Werte bei 
     window.__TAURI_INTERNALS__ = { transformCallback: () => 1, invoke: async (cmd, args) => {
       const rollen = { orchestrator: { modell: "Haiku 5.5", effort: "Niedrig" }, reviewer: {
         claude: { modell: "Sonnet 5.5", effort: "Mittel" }, codex: { modell: "gpt-6.1-sol", effort: "Sehr hoch" } } };
-      if (cmd === "einstellungen_laden") { window.leseprojekte.push(args.projekt); if (window.ladeFehler) throw "Nicht erreichbar"; return { rollen }; }
+      if (cmd === "einstellungen_laden") { window.leseprojekte.push(args.projekt); if (window.ladeWarten) await new Promise(resolve => { window.ladeFortsetzen = resolve; }); if (window.ladeFehler) throw "Nicht erreichbar"; return { rollen }; }
       if (cmd === "einstellungen_speichern") { window.schreibwerte.push(args); if (window.speicherWarten) await new Promise(resolve => { window.speicherFortsetzen = resolve; }); if (window.speicherFehler) throw "Kein Zugriff"; return { rollen }; }
       if (cmd === "projekte_zuletzt") return [];
       if (cmd === "chats_laden") return { chats: [], aktiverChatId: null };
@@ -41,14 +41,26 @@ test("Rollen: Tauri lädt je Projekt, zeigt Kernantworten und behält Werte bei 
   });
   await page.goto("/"); await page.getByRole("button", { name: "Rollen", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Rollen", exact: true }), modell = dialog.getByLabel("Orchestrator Modell");
+  const meldung = dialog.locator("#rollen-fehler");
+  const farbe = token => page.evaluate(token => {
+    const probe = document.createElement("span"); probe.style.color = `var(${token})`; document.body.append(probe);
+    const wert = getComputedStyle(probe).color; probe.remove(); return wert;
+  }, token);
   await expect(modell).toHaveValue("Haiku 5.5"); await modell.selectOption("Sonnet 5.5"); await expect(modell).toHaveValue("Haiku 5.5");
   expect(await page.evaluate(() => window.schreibwerte[0])).toMatchObject({ projekt: "C:\\ProjectB", werte: { rollen: { orchestrator: { modell: "Sonnet 5.5", effort: "Niedrig" } } } });
   await modell.focus(); await page.evaluate(() => { window.speicherFehler = true; window.speicherWarten = true; }); await modell.selectOption("Opus 5.5");
   await expect(dialog).toBeVisible(); await expect(modell).toBeFocused();
+  await expect(meldung).toHaveText("Wird gespeichert …");
+  await expect(meldung).toHaveCSS("color", await farbe("--text-2")); await expect(meldung.locator("svg")).toHaveCount(0);
   await page.evaluate(() => { window.speicherFortsetzen(); });
   await expect(dialog.getByRole("status")).toContainText("Nicht gespeichert: Kein Zugriff"); await expect(modell).toHaveValue("Haiku 5.5");
-  await page.evaluate(async () => { const q = (await import("/src/bereiche/ChatEingabe.tsx")).chatEingabeQuelle; const d = q.lesen(); d.kopf.pfad = "B"; q.aktualisieren(d); });
+  await expect.soft(meldung).toHaveCSS("color", await farbe("--status-problem"));
+  await expect.soft(meldung.locator("svg.lucide-circle-x")).toHaveCount(1);
+  await page.evaluate(async () => { window.ladeWarten = true; const q = (await import("/src/bereiche/ChatEingabe.tsx")).chatEingabeQuelle; const d = q.lesen(); d.kopf.pfad = "B"; q.aktualisieren(d); });
   await page.getByRole("button", { name: "Rollen", exact: true }).click();
+  await expect(meldung).toHaveText("Rollen werden geladen …");
+  await expect(meldung).toHaveCSS("color", await farbe("--text-2")); await expect(meldung.locator("svg")).toHaveCount(0);
+  await page.evaluate(() => { window.ladeWarten = false; window.ladeFortsetzen(); });
   await expect(dialog.locator("#rollen-fehler")).toBeEmpty(); await expect(modell).toBeEnabled();
   expect(await page.evaluate(() => window.leseprojekte)).toContain("B");
   await page.evaluate(async () => { window.ladeFehler = true; const q = (await import("/src/bereiche/ChatEingabe.tsx")).chatEingabeQuelle; const d = q.lesen(); d.kopf.pfad = "C"; d.kopf.geoeffnet = true; q.aktualisieren(d); });
@@ -63,5 +75,8 @@ test("Rollen: Tauri lädt je Projekt, zeigt Kernantworten und behält Werte bei 
   await expect(dialog.getByRole("status")).toContainText("Rollen nicht geladen: Nicht erreichbar"); await expect(modell).toBeDisabled();
   await expect(modell).toHaveValue("Opus 5.5");
   expect(await page.evaluate(() => window.schreibwerte)).toHaveLength(2);
+  if (process.env.BILD_ORDNER && info.project.name !== "1280x800") await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-7-5_rollen-fehler_${info.project.name}.png`, animations: "disabled" });
+  await expect.soft(meldung).toHaveCSS("color", await farbe("--status-problem"));
+  await expect.soft(meldung.locator("svg.lucide-circle-x")).toHaveCount(1);
   if (process.env.BILD_ORDNER) await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-7-4_fehler_${info.project.name}.png` });
 });

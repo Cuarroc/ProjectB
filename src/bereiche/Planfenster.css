@@ -36,6 +36,6 @@
 .pl-chips{display:flex;flex-wrap:wrap;gap:var(--abstand-2)}
 .pl-karte-kopf{display:flex;align-items:center;justify-content:space-between;gap:var(--abstand-2)}.pl-einheit{font:var(--schrift-klein);color:var(--text-2);white-space:nowrap;border-radius:var(--rund-voll);padding:var(--abstand-1) var(--abstand-2);background:var(--flaeche-3)}
 .pl-farbpunkt{flex:none;width:calc(var(--abstand-2) - 1px);height:calc(var(--abstand-2) - 1px);border-radius:var(--rund-voll);background:var(--f)}
-.pl-zaehler{padding:0 var(--abstand-2);border-radius:var(--rund-knopf);background:var(--akzent-grund);color:var(--akzent-text);font:var(--schrift-klein);font-variant-numeric:tabular-nums}
+.pl-zaehler{margin-inline-start:var(--abstand-2);padding:0 var(--abstand-2);border-radius:var(--rund-knopf);background:var(--akzent-grund);color:var(--akzent-text);font:var(--schrift-klein);font-variant-numeric:tabular-nums}
 .pl-vorlesen{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @starting-style{.pl-marke{opacity:0}}

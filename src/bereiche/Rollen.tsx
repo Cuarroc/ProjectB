@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
+import { CircleX } from "lucide-react";
 import { rollenLaden, rollenSpeichern } from "../daten/rollen";
 import type { BeispielQuelle } from "../daten/quelle";
 import type { Datenstand, Rolle } from "../daten/typen";
@@ -41,7 +42,7 @@ export default function Rollen({ daten, quelle, children }: { daten: Datenstand;
         </div>;
       })}
       <p id="rollen-hinweis">Das Modell eines Arbeiters steht je Agent im Plan.<br />Die Rollen gelten ab dem nächsten Chat oder Team-Start in diesem Projekt.</p>
-      <p id="rollen-fehler" role="status">{fehler || (!bereit ? "Rollen werden geladen …" : speichert ? "Wird gespeichert …" : "")}</p>
+      <p id="rollen-fehler" role="status">{fehler ? <><CircleX strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /><span>{fehler}</span></> : !bereit ? "Rollen werden geladen …" : speichert ? "Wird gespeichert …" : ""}</p>
     </form>
   </>);
 }

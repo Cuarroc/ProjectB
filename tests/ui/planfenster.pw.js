@@ -1,6 +1,30 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test("Planfenster: Zähler hat Abstand zum Text, auch am gesperrten Knopf", async ({ page }, testInfo) => {
+  test.skip(process.env.UI_BASELINE === "1", "Der Zählerabstand wird am Kandidaten geprüft.");
+  await page.goto("/"); await page.evaluate(() => document.fonts.ready);
+  await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: /^Plan:/ });
+  await dialog.locator(".pl-schritt").first().getByRole("button", { name: "Simpler, Türkis", exact: true }).click();
+  const zaehler = dialog.locator("button .pl-zaehler");
+  await expect(zaehler).toHaveText("1");
+  for (const gesperrt of [false, true]) {
+    await zaehler.evaluateAll((es, gesperrt) => es.forEach(e => { e.parentElement.disabled = gesperrt; }), gesperrt);
+    for (const e of await zaehler.all()) {
+      const abstand = await e.evaluate(e => {
+        const text = document.createRange(); text.selectNodeContents(e.previousSibling);
+        return e.getBoundingClientRect().left - text.getBoundingClientRect().right;
+      });
+      expect.soft(abstand, `Textabstand bei disabled=${gesperrt}`).toBeGreaterThan(0);
+    }
+  }
+  if (process.env.BILD_ORDNER && testInfo.project.name !== "1280x800") {
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-7-p3_planfenster_${testInfo.project.name}.png`, animations: "disabled" });
+  }
+});
+
 test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe", async ({ page }, testInfo) => {
   test.skip(process.env.UI_BASELINE === "1", "Das Planfenster wird am Kandidaten geprüft; im Basisstand ist Plan öffnen deaktiviert.");
   await page.goto("/"); await page.evaluate(() => document.fonts.ready);
