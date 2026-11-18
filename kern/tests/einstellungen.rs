@@ -50,6 +50,7 @@ fn speichern_laden_rundreise_und_ersetzen() {
         (AgentenGleichzeitig::BisZu5, Pruefrunden::Zwei, Plan::Ausfuehrlich),
     ] {
         let e = Einstellungen {
+            rollen: Default::default(),
             berechtigung: Default::default(),
             ausfuehren: Ausfuehren {
                 agenten_gleichzeitig: agenten,
@@ -132,6 +133,7 @@ fn json_rundreise_aller_wertekombinationen() {
                     for schaetzen in [Schalter::An, Schalter::Aus] {
                         for nachfragen in [Schalter::An, Schalter::Aus] {
                             let e = Einstellungen {
+                                rollen: Default::default(),
                                 berechtigung: Default::default(),
                                 ausfuehren: Ausfuehren {
                                     agenten_gleichzeitig: agenten,
@@ -156,17 +158,19 @@ fn json_rundreise_aller_wertekombinationen() {
 #[test]
 fn json_schluessel_und_rueckfall_je_feld_wie_beim_laden() {
     let datei = Datei::neu();
-    let gueltig = json!({
+    let mut gueltig = json!({
         "berechtigung": "Nur bei Wichtigem",
         "ausfuehren": {"agentenGleichzeitig": "einer", "pruefungDurch": "gleicheFamilie", "pruefrundenHoechstens": "zwei"},
         "planen": {"plan": "ausfuehrlich", "dauerUndTokensSchaetzen": "aus", "beiUnklaremNachfragen": "aus"}
     });
+    gueltig["rollen"] = standardrollen();
     assert_eq!(als_json(&aus_json(&gueltig)), gueltig);
-    let empfohlen = json!({
+    let mut empfohlen = json!({
         "berechtigung": "Nur bei Wichtigem",
         "ausfuehren": {"agentenGleichzeitig": "bisZu3", "pruefungDurch": "andereModellfamilie", "pruefrundenHoechstens": "drei"},
         "planen": {"plan": "normal", "dauerUndTokensSchaetzen": "an", "beiUnklaremNachfragen": "an"}
     });
+    empfohlen["rollen"] = standardrollen();
     for modus in ["ausfuehren", "planen"] {
         for feld in gueltig[modus].as_object().unwrap().keys() {
             for defekt in [
@@ -297,4 +301,76 @@ fn berechtigung_je_projekt_und_nur_gueltige_aenderungen() {
         );
     }
     assert_eq!(als_json(&laden(&b))["berechtigung"], "Nur bei Wichtigem");
+}
+
+fn standardrollen() -> Value {
+    json!({
+        "orchestrator": {"modell": "Opus 5.5", "effort": "Hoch"},
+        "reviewer": {
+            "claude": {"modell": "Opus 5.5", "effort": "Hoch"},
+            "codex": {"modell": "gpt-6.1-sol", "effort": "Hoch"}
+        }
+    })
+}
+
+#[test]
+fn rollen_standard_und_rueckfall_je_feld() {
+    let datei = Datei::neu();
+    assert_eq!(als_json(&laden(&datei.0))["rollen"], standardrollen());
+    let gueltig = json!({"rollen": {
+        "orchestrator": {"modell": "gpt-6.1-sol", "effort": "Mittel"},
+        "reviewer": {
+            "claude": {"modell": "Sonnet 5.5", "effort": "Niedrig"},
+            "codex": {"modell": "gpt-6.1-sol", "effort": "Sehr hoch"}
+        }
+    }});
+    let standard = standardrollen();
+    for pfad in ["/orchestrator", "/reviewer/claude", "/reviewer/codex"] {
+        for feld in ["modell", "effort"] {
+            for defekt in [None, Some(json!("unbekannt")), Some(json!(42)), Some(Value::Null), Some(json!({}))] {
+                let mut kaputt = gueltig.clone();
+                let rolle = kaputt["rollen"].pointer_mut(pfad).unwrap().as_object_mut().unwrap();
+                rolle.remove(feld);
+                if let Some(wert) = defekt {
+                    rolle.insert(feld.into(), wert);
+                }
+                let mut erwartet = gueltig["rollen"].clone();
+                erwartet.pointer_mut(pfad).unwrap()[feld] = standard.pointer(pfad).unwrap()[feld].clone();
+                fs::write(&datei.0, kaputt.to_string()).unwrap();
+                assert_eq!(als_json(&laden(&datei.0))["rollen"], erwartet, "{pfad}/{feld}");
+            }
+        }
+    }
+    for (familie, falsch) in [("claude", "gpt-6.1-sol"), ("codex", "Haiku 5.5")] {
+        let mut kaputt = gueltig.clone();
+        kaputt["rollen"]["reviewer"][familie]["modell"] = json!(falsch);
+        let mut erwartet = gueltig["rollen"].clone();
+        erwartet["reviewer"][familie]["modell"] = standard["reviewer"][familie]["modell"].clone();
+        assert_eq!(als_json(&aus_json(&kaputt))["rollen"], erwartet);
+    }
+}
+
+#[test]
+fn rollen_aendern_nur_gueltiges_und_andere_werte_erhalten() {
+    let datei = Datei::neu();
+    let delta = json!({"berechtigung": "Vorsichtig", "planen": {"plan": "kurz"}, "rollen": {
+        "orchestrator": {"modell": "Haiku 5.5", "effort": "Niedrig"},
+        "reviewer": {"claude": {"modell": "Sonnet 5.5", "effort": "Sehr hoch"},
+                     "codex": {"modell": "gpt-6.1-sol", "effort": "Mittel"}}
+    }});
+    let e = aendern(&datei.0, &delta).unwrap();
+    assert_eq!(als_json(&laden(&datei.0))["rollen"], delta["rollen"]);
+    for falsch in [json!("unbekannt"), json!(42), Value::Null, json!({}), json!(false)] {
+        let ungueltig = json!({"rollen": {"orchestrator": {"modell": falsch, "effort": falsch},
+            "reviewer": {"claude": {"modell": "gpt-6.1-sol", "effort": falsch},
+                         "codex": {"modell": "Opus 5.5", "effort": falsch}}}});
+        assert_eq!(aendern(&datei.0, &ungueltig).unwrap(), e);
+    }
+    let mut erwartet = als_json(&e);
+    erwartet["rollen"]["reviewer"]["claude"]["effort"] = json!("Hoch");
+    let e = aendern(&datei.0, &json!({"rollen": {"reviewer": {"claude": {"effort": "Hoch"}}}})).unwrap();
+    assert_eq!(als_json(&laden(&datei.0)), erwartet);
+    assert_eq!(als_json(&aendern(&datei.0, &json!({"rollen": false})).unwrap()), erwartet);
+    assert_eq!(laden(datei.0.with_file_name("anderes-projekt.json")), Einstellungen::default());
+    assert_eq!(als_json(&e), erwartet);
 }

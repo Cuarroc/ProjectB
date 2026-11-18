@@ -1,5 +1,5 @@
 //! Projekteinstellungen: stabile deutsche JSON-Schlüssel, Rückfall je einzelnem Feld.
-use crate::start::Berechtigung;
+use crate::start::{self, Berechtigung};
 use serde_json::json;
 pub use serde_json::Value;
 use std::{
@@ -60,8 +60,69 @@ impl Planen {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rolle {
+    pub modell: String,
+    pub effort: String,
+}
+
+impl Rolle {
+    fn als_json(&self) -> Value {
+        json!({"modell": self.modell, "effort": self.effort})
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reviewer {
+    pub claude: Rolle,
+    pub codex: Rolle,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rollen {
+    pub orchestrator: Rolle,
+    pub reviewer: Reviewer,
+}
+
+impl Default for Rollen {
+    fn default() -> Self {
+        let rolle = |modell: &str| Rolle { modell: modell.into(), effort: "Hoch".into() };
+        Self {
+            orchestrator: rolle("Opus 5.5"),
+            reviewer: Reviewer { claude: rolle("Opus 5.5"), codex: rolle("gpt-6.1-sol") },
+        }
+    }
+}
+
+impl Rollen {
+    fn uebernehmen(&mut self, v: &Value) {
+        for (rolle, wert, familie) in [
+            (&mut self.orchestrator, &v["orchestrator"], None),
+            (&mut self.reviewer.claude, &v["reviewer"]["claude"], Some("claude")),
+            (&mut self.reviewer.codex, &v["reviewer"]["codex"], Some("codex")),
+        ] {
+            if let Some(modell) = wert["modell"]
+                .as_str()
+                .filter(|m| start::modell(m).is_some_and(|(anbieter, _)| familie.is_none_or(|f| f == anbieter)))
+            {
+                rolle.modell = modell.into();
+            }
+            if let Some(effort) = wert["effort"].as_str().filter(|e| start::Effort::aus_text(e).is_some()) {
+                rolle.effort = effort.into();
+            }
+        }
+    }
+
+    fn als_json(&self) -> Value {
+        json!({"orchestrator": self.orchestrator.als_json(), "reviewer": {
+            "claude": self.reviewer.claude.als_json(), "codex": self.reviewer.codex.als_json()
+        }})
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Einstellungen {
+    pub rollen: Rollen,
     pub berechtigung: Berechtigung,
     pub ausfuehren: Ausfuehren,
     pub planen: Planen,
@@ -97,7 +158,8 @@ pub fn aendern(pfad: impl AsRef<Path>, aenderung: &Value) -> io::Result<Einstell
     if let Some(stufe) = aenderung["berechtigung"].as_str().and_then(Berechtigung::aus_text) {
         werte["berechtigung"] = json!(stufe.text());
     }
-    let werte = aus_json(&werte);
+    let mut werte = aus_json(&werte);
+    werte.rollen.uebernehmen(&aenderung["rollen"]);
     speichern(pfad, &werte)?;
     Ok(werte)
 }
@@ -106,7 +168,10 @@ pub fn aendern(pfad: impl AsRef<Path>, aenderung: &Value) -> io::Result<Einstell
 pub fn aus_json(v: &Value) -> Einstellungen {
     let a = &v["ausfuehren"];
     let p = &v["planen"];
+    let mut rollen = Rollen::default();
+    rollen.uebernehmen(&v["rollen"]);
     Einstellungen {
+        rollen,
         berechtigung: v["berechtigung"].as_str().and_then(Berechtigung::aus_text).unwrap_or_default(),
         ausfuehren: Ausfuehren {
             agenten_gleichzeitig: AgentenGleichzeitig::lesen(&a["agentenGleichzeitig"]),
@@ -126,6 +191,7 @@ pub fn als_json(e: &Einstellungen) -> Value {
     let a = &e.ausfuehren;
     let p = &e.planen;
     json!({
+        "rollen": e.rollen.als_json(),
         "berechtigung": e.berechtigung.text(),
         "ausfuehren": {
             "agentenGleichzeitig": a.agenten_gleichzeitig.text(),
