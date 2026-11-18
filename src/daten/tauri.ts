@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beispiel, modusEinstellungen } from "./beispiel";
-import type { Agent, Chat, Datenstand, Kontingent, Kopf } from "./typen";
+import type { Agent, Berechtigungsstufe, Chat, Datenstand, Kontingent, Kopf } from "./typen";
 
 type TeamAuftrag = Pick<Agent, "name" | "anbieter" | "modell" | "effort"> & { text: string };
 export type AnhalteBericht = {
@@ -78,12 +78,12 @@ const felder = {
   Ausführen: [["agentenGleichzeitig", ["einer", "bisZu3", "bisZu5"]], ["pruefungDurch", ["andereModellfamilie", "gleicheFamilie"]], ["pruefrundenHoechstens", ["eins", "zwei", "drei"]]],
   Planen: [["plan", ["kurz", "normal", "ausfuehrlich"]], ["dauerUndTokensSchaetzen", ["an", "aus"]], ["beiUnklaremNachfragen", ["an", "aus"]]],
 } as const;
-type Kernwerte = Record<string, Record<string, string>>;
+type Kernwerte = { ausfuehren?: Record<string, string>; planen?: Record<string, string>; berechtigung?: Berechtigungsstufe };
 const modusSchluessel = (modus: string) => modus === "Ausführen" ? "ausfuehren" : "planen";
 function anzeigen(daten: Kernwerte): Record<string, string[]> {
   return Object.fromEntries(Object.entries(felder).map(([modus, zeilen]) => [modus, zeilen.map(([feld, texte], i) => {
     const z = modusEinstellungen[modus as keyof typeof modusEinstellungen][i];
-    return z.werte[(texte as readonly string[]).indexOf(daten[modusSchluessel(modus)]?.[feld])] ?? z.empfohlen;
+    return z.werte[(texte as readonly string[]).indexOf(daten[modusSchluessel(modus)]?.[feld] ?? "")] ?? z.empfohlen;
   })]));
 }
 export function einstellungenAenderung(modus: string, werte: string[], index?: number): Kernwerte {
@@ -92,10 +92,12 @@ export function einstellungenAenderung(modus: string, werte: string[], index?: n
     .flatMap(([feld, texte], i) => index !== undefined && index !== i ? [] : [[feld, texte[(zeilen[i].werte as readonly string[]).indexOf(werte[i])]]])) };
 }
 export async function einstellungenLaden(projekt: string) {
-  return anzeigen(await invoke<Kernwerte>("einstellungen_laden", { projekt }));
+  const daten = await invoke<Kernwerte>("einstellungen_laden", { projekt });
+  return { werte: anzeigen(daten), berechtigung: daten.berechtigung ?? "Nur bei Wichtigem" };
 }
 export async function einstellungenAendern(projekt: string, werte: Kernwerte) {
-  return anzeigen(await invoke<Kernwerte>("einstellungen_speichern", { projekt, werte }));
+  const daten = await invoke<Kernwerte>("einstellungen_speichern", { projekt, werte });
+  return { werte: anzeigen(daten), berechtigung: daten.berechtigung ?? "Nur bei Wichtigem" };
 }
 
 export async function teamDateiAnsehen(name: string, pfad: string): Promise<string> {

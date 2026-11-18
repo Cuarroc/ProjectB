@@ -1,11 +1,15 @@
 //! Projekteinstellungen: stabile deutsche JSON-Schlüssel, Rückfall je einzelnem Feld.
+use crate::start::Berechtigung;
 use serde_json::json;
 pub use serde_json::Value;
 use std::{
     fs::{self, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Mutex,
+    },
 };
 
 macro_rules! auswahl {
@@ -58,6 +62,7 @@ impl Planen {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Einstellungen {
+    pub berechtigung: Berechtigung,
     pub ausfuehren: Ausfuehren,
     pub planen: Planen,
 }
@@ -71,6 +76,8 @@ pub fn laden(pfad: impl AsRef<Path>) -> Einstellungen {
 
 /// Ändert nur übergebene Felder; Lesefehler außer „fehlt“ verhindern jedes Schreiben.
 pub fn aendern(pfad: impl AsRef<Path>, aenderung: &Value) -> io::Result<Einstellungen> {
+    static SPERRE: Mutex<()> = Mutex::new(());
+    let _sperre = SPERRE.lock().map_err(|_| io::Error::other("Einstellungssperre beschädigt"))?;
     let pfad = pfad.as_ref();
     let basis = match fs::read(pfad) {
         Ok(daten) => serde_json::from_slice(&daten).unwrap_or_default(),
@@ -87,6 +94,9 @@ pub fn aendern(pfad: impl AsRef<Path>, aenderung: &Value) -> io::Result<Einstell
             }
         }
     }
+    if let Some(stufe) = aenderung["berechtigung"].as_str().and_then(Berechtigung::aus_text) {
+        werte["berechtigung"] = json!(stufe.text());
+    }
     let werte = aus_json(&werte);
     speichern(pfad, &werte)?;
     Ok(werte)
@@ -97,6 +107,7 @@ pub fn aus_json(v: &Value) -> Einstellungen {
     let a = &v["ausfuehren"];
     let p = &v["planen"];
     Einstellungen {
+        berechtigung: v["berechtigung"].as_str().and_then(Berechtigung::aus_text).unwrap_or_default(),
         ausfuehren: Ausfuehren {
             agenten_gleichzeitig: AgentenGleichzeitig::lesen(&a["agentenGleichzeitig"]),
             pruefung_durch: PruefungDurch::lesen(&a["pruefungDurch"]),
@@ -115,6 +126,7 @@ pub fn als_json(e: &Einstellungen) -> Value {
     let a = &e.ausfuehren;
     let p = &e.planen;
     json!({
+        "berechtigung": e.berechtigung.text(),
         "ausfuehren": {
             "agentenGleichzeitig": a.agenten_gleichzeitig.text(),
             "pruefungDurch": a.pruefung_durch.text(),

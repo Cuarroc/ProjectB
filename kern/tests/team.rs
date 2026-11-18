@@ -58,6 +58,7 @@ impl Drop for Repo {
 
 fn auftrag(name: &str) -> TeamAuftrag {
     TeamAuftrag {
+        berechtigung: start::Berechtigung::default(),
         name: name.into(),
         anbieter: "claude".into(),
         modell: "Opus 5.5".into(),
@@ -997,4 +998,28 @@ fn anhalten_trifft_pruefer_und_verwirft_spaetes_review() {
     assert!(team.anhalten(None, Duration::from_secs(2)).unwrap().lauffehler.is_empty());
     assert!(!team.laeuft());
     assert!(alle(&rx).is_empty());
+}
+
+#[test]
+fn vorsichtig_erreicht_die_worker_argumente() {
+    let repo = Repo::neu();
+    let mut auftrag = auftrag("vorsichtig");
+    auftrag.berechtigung = start::Berechtigung::Vorsichtig;
+    let mut team = Team::starten_mit(
+        &repo.0,
+        vec![auftrag],
+        |_| {},
+        |a, w, p| {
+            let args = start::argumente(a, w)?;
+            assert!(args.windows(2).any(|paar| paar == ["--permission-mode", "acceptEdits"]));
+            let erlaubt = args.iter().find(|arg| arg.starts_with("--allowedTools=")).unwrap();
+            assert!(erlaubt.contains("Bash(cargo test *)"));
+            assert!(!erlaubt.contains("git commit"));
+            assert!(!erlaubt.contains("cargo build"));
+            assert!(args.iter().any(|arg| arg.starts_with("--disallowedTools=") && arg.contains("Bash(git push *)")));
+            start::starten(&Anbieter { programm: env!("CARGO_BIN_EXE_test_agent"), argumente: &[], ..*a }, w, p)
+        },
+    )
+    .unwrap();
+    assert!(team.laeufe_mut()[0].warten().unwrap().success());
 }
