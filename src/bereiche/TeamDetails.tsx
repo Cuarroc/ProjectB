@@ -38,44 +38,29 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
     const spalte = bereich.current?.closest(".team-bereich");
     const karte = [...spalte?.querySelectorAll<HTMLElement>(`[data-agent="${agent.id}"]`) ?? []].find(el => el.getClientRects().length);
     const liste = karte?.closest<HTMLElement>(".team-liste"), achse = liste?.querySelector<HTMLElement>(".team-achse");
-    if (liste && achse) {
+    if (!echt && liste && achse) {
       liste.style.scrollPaddingTop = `${achse.offsetHeight + parseFloat(getComputedStyle(liste).gap)}px`;
       liste.style.paddingBottom = `${liste.clientHeight}px`;
     }
-    karte?.scrollIntoView({ block: "start", behavior: "instant" });
+    karte?.scrollIntoView({ block: echt ? "nearest" : "start", behavior: "instant" });
     if (bereich.current) bereich.current.scrollTop = 0;
     bereich.current?.focus({ preventScroll: true });
     return () => { anfrage.current++; if (liste) { liste.style.scrollPaddingTop = ""; liste.style.paddingBottom = ""; } };
   }, [agent.id]);
-  const scrolleVorschau = () => {
-    if (vorschauBereich.current) vorschauBereich.current.style.marginBottom = "";
-    vorschauBereich.current?.scrollIntoView({ block: "nearest" });
-    if (!echt || !bereich.current || !vorschauBereich.current) return;
-    const sichtbar = bereich.current.getBoundingClientRect(), oben = sichtbar.top;
-    const angeschnitten = [...bereich.current.querySelectorAll<HTMLElement>(".tm-det-kopf, .tm-det-leiste, .tm-dkarte")].find(el => {
-      const box = el.getBoundingClientRect(); return box.top < oben && box.bottom > oben;
-    });
-    // Ganze Inhaltsblöcke zeigen, ohne die angeforderte Vorschau aus dem Blick zu schieben.
-    if (angeschnitten) {
-      const delta = oben - angeschnitten.getBoundingClientRect().top;
-      const vorschau = vorschauBereich.current.getBoundingClientRect();
-      if (vorschau.bottom + delta <= sichtbar.bottom) bereich.current.scrollTop -= delta;
-      else {
-        // Auch am Scrollende muss die Vorschau den oberen Rand erreichen können.
-        vorschauBereich.current.style.marginBottom = `${Math.max(0, sichtbar.height - vorschau.height)}px`;
-        bereich.current.scrollTop += vorschau.top - oben;
-      }
-    }
-  };
-  useLayoutEffect(() => { if (vorschau) { scrolleVorschau(); vorschauBereich.current?.focus({ preventScroll: true }); } }, [vorschau]);
   useLayoutEffect(() => {
-    if (datei && !datei.laedt && document.activeElement === vorschauBereich.current) scrolleVorschau();
-  }, [datei]);
+    if (!vorschau) return;
+    vorschauBereich.current?.focus({ preventScroll: true });
+  }, [vorschau]);
+  useLayoutEffect(() => {
+    if (vorschauBereich.current?.contains(document.activeElement)) {
+      vorschauBereich.current.scrollIntoView({ block: "nearest" });
+    }
+  }, [vorschau, datei]);
   const zu = () => {
     const knopf = [...bereich.current?.closest(".team-bereich")?.querySelectorAll<HTMLElement>(`[data-agent="${agent.id}"] [aria-expanded="true"]`) ?? []].find(el => el.getClientRects().length);
     schliessen(); knopf?.focus({ preventScroll: true });
   };
-  const oeffnen = (e: React.MouseEvent<HTMLButtonElement>, inhalt: string) => { anfrage.current++; setDatei(null); vorschauKnopf.current = e.currentTarget; zeige(inhalt); };
+  const oeffnen = (e: React.MouseEvent<HTMLButtonElement>, inhalt: string) => { anfrage.current++; setDatei(null); vorschauKnopf.current = e.currentTarget; zeige(inhalt); vorschauBereich.current?.focus({ preventScroll: true }); };
   const ansehen = async (e: React.MouseEvent<HTMLButtonElement>, pfad: string) => {
     oeffnen(e, pfad);
     if (!echt) return;
@@ -111,9 +96,9 @@ export function TeamDetails({ agent, daten = { ausgaben: [], belege: [] }, schli
             <span>{agent.tests.gesamt}</span><span className="tm-null">0</span>{rot && <b className="tm-rot">{rot.rot} rot</b>}<b className="tm-gruen">{agent.tests.gruen} / {agent.tests.gesamt}</b></div>
             <div className="team-diagramm-zeiten"><span>{rot?.zeit ?? agent.tests.gruenSeit}</span><span className="tm-jetzt">Jetzt</span></div>
             <p>{agent.tests.gruen} von {agent.tests.gesamt} grün{rot && ` · Um ${rot.zeit} waren ${rot.rot} rot, der Agent hat sie repariert`}</p></> : <p>Noch keine Tests</p>}</section></>}
-        {echt && <section className="tm-dkarte"><h4>Tests</h4><p>{agent.tests ? `${agent.tests.gruen} von ${agent.tests.gesamt} grün` : "Noch keine Tests"}</p></section>}
+        {echt && <section className="tm-dkarte tm-tests"><h4>Tests</h4><p>{agent.tests ? `${agent.tests.gruen} von ${agent.tests.gesamt} grün` : "Noch keine Tests"}</p></section>}
         <section className="tm-dkarte"><h4>Dateien</h4><ul className="tm-dateien">{agent.dateien.map(d => <li key={d.pfad}><span><code>{d.pfad}</code><small>+{d.hinzugefuegt} −{d.entfernt}</small></span><Knopf text="Ansehen" onClick={e => ansehen(e, d.pfad)} /></li>)}</ul>{!agent.dateien.length && <p>Noch keine Dateien</p>}</section>
-        {!echt && <section className="tm-dkarte"><h4>Ausgaben</h4><ul className="tm-dateien">{ausgaben.map(a => <li key={a.id}><span>{a.name}<small>{a.pfad}</small></span><Knopf text="Ansehen" onClick={e => { vorschauKnopf.current = e.currentTarget; zeige(a.pfad); }} /></li>)}</ul>{!ausgaben.length && <p>Noch keine Ausgaben</p>}</section>}
+        {!echt && <section className="tm-dkarte"><h4>Ausgaben</h4><ul className="tm-dateien">{ausgaben.map(a => <li key={a.id}><span>{a.name}<small>{a.pfad}</small></span><Knopf text="Ansehen" onClick={e => oeffnen(e, a.pfad)} /></li>)}</ul>{!ausgaben.length && <p>Noch keine Ausgaben</p>}</section>}
         {beleg && agent.zustand === "Fertig" && <section className="tm-dkarte tm-breit"><h4>Beleg</h4><p>{beleg.titel}</p><PrLink url={beleg.prLink} /></section>}
         {agent.review && <section className="tm-dkarte tm-breit"><h4>Review</h4>
           <div className="tm-det-leiste"><span>{agent.review.familie}</span>{agent.review.urteil && <Statusmarke zustand={agent.review.urteil === "OK" ? "fertig" : "wartet"} wort={agent.review.urteil === "OK" ? "OK" : "Funde"} />}</div>

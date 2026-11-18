@@ -17,8 +17,8 @@ export function MarkierterText({ text, marke }: { text: string; marke?: Marke })
   return marke ? <>{text.slice(0, marke.start)}<mark style={{ "--f": farbe(marke.name) } as CSSProperties}>{text.slice(marke.start, marke.ende)}</mark>
     <span className="pl-vorlesen"> ({marke.name}, {farben.find(f => f[0] === marke.name)![2]})</span>{text.slice(marke.ende)}</> : <>{text}</>;
 }
-export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarken, onSchliessen, onEntscheiden, entscheidbar = true, laeuft = false }: {
-  daten: Datenstand; plan?: Plan; entscheidbar?: boolean; laeuft?: boolean; gespeicherteMarken: PlanMarken; onSchliessen: () => void; onEntscheiden: (plan: Plan, marken: PlanMarken, stil: string) => void;
+export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarken, onSchliessen, onEntscheiden, entscheidbar = true, freigabeGesperrt = false, laeuft = false }: {
+  daten: Datenstand; plan?: Plan; entscheidbar?: boolean; freigabeGesperrt?: boolean; laeuft?: boolean; gespeicherteMarken: PlanMarken; onSchliessen: () => void; onEntscheiden: (plan: Plan, marken: PlanMarken, stil: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [plan, setPlan] = useState(() => structuredClone(echterPlan ?? daten.plan));
@@ -91,7 +91,7 @@ export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarke
         <p className="pl-hinweis">Jeder Knopf an einem Schritt färbt ihn in seiner Farbe. Mehrere Knöpfe ergeben mehrere Farben oben am Schritt.</p></section>
       <section className="pl-karte"><h3>Wie soll der Plan geschrieben sein?</h3><div className="pl-stil">{["Simpler", "Ausführlicher", "Innovativer", "Vorsichtiger", "Schneller"].map(w => <button type="button" disabled={!entscheidbar} className="pl-stilknopf" key={w} aria-pressed={stil === w} onClick={() => setStil(w)}>{w}</button>)}</div>
         {stil && <p className="pl-hinweis">Nächste Fassung wird {stil.toLocaleLowerCase("de")}.</p>}<Knopf text="Neu schreiben lassen" vorsatz={<RefreshCw size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} disabled={!entscheidbar} onClick={() => echterPlan ? entscheiden(false) : setHinweis(`Beispiel: Der Plan wird ${stil.toLocaleLowerCase("de")} geschrieben.`)} /></section>
-    </div><footer className="pl-fuss"><p role="status">{hinweis}</p><Knopf text="Freigeben und bauen" vorsatz={<Check size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="haupt" disabled={!entscheidbar} onClick={() => entscheiden(true)} />
+    </div><footer className="pl-fuss"><p role="status">{hinweis}</p><Knopf text="Freigeben und bauen" vorsatz={<Check size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="haupt" disabled={!entscheidbar || freigabeGesperrt} grund={freigabeGesperrt ? "Das letzte Team läuft noch oder ist nicht gesichert." : undefined} onClick={() => entscheiden(true)} />
       <button type="button" className="knopf kn kn-zweit" disabled={!entscheidbar} aria-label={`Mit Kommentaren zurückgeben, ${markZahl} markiert`} onClick={() => entscheiden(false)}>Mit Kommentaren zurückgeben<span className="pl-zaehler" aria-hidden="true">{markAnzahl}</span></button></footer></aside>
   </dialog>;
 }
