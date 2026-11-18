@@ -83,8 +83,11 @@ fn freigabepfade(ordner: &Path, basis: &str) -> Result<Vec<String>, String> {
     ] {
         let ausgabe = anhalten::git(ordner, &args)?;
         for pfad in ausgabe.split('\0').map(str::trim_start).filter(|p| !p.is_empty()) {
-            let ort = pfad.split('/').next().unwrap_or_default().to_ascii_lowercase();
-            if matches!(ort.as_str(), ".github" | ".mergify.yml" | ".mcp.json" | ".claude" | ".agents") {
+            let teile: Vec<_> = pfad.split('/').map(str::to_ascii_lowercase).collect();
+            // Wie in .mergify.yml: .github und .mergify.yml nur an der Wurzel, die übrigen überall.
+            if matches!(teile[0].as_str(), ".github" | ".mergify.yml")
+                || teile.iter().any(|t| matches!(t.as_str(), ".mcp.json" | ".claude" | ".agents"))
+            {
                 pfade.insert(pfad.to_owned());
             }
         }

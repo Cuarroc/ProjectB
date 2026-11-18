@@ -239,6 +239,21 @@ pub fn starten(anbieter: &Anbieter, wunsch: &Startwunsch, ordner: &Path) -> Resu
     Lauf::starten(&anbieter, &wunsch.prompt(), ordner)
 }
 
+/// Push-Sperre und gh ohne Anmeldung für Agenten und ihre Tests.
+pub fn agenten_umgebung_setzen(befehl: &mut std::process::Command) -> std::io::Result<()> {
+    // Ein leerer gh-Ordner je App-Prozess statt je Start, damit sich im Temp nichts ansammelt.
+    let gh_ordner = std::env::temp_dir().join(format!("projectb-gh-{}", std::process::id()));
+    std::fs::create_dir_all(&gh_ordner)?;
+    for (key, value) in agenten_umgebung(&gh_ordner) {
+        if let Some(value) = value {
+            befehl.env(key, value);
+        } else {
+            befehl.env_remove(key);
+        }
+    }
+    Ok(())
+}
+
 pub fn agenten_umgebung(gh_ordner: &Path) -> Vec<(String, Option<std::ffi::OsString>)> {
     // git help config: ENVIRONMENT (COUNT/KEY_n/VALUE_n), url.<base>.pushInsteadOf (nur Push).
     // https://git-scm.com/docs/git-config: explizites pushurl umgeht die Umschreibung, git -c hat Vorrang.

@@ -836,6 +836,13 @@ fn pfadschutz_weitere_orte_auch_ignoriert() {
 }
 
 #[test]
+fn pfadschutz_auch_in_unterordnern() {
+    for pfad in ["app/.claude/settings.json", "app/.MCP.json", "a/b/.agents/x"] {
+        pruefe_pfadschutz(pfad, "neu");
+    }
+}
+
+#[test]
 fn pfadschutz_zeigt_hoechstens_drei_pfade() {
     let repo = Repo::neu();
     let (mut team, rx) = pr_team(&repo,
