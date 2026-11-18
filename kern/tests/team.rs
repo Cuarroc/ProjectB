@@ -58,6 +58,7 @@ impl Drop for Repo {
 
 fn auftrag(name: &str) -> TeamAuftrag {
     TeamAuftrag {
+        rollen: Default::default(),
         berechtigung: start::Berechtigung::default(),
         name: name.into(),
         anbieter: "claude".into(),
@@ -685,7 +686,7 @@ fn review_team(
             assert_eq!(w.berechtigung, None);
             assert_eq!(a.name, if codex { "claude" } else { "codex" });
             assert_eq!(w.modell.as_deref(), Some(if codex { "claude-opus-5-5" } else { "gpt-6.1-sol" }));
-            assert_eq!(w.effort, Some(start::Effort::Mittel));
+            assert_eq!(w.effort, Some(start::Effort::Hoch));
             assert!(w.auftrag.contains(&format!("git diff {}..HEAD", git(p, &["rev-parse", "HEAD~1"]))));
             assert!(w
                 .auftrag
@@ -1022,4 +1023,60 @@ fn vorsichtig_erreicht_die_worker_argumente() {
     )
     .unwrap();
     assert!(team.laeufe_mut()[0].warten().unwrap().success());
+}
+
+#[test]
+fn reviewer_nutzt_das_gespeicherte_modell_und_den_effort() {
+    for (worker, modell, effort, cli_modell, effort_arg) in [
+        ("codex", "Sonnet 5.5", "Sehr hoch", "claude-sonnet-5-5", "xhigh"),
+        ("claude", "gpt-6.1-sol", "Niedrig", "gpt-6.1-sol", "model_reasoning_effort=\"low\""),
+    ] {
+        let repo = Repo::neu();
+        let familie = if worker == "codex" { "claude" } else { "codex" };
+        for (k, v) in [("user.name", "Test"), ("user.email", "test@example.invalid"), ("commit.gpgSign", "false")] {
+            git(&repo.0, &["config", k, v]);
+        }
+        let datei = repo.0.join("einstellungen.json");
+        let delta = serde_json::json!({"rollen": {"reviewer": {familie: {"modell": modell, "effort": effort}}}});
+        projectb_kern::einstellungen::aendern(&datei, &delta).unwrap();
+        let mut arbeit = auftrag("rollen");
+        arbeit.rollen = projectb_kern::einstellungen::laden(&datei).rollen;
+        arbeit.anbieter = worker.into();
+        arbeit.modell = if worker == "codex" { "gpt-6.1-sol" } else { "Opus 5.5" }.into();
+        let (tx, rx) = mpsc::channel();
+        let (_team, rx) = (
+            Team::starten_mit_kontingent(
+                &repo.0,
+                vec![arbeit],
+                None,
+                move |j| tx.send(j).unwrap(),
+                move |a, w, p| {
+                    if w.nur_lesen {
+                        assert_eq!(a.name, familie);
+                        let args = start::argumente(a, w)?;
+                        assert!(args.windows(2).any(|paar| paar == ["--model", cli_modell]));
+                        let schalter = if familie == "claude" { "--effort" } else { "-c" };
+                        assert!(args.windows(2).any(|paar| paar == [schalter, effort_arg]));
+                        return Err(std::io::Error::other("Review-Argumente geprüft"));
+                    }
+                    assert_eq!(w.effort, Some(start::Effort::Hoch));
+                    fs::write(p.join("package.json"), r#"{"scripts":{"test":"node -e \"process.exit(0)\""}}"#)?;
+                    start::starten(
+                        &Anbieter {
+                            programm: env!("CARGO_BIN_EXE_test_agent"),
+                            argumente: &[],
+                            lesen: projectb_kern::lies_claude,
+                            ..*a
+                        },
+                        w,
+                        p,
+                    )
+                },
+                Some((SAUBER, pr_ok)),
+            )
+            .unwrap(),
+            rx,
+        );
+        assert_eq!(alle(&rx).last().unwrap()["liveZeile"], "Review fehlgeschlagen: Review-Argumente geprüft");
+    }
 }
