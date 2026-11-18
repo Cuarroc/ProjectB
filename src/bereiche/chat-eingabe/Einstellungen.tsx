@@ -26,7 +26,7 @@ export function Einstellungen({ modus }: { modus: string }) {
       if (speicher.current) speicher.current.aktiv = false;
       const stand: NonNullable<typeof speicher.current> = { aktiv: true, gespeichert: {}, offen: [], fehler: projekte.get(neu)?.fehler ?? new Map(), kette: Promise.resolve() };
       speicher.current = stand; setWerte({}); setFehler("");
-      stand.kette = (projekte.get(neu)?.kette ?? Promise.resolve()).then(() => einstellungenLaden(neu)).then(werte => {
+      stand.kette = (projekte.get(neu)?.kette ?? Promise.resolve()).then(() => einstellungenLaden(neu)).then(({ werte }) => {
         stand.gespeichert = werte; if (stand.aktiv) { if (!stand.offen.length) setWerte(werte); setFehler([...new Set(stand.fehler.values())].join(" ")); }
       }).catch(e => { if (stand.aktiv) setFehler(`Nicht geladen: ${String(e)}`); });
       projekte.set(neu, stand);
@@ -48,7 +48,7 @@ export function Einstellungen({ modus }: { modus: string }) {
     stand.offen.push(w => ({ ...w, [modus]: (w[modus] ?? neu).map((alt, i) => index === undefined || index === i ? neu[i] : alt) }));
     stand.kette = stand.kette.then(async () => {
       try {
-        stand.gespeichert = await einstellungenAendern(pfad, delta);
+        stand.gespeichert = (await einstellungenAendern(pfad, delta)).werte;
         felder.forEach(feld => stand.fehler.delete(feld));
       } catch (e) {
         felder.forEach(feld => stand.fehler.set(feld, `Nicht gespeichert: ${String(e)}`));

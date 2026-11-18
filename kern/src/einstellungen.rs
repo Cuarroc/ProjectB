@@ -1,4 +1,5 @@
 //! Projekteinstellungen: stabile deutsche JSON-Schlüssel, Rückfall je einzelnem Feld.
+use crate::start::Berechtigung;
 use serde_json::json;
 pub use serde_json::Value;
 use std::{
@@ -58,6 +59,7 @@ impl Planen {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Einstellungen {
+    pub berechtigung: Berechtigung,
     pub ausfuehren: Ausfuehren,
     pub planen: Planen,
 }
@@ -87,6 +89,9 @@ pub fn aendern(pfad: impl AsRef<Path>, aenderung: &Value) -> io::Result<Einstell
             }
         }
     }
+    if let Some(stufe) = aenderung["berechtigung"].as_str().and_then(Berechtigung::aus_text) {
+        werte["berechtigung"] = json!(stufe.text());
+    }
     let werte = aus_json(&werte);
     speichern(pfad, &werte)?;
     Ok(werte)
@@ -97,6 +102,7 @@ pub fn aus_json(v: &Value) -> Einstellungen {
     let a = &v["ausfuehren"];
     let p = &v["planen"];
     Einstellungen {
+        berechtigung: v["berechtigung"].as_str().and_then(Berechtigung::aus_text).unwrap_or_default(),
         ausfuehren: Ausfuehren {
             agenten_gleichzeitig: AgentenGleichzeitig::lesen(&a["agentenGleichzeitig"]),
             pruefung_durch: PruefungDurch::lesen(&a["pruefungDurch"]),
@@ -115,6 +121,7 @@ pub fn als_json(e: &Einstellungen) -> Value {
     let a = &e.ausfuehren;
     let p = &e.planen;
     json!({
+        "berechtigung": e.berechtigung.text(),
         "ausfuehren": {
             "agentenGleichzeitig": a.agenten_gleichzeitig.text(),
             "pruefungDurch": a.pruefung_durch.text(),

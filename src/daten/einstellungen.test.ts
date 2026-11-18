@@ -17,6 +17,6 @@ it.each([
     const delta = einstellungenAenderung(modus, anzeige, i);
     expect(delta).toEqual({ [modus === "Ausführen" ? "ausfuehren" : "planen"]: { [feld]: texte[n] } });
     vi.mocked(invoke).mockResolvedValueOnce(delta);
-    expect((await einstellungenAendern("Projekt", delta))[modus]).toEqual(anzeige);
+    expect((await einstellungenAendern("Projekt", delta)).werte[modus]).toEqual(anzeige);
   }
 });

@@ -147,6 +147,7 @@ fn ohne_zugangsdaten(text: &str) -> String {
 }
 
 pub struct TeamAuftrag {
+    pub berechtigung: start::Berechtigung,
     pub name: String,
     pub anbieter: String,
     pub modell: String,
@@ -227,7 +228,7 @@ impl Team {
                 let (anbieter, mut wunsch) =
                     chat::startwunsch(&auftrag.modell, &auftrag.effort, "Ausführen", None, "", auftrag.text)
                         .map_err(io::Error::other)?;
-                wunsch.berechtigung = Some(start::Berechtigung::default());
+                wunsch.berechtigung = Some(auftrag.berechtigung);
                 if !auftrag.anbieter.eq_ignore_ascii_case(anbieter.name) {
                     return Err(io::Error::new(io::ErrorKind::InvalidInput, "Anbieter passt nicht zum Modell"));
                 }
