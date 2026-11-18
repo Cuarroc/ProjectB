@@ -187,7 +187,11 @@ pub fn argumente(anbieter: &Anbieter, wunsch: &Startwunsch) -> Result<Vec<String
         } else if anbieter.name == "codex" {
             // Geprüft: codex-cli 0.166.0, exec/resume --help: -c <key=value>, verschachtelte TOML-Werte.
             // Schlüssel: https://learn.chatgpt.com/docs/config-file/config-reference
-            let sandbox = if wunsch.nur_lesen { "read-only" } else { "workspace-write" };
+            let sandbox = if wunsch.nur_lesen || berechtigung == Berechtigung::Vorsichtig {
+                "read-only"
+            } else {
+                "workspace-write"
+            };
             let netz = !wunsch.nur_lesen && berechtigung == Berechtigung::Autonom;
             args.extend([
                 "-c".into(),
@@ -325,7 +329,11 @@ mod tests {
             }
             let codex = argumente(&CODEX, &w).unwrap();
             let netz = format!("sandbox_workspace_write.network_access={}", stufe == Berechtigung::Autonom);
-            let sandbox = "sandbox_mode=\"workspace-write\"";
+            let sandbox = if stufe == Berechtigung::Vorsichtig {
+                "sandbox_mode=\"read-only\""
+            } else {
+                "sandbox_mode=\"workspace-write\""
+            };
             let freigabe = "approval_policy=\"never\"";
             assert_eq!(codex, ["exec", "--json", "-c", sandbox, "-c", freigabe, "-c", &netz, "-"]);
             assert_eq!(
