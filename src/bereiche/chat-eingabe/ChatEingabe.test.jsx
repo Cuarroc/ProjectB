@@ -17,7 +17,7 @@ it("startet mit Ausführen, Opus 5.5, Hoch und 1M aus den Beispieldaten", () => 
 it("verdrahtet Enter mit dem Beispielzustand; Umschalt+Enter und IME senden nicht", () => {
   const quelle = new BeispielQuelle(), daten = quelle.lesen(), chat = daten.chats[0], senden = vi.fn(text => nachrichtAblegen(quelle, text));
   const ansicht = ChatEingabeAnsicht({ chat, modelle: [chat.modell], text: "Neue Nachricht", fehler: "", aendern: vi.fn(), schreiben: vi.fn(), senden });
-  const huelle = Children.toArray(ansicht.props.children).find(el => el.type === Befehle).props.children({});
+  const huelle = Children.toArray(ansicht.props.children).find(el => el.type === Befehle).props.children({}, () => false, "");
   const feld = Eingabefeld(huelle.props).props.children[1];
   for (const extra of [{ shiftKey: true }, { nativeEvent: { isComposing: true } }, { keyCode: 229 }])
     feld.props.onKeyDown({ key: "Enter", nativeEvent: {}, preventDefault: vi.fn(), ...extra });

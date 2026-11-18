@@ -31,12 +31,18 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/"); await expect(page.locator("#chat-nachricht")).toBeVisible();
 });
 for (const modus of ["Planen", "Interview"]) test(`/${modus.toLowerCase()} aktiviert den Modus`, async ({ page }) => {
-  const feld = page.getByRole("combobox", { name: "Nachricht an den Orchestrator" }).getByRole("textbox");
+  const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" });
   await feld.fill(`/${modus.toLowerCase()}`); await feld.press("Enter");
   await expect(page.getByRole("radio", { name: modus, exact: true })).toHaveAttribute("aria-checked", "true"); await expect(feld).toHaveValue("");
 });
+test("/interview mit Senden wechselt den Modus ohne neue Nachricht", async ({ page }) => {
+  const feld = page.locator("#chat-nachricht"), nachrichten = page.locator(".chat-nachrichten > li"), vorher = await nachrichten.count();
+  await feld.fill("/interview"); await page.getByRole("button", { name: "Senden", exact: true }).click();
+  await expect(page.getByRole("radio", { name: "Interview", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(feld).toHaveValue(""); await expect(nachrichten).toHaveCount(vorher);
+});
 test("/neu legt einen Chat an; Liste, Tastatur und Bilder", async ({ page }, info) => {
-  const feld = page.getByRole("combobox", { name: "Nachricht an den Orchestrator" }).getByRole("textbox"); await feld.fill("/");
+  const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" }); await feld.fill("/");
   const liste = page.getByRole("listbox", { name: "Befehle" }); await expect(liste.getByRole("option")).toHaveCount(4);
   await expect(feld).toHaveAttribute("aria-activedescendant", "befehl-neu");
   expect((await new AxeBuilder({ page }).include(".chat-eingabe").analyze()).violations).toEqual([]);
@@ -54,7 +60,7 @@ test("/neu legt einen Chat an; Liste, Tastatur und Bilder", async ({ page }, inf
   await expect(page.locator(".rand-chat")).toHaveCount(2); await expect(page.locator(".rand-chat").last()).toContainText("Neuer Chat");
 });
 test("/anhalten ist ohne Lauf gesperrt und hält den echten Teamweg an", async ({ page }) => {
-  const feld = page.getByRole("combobox", { name: "Nachricht an den Orchestrator" }).getByRole("textbox"); await feld.fill("/anhalten");
+  const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" }); await feld.fill("/anhalten");
   const option = page.getByRole("option"); await expect(option).toBeDisabled(); await expect(option).toContainText("Kein Agent läuft");
   await feld.press("Enter"); await expect(feld).toHaveValue("/anhalten");
   await expect.poll(() => page.evaluate(() => [...window.listener.values()].includes("team-agent"))).toBe(true);

@@ -1,13 +1,17 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-test("Planfenster: Zurückgeben bleibt einzeilig", async ({ page }, info) => {
+test("Planfenster: Zurückgeben und Schrittaktionen bleiben einzeilig", async ({ page }, info) => {
   test.skip(process.env.UI_BASELINE === "1", "Einzeiliger Knopf wird am Kandidaten geprüft.");
   await page.goto("/"); await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();
+  await page.evaluate(() => document.fonts.ready);
+  for (const zeile of await page.locator(".pl-aktionen").all())
+    expect(await zeile.locator("button").evaluateAll(es => new Set(es.map(e => e.offsetTop)).size)).toBe(1);
   const knopf = page.getByRole("button", { name: /^Mit Kommentaren zurückgeben,/ });
   expect(await knopf.evaluate(e => {
-    const r = document.createRange(); r.selectNode(e.firstChild); return r.getClientRects().length;
-  })).toBe(1);
+    const r = document.createRange(); r.selectNode(e.firstChild); const t = r.getBoundingClientRect(), z = e.querySelector(".pl-zaehler").getBoundingClientRect(), k = e.getBoundingClientRect();
+    return r.getClientRects().length === 1 && t.left >= k.left && z.right <= k.right && z.top < t.bottom && z.bottom > t.top;
+  })).toBe(true);
   if (process.env.BILD_ORDNER && info.project.name !== "1280x800")
     await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-8-1_planfenster_${info.project.name}.png`, animations: "disabled" });
 });

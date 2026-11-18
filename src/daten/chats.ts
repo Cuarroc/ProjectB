@@ -1,6 +1,6 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { beispiel } from "./beispiel";
-import type { Chat, Rolle } from "./typen";
+import type { Chat, Datenstand, Rolle } from "./typen";
 import type { BeispielQuelle } from "./quelle";
 import { chatsLaden, chatsSpeichern } from "./tauri";
 
@@ -9,9 +9,10 @@ export function neuerChat(rolle: Rolle = beispiel.rollen.orchestrator): Chat {
     verlauf: [], todos: [], sitzung: null, gestartetUm: null, kontextProzent: 0 };
 }
 
+export const neuerChatGesperrt = (daten: Datenstand) => isTauri() && daten.rollenPfad !== daten.kopf.pfad;
 export function chatAnlegen(quelle: BeispielQuelle) {
   const daten = quelle.lesen();
-  if (isTauri() && daten.rollenPfad !== daten.kopf.pfad) return;
+  if (neuerChatGesperrt(daten)) return;
   const chat = neuerChat(daten.rollen.orchestrator);
   quelle.aktualisieren({ ...daten, chats: [...daten.chats, chat], aktiverChatId: chat.id });
 }
