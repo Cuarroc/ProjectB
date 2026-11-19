@@ -36,6 +36,10 @@ export async function teamAgentHoeren(cb: (agent: Agent) => void): Promise<() =>
 }
 
 export type Chats = Pick<Datenstand, "chats" | "aktiverChatId">;
+export async function anhangSpeichern(pfad: string, datei: File): Promise<string> {
+  return isTauri() ? invoke<string>("anhang_speichern", { pfad, name: datei.name, inhalt: Array.from(new Uint8Array(await datei.arrayBuffer())) })
+    : `.projectb/anhaenge/${crypto.randomUUID()}-${datei.name.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
 export async function chatsLaden(projekt: string): Promise<Chats | undefined> {
   if (isTauri()) return invoke<Chats>("chats_laden", { projekt });
 }

@@ -16,6 +16,7 @@ export type Agent = {
   schaetzung: { fertigUm: string; restMinuten: number } | null;
 };
 export type Nachricht = {
+  anhaenge?: string[];
   id: string; von: "Du" | "Orchestrator"; zeit: string; text: string;
   aktionen: Aktion[]; planId?: string; plan?: Plan; frageId?: string;
 };

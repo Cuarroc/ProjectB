@@ -92,6 +92,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
                 <Knopf text="Kopieren" symbol={Copy} nurSymbol variante="leise" onClick={() => void kopieren(frage ? `${n.text}\n${frage.text}` : n.text)} />
               </header>
               {!frage && <p className="r-msg-text">{n.text}</p>}
+              {!!n.anhaenge?.length && <p className="r-msg-anhaenge">{n.anhaenge.map(p => p.replace(/^.*\/(?:[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}|[^-]+)-/, "")).join(" · ")}</p>}
               {plan && <section className="r-innen r-plan" aria-label={plan.titel}>
                 <div className="r-plan-kopf">
                   <Fortschrittsring wert={teilaufgaben.length ? fertig / teilaufgaben.length * 100 : 0} text={`${fertig} / ${teilaufgaben.length}`} />
