@@ -7,7 +7,7 @@ import ChatEingabe from "../ChatEingabe";
 const h = vi.hoisted(() => ({ werte: [], refs: [], effekte: [], i: 0, r: 0 }));
 vi.mock("react", async original => ({ ...await original(),
   useState: initial => { const i = h.i++; if (!(i in h.werte)) h.werte[i] = typeof initial === "function" ? initial() : initial;
-    return [h.werte[i], wert => { h.werte[i] = wert; }]; },
+    return [h.werte[i], wert => { h.werte[i] = typeof wert === "function" ? wert(h.werte[i]) : wert; }]; },
   useRef: initial => h.refs[h.r++] ??= { current: initial },
   useEffect: fn => h.effekte.push(fn),
 }));
@@ -87,11 +87,11 @@ it("legt im Browser nur die Nachricht ab", async () => {
   expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Beispiel" });
   expect(chat().gestartetUm).toBe("14:30"); expect(auftragSenden).not.toHaveBeenCalled();
 });
-it("hängt Dateibezüge nur an den Auftrag an, Agenten bleiben Text", async () => {
-  vi.mocked(projektDateien).mockResolvedValue(["src/export/csv.rs"]);
+it.each([["src/export/csv.rs", "src/export/mod.rs"], ["docs/release notes.md", "docs/release"]])("hängt nur die gewählte Datei %s an, Agenten bleiben Text", async (pfad, andere) => {
+  vi.mocked(projektDateien).mockResolvedValue([andere, pfad]);
   vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
-  const text = "Prüfe @src/export/csv.rs mit @CSV-Export im Kern"; await ansicht().props.senden(text);
-  expect(auftragSenden.mock.calls[0][0].text).toMatch(/Bezüge:\n- src\/export\/csv.rs$/);
+  const text = `Prüfe @${pfad} mit @CSV-Export im Kern`; await ansicht().props.senden(text, [pfad]);
+  expect(auftragSenden.mock.calls[0][0].text.split("\n\nBezüge:\n").at(-1)).toBe(`- ${pfad}`);
   expect(chat().verlauf.at(-1).text).toBe(text);
 });
 it("sperrt Doppelsenden bereits beim Laden der Dateiliste", async () => {
@@ -99,6 +99,26 @@ it("sperrt Doppelsenden bereits beim Laden der Dateiliste", async () => {
   vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
   const erstes = ansicht().props.senden("@src/export/csv.rs"); await ansicht().props.senden("Zweiter Auftrag");
   expect(auftragSenden).not.toHaveBeenCalled(); laden(["src/export/csv.rs"]); await erstes; expect(auftragSenden).toHaveBeenCalledOnce();
+});
+it("gibt einen Plan mit @ ohne Dateiladen frei und legt die Nachricht ab", async () => {
+  const d = quelle.lesen(); d.chats[0].verlauf = [{ id: "plan", von: "Orchestrator", text: "Prüfe @src/export/csv.rs", aktionen: [{ id: "plan-freigeben" }] }]; quelle.aktualisieren(d);
+  vi.mocked(projektDateien).mockRejectedValue(new Error("nicht lesbar")); vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  await ansicht().props.onAktion("plan", "plan-freigeben"); expect(projektDateien).not.toHaveBeenCalled();
+  expect(chat().verlauf.at(-1).text).toBe("Plan freigegeben."); expect(auftragSenden).toHaveBeenCalledOnce();
+});
+it.each(["@CSV-Export im Kern", "@src/export/csv.rs"])("sendet %s bei Ladefehler ohne Bezüge-Block", async text => {
+  vi.mocked(projektDateien).mockRejectedValue(new Error("nicht lesbar")); vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  await ansicht().props.senden(text, ["src/export/csv.rs"]); expect(chat().verlauf.at(-1).text).toBe(text);
+  expect(auftragSenden).toHaveBeenCalledOnce(); expect(auftragSenden.mock.calls[0][0].text).not.toContain("\n\nBezüge:");
+});
+it.each(["@src/export/csv.rs", "Neue Nachricht"])("bewahrt beim Dateiladen den aktuellen Feldinhalt %s", async aktuell => {
+  let laden; vi.mocked(projektDateien).mockReturnValue(new Promise(resolve => { laden = resolve; }));
+  vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  ansicht().props.schreiben("@src/export/csv.rs"); const lauf = ansicht().props.senden("@src/export/csv.rs");
+  ansicht().props.schreiben(aktuell); laden(["src/export/csv.rs"]); await lauf;
+  expect(ansicht().props.text).toBe(aktuell === "@src/export/csv.rs" ? "" : aktuell);
+  expect(auftragSenden.mock.calls[0][0].text).toContain("@src/export/csv.rs");
+  expect(chat().verlauf.at(-1).text).toBe("@src/export/csv.rs");
 });
 it("meldet einen erst nach dem Unmount bereitstehenden Listener ab", async () => {
   aufraeumen.forEach(fn => fn?.()); await Promise.resolve();

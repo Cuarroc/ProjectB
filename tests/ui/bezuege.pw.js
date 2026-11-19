@@ -32,7 +32,7 @@ test("@exp einfügen und mit Dateibezug senden", async ({ page }, info) => {
   await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(1);
   expect(await page.evaluate(() => window.auftraege[0].text)).toContain("@src/export/csv.rs \n\nBezüge:\n- src/export/csv.rs");
   await expect(page.locator(".r-du .r-msg-text").last()).toHaveText("@src/export/csv.rs");
-  await feld.fill("@exp"); await expect(liste).toBeVisible(); expect(await page.evaluate(() => window.dateiladungen)).toBe(1);
+  await feld.fill("@exp"); await expect(liste).toBeVisible(); await expect.poll(() => page.evaluate(() => window.dateiladungen)).toBe(3);
   await liste.getByRole("option").last().click(); await expect(feld).toHaveValue("@CSV-Export im Kern "); await expect(feld).toBeFocused();
   await page.getByRole("button", { name: "Bezug CSV-Export im Kern entfernen", exact: true }).click(); await expect(feld).toHaveValue(" ");
 });

@@ -24,7 +24,7 @@ const status = { Arbeitet: "arbeitet", "Wartet auf dich": "wartet", Fertig: "fer
 export function Befehle({ text, anzahl = 0, neuGesperrt = false, kompaktGrund = "", kontextProzent = 0, ausfuehren, children, dateien = [], agenten = [], schreiben }: {
   text: string; kompaktGrund?: string; kontextProzent?: number; anzahl?: number; neuGesperrt?: boolean; ausfuehren: (name: string) => void;
   dateien?: string[]; agenten?: Agent[]; schreiben?: (text: string) => void;
-  children: (feld: TextareaHTMLAttributes<HTMLTextAreaElement>, abfangen: (text: string) => boolean, fehler: string, marken?: ReactNode) => ReactNode;
+  children: (feld: TextareaHTMLAttributes<HTMLTextAreaElement>, abfangen: (text: string) => boolean, fehler: string, marken?: ReactNode, bezuege?: string[]) => ReactNode;
 }) {
   const [geschlossen, schliessen] = useState(false), [index, waehlen] = useState(0);
   const [fehler, melden] = useState("");
@@ -93,6 +93,6 @@ export function Befehle({ text, anzahl = 0, neuGesperrt = false, kompaktGrund = 
       },
     }, auswahl, fehler, !!marken.length && <div className="ein-bezugmarken">{marken.map(({ name, Symbol }) => <button type="button" className="kn kn-leise" key={name}
       aria-label={`Bezug ${name} entfernen`} onClick={() => { schreiben?.(text.replace(bezugMuster(name), "$1")); cursorSetzen(undefined); }}>
-      <Symbol size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{name}<span aria-hidden="true">×</span></button>)}</div>)}
+      <Symbol size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{name}<span aria-hidden="true">×</span></button>)}</div>, marken.filter(e => e.gruppe === "Dateien").map(e => e.name))}
   </div>;
 }

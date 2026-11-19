@@ -14,7 +14,7 @@ vi.mock("react", async original => ({ ...await original(),
 }));
 let text, ausfuehren, senden, chat, anzahl, neuGesperrt, laeuft, projektOffen;
 const ansicht = () => { h.i = 0; const el = ChatEingabeAnsicht({ chat, modelle: [chat.modell], text, anzahl, neuGesperrt, laeuft, projektOffen, fehler: "",
-  dateien: ["src/export/csv.rs", "src/export/mod.rs", "tests/export.rs"], agenten: [{ name: "CSV-Export im Kern", anbieter: "Codex", zustand: "Arbeitet" }],
+  dateien: ["src/export/csv.rs", "src/export/mod.rs", "tests/export.rs", "docs/release", "docs/release notes.md"], agenten: [{ name: "CSV-Export im Kern", anbieter: "Codex", zustand: "Arbeitet" }],
   aendern: vi.fn(), schreiben: wert => { text = wert; }, senden, befehl: ausfuehren }).props.children.find(el => el?.type === Befehle);
   return Befehle(el.props); };
 const eingabe = () => Eingabefeld(ansicht().props.children.at(-1).props);
@@ -46,7 +46,7 @@ it.each(["Enter", "Senden"])("sperrt /neu bei ladenden Rollen mit %s und behält
   neuGesperrt = false; taste("Enter"); expect(ausfuehren).toHaveBeenCalledWith("neu"); expect(text).toBe("");
 });
 it.each(["/planen bitte", "/xyz"])("sendet %j mit Senden als Nachricht", wert => {
-  tippen(wert); abschicken(); expect(senden).toHaveBeenCalledWith(wert); expect(ausfuehren).not.toHaveBeenCalled();
+  tippen(wert); abschicken(); expect(senden).toHaveBeenCalledWith(wert, []); expect(ausfuehren).not.toHaveBeenCalled();
 });
 it("führt /planen nach Esc mit Enter aus", () => {
   tippen("/planen"); taste("Escape"); taste("Enter");
@@ -66,11 +66,11 @@ it("wählt mit Pfeilen, führt aus und sendet bei offener Liste nicht", () => {
 });
 it("schließt mit Esc, sendet danach normal und öffnet beim Tippen wieder", () => {
   expect(taste("Escape").defaultPrevented).toBe(true); expect(renderToStaticMarkup(ansicht())).not.toContain('role="listbox"');
-  taste("Enter"); expect(senden).toHaveBeenCalledWith("/"); tippen("/n"); expect(renderToStaticMarkup(ansicht())).toContain('role="listbox"');
+  taste("Enter"); expect(senden).toHaveBeenCalledWith("/", []); tippen("/n"); expect(renderToStaticMarkup(ansicht())).toContain('role="listbox"');
 });
 it("meldet unbekannte Befehle und sendet sie mit Enter normal", () => {
   tippen("/xyz"); expect(renderToStaticMarkup(ansicht())).toContain("Kein Befehl gefunden");
-  taste("Enter"); expect(senden).toHaveBeenCalledWith("/xyz"); expect(ausfuehren).not.toHaveBeenCalled();
+  taste("Enter"); expect(senden).toHaveBeenCalledWith("/xyz", []); expect(ausfuehren).not.toHaveBeenCalled();
 });
 it("führt während IME oder mit Umschalt+Enter keinen Befehl aus", () => {
   tippen("/planen");
@@ -106,7 +106,7 @@ it("wählt @ mit Pfeilen ohne Senden; Esc schließt, ohne Treffer sendet Enter",
   tippen("@exp"); taste("ArrowDown"); taste("Enter"); expect(text).toBe("@src/export/mod.rs "); expect(senden).not.toHaveBeenCalled();
   tippen("@exp"); taste("Escape"); expect(renderToStaticMarkup(ansicht())).not.toContain('role="listbox"');
   tippen("@unbekannt"); expect(renderToStaticMarkup(ansicht())).toContain("Nichts gefunden"); taste("Enter");
-  expect(senden).toHaveBeenCalledWith("@unbekannt"); vi.unstubAllGlobals();
+  expect(senden).toHaveBeenCalledWith("@unbekannt", []); vi.unstubAllGlobals();
 });
 it("öffnet / und @ nie gleichzeitig und ignoriert E-Mail-Adressen", () => {
   for (const wert of ["/planen @exp", "@"]) { tippen(wert); const html = renderToStaticMarkup(ansicht());
@@ -118,4 +118,9 @@ it("entfernt eine gewählte Marke samt Text", () => {
   expect(renderToStaticMarkup(eingabe())).toContain('aria-label="Bezug src/export/csv.rs entfernen"');
   eingabe().props.children[2].props.children[0].props.onClick(); expect(text).toBe(" ");
   expect(renderToStaticMarkup(eingabe())).not.toContain("Bezug src/export/csv.rs entfernen"); vi.unstubAllGlobals();
+});
+it("sendet nur den gewählten Pfad mit Leerzeichen und verwirft entfernte Bezüge", () => {
+  vi.stubGlobal("requestAnimationFrame", vi.fn()); tippen("@release"); taste("ArrowDown"); taste("Enter"); abschicken();
+  expect(senden).toHaveBeenLastCalledWith("@docs/release notes.md ", ["docs/release notes.md"]);
+  tippen("Ohne Bezug"); abschicken(); expect(senden).toHaveBeenLastCalledWith("Ohne Bezug", []); vi.unstubAllGlobals();
 });

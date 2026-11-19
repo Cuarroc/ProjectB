@@ -74,14 +74,14 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false
   laeuft?: boolean;
   dateien?: string[]; agenten?: Agent[];
   befehl?: (name: string) => void; anzahl?: number; neuGesperrt?: boolean; projektOffen?: boolean;
-  aendern: (werte: Partial<Chat>) => void; schreiben: (text: string) => void; senden: (text: string) => void;
+  aendern: (werte: Partial<Chat>) => void; schreiben: (text: string) => void; senden: (text: string, bezuege?: string[]) => void;
 }) {
   return <footer className="chat-eingabe">
     {laeuft && <p className="ein-arbeitet" id="chat-arbeitet" role="status">Orchestrator arbeitet … Bitte warte vor dem nächsten Senden.</p>}
     <span className="ein-sr" id="modus-hilfe">{erklaerungen[modi.indexOf(chat.modus)]}</span>
-    <Befehle key={chat.id} text={text} dateien={dateien} agenten={agenten} schreiben={schreiben} anzahl={anzahl} neuGesperrt={neuGesperrt} kompaktGrund={kompaktSperrgrund(chat, laeuft, projektOffen)} kontextProzent={chat.kontextProzent} ausfuehren={name => { befehl(name); schreiben(""); }}>{(feld, abfangen, befehlFehler, marken) =>
+    <Befehle key={chat.id} text={text} dateien={dateien} agenten={agenten} schreiben={schreiben} anzahl={anzahl} neuGesperrt={neuGesperrt} kompaktGrund={kompaktSperrgrund(chat, laeuft, projektOffen)} kontextProzent={chat.kontextProzent} ausfuehren={name => { befehl(name); schreiben(""); }}>{(feld, abfangen, befehlFehler, marken, bezuege) =>
     <Eingabefeld feld={feld} marken={marken} id="chat-nachricht" text={text} onTextAendern={schreiben}
-      onSenden={inhalt => { if (!abfangen(inhalt)) senden(inhalt); }} fehler={befehlFehler || fehler}
+      onSenden={inhalt => { if (!abfangen(inhalt)) senden(inhalt, bezuege); }} fehler={befehlFehler || fehler}
       ohneAnhaengen sendet={laeuft} beschreibungId={laeuft ? "modus-hilfe chat-arbeitet" : "modus-hilfe"}
       kopf={<div className="ein-moduszeile"><Modi wert={chat.modus} aendern={modus => aendern({ modus: modus as Chat["modus"] })} /><Einstellungen modus={chat.modus} /></div>}
       werkzeuge={<>
@@ -130,7 +130,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (werte.kontextfenster && !Object.hasOwn(werte, "kontextProzent")) werte.kontextProzent = ziel.kontextProzent * ziel.kontextfenster / werte.kontextfenster;
     Object.assign(ziel, werte); quelle.aktualisieren(neu);
   };
-  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt, kompakt = false) => {
+  const senden = async (inhalt: string, bezuege: string[] = [], freigabe?: string, anzeige = inhalt, kompakt = false) => {
     if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
     if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
     if (freigabe) {
@@ -144,10 +144,10 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     let gesendet = inhalt;
     try {
       const vorher = quelle.lesen(), ziel = vorher.chats.find(c => c.id === chat.id);
-      const auftrag = /(?:^|\s)@/.test(inhalt) ? mitBezuegen(inhalt, await projektDateien(vorher.kopf.pfad)) : inhalt;
+      const auftrag = !freigabe && /(?:^|\s)@/.test(inhalt) ? mitBezuegen(inhalt, (await projektDateien(vorher.kopf.pfad).catch(() => [])).filter(p => bezuege.includes(p))) : inhalt;
       if (quelle.lesen().kopf.pfad !== vorher.kopf.pfad || quelle.lesen().aktiverChatId !== chat.id) throw new Error("Chat oder Projekt gewechselt");
       if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, auftrag);
-      nachrichtAblegen(quelle, anzeige, kompakt); schreiben(""); setFehler("");
+      nachrichtAblegen(quelle, anzeige, kompakt); schreiben(aktuell => aktuell === inhalt ? "" : aktuell); setFehler("");
     }
     catch { laufende.current.delete(chat.id); setFehler("Nicht gesendet. Dein Text bleibt stehen."); return; }
     if (!isTauri()) { laufende.current.delete(chat.id); return; }
@@ -208,7 +208,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
         return;
       }
       if (nachricht.plan) { nachricht.plan.freigabe = "Freigegeben"; quelle.aktualisieren(neu); }
-      return senden(`Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${nachricht.text}${hinweise ? `\n\nBeachte dabei:\n${hinweise}` : ""}`, nachrichtId, "Plan freigegeben.");
+      return senden(`Der Plan ist freigegeben. Melde am Ende den Stand als Aufgabenliste (- [x] erledigt, - [ ] offen). Setze genau diesen Plan um:\n\n${nachricht.text}${hinweise ? `\n\nBeachte dabei:\n${hinweise}` : ""}`, [], nachrichtId, "Plan freigegeben.");
     }
     if (aktionId !== "plan-kommentieren") return;
     nachricht.aktionen = []; ziel.modus = "Planen"; quelle.aktualisieren(neu);
@@ -223,7 +223,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
         if (!ziel) return;
         const grund = kompaktSperrgrund(ziel, laufende.current.has(chat.id), !isTauri() || !!aktuell.kopf.geoeffnet);
         if (grund) { setFehler(grund); return; }
-        return senden("Fasse den bisherigen Verlauf knapp zusammen: Ziel, Entscheidungen, offene Punkte und wichtige Dateien. Höchstens etwa 300 Wörter. Ändere nichts.", undefined, "Verlauf wird zusammengefasst …", true);
+        return senden("Fasse den bisherigen Verlauf knapp zusammen: Ziel, Entscheidungen, offene Punkte und wichtige Dateien. Höchstens etwa 300 Wörter. Ändere nichts.", [], undefined, "Verlauf wird zusammengefasst …", true);
       }
       if (name === "neu") chatAnlegen(quelle);
       else if (name === "anhalten") allesAnhalten.setzen(true);
