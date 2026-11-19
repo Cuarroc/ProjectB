@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { anhangSpeichern, auftragSenden, chatNachrichtenHoeren, teamStarten } from "../daten/tauri";
-import { Anhaenge, useAnhaenge } from "./chat-eingabe/Anhaenge";
+import { Anhaenge, AnhangAblage, useAnhaenge } from "./chat-eingabe/Anhaenge";
 import { teamAuftraege } from "../daten/team-plan";
 import { antwortPlan, aufgabenListe, markdownKlartext } from "../daten/plan";
 import { BeispielQuelle } from "../daten/quelle";
@@ -76,7 +76,7 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false
   befehl?: (name: string) => void; anzahl?: number; neuGesperrt?: boolean; projektOffen?: boolean;
   aendern: (werte: Partial<Chat>) => void; schreiben: (text: string) => void; senden: (text: string) => void;
 }) {
-  return <footer className="chat-eingabe">
+  return <AnhangAblage anhaenge={anhaenge} gesperrt={laeuft}>
     {laeuft && <p className="ein-arbeitet" id="chat-arbeitet" role="status">Orchestrator arbeitet … Bitte warte vor dem nächsten Senden.</p>}
     <span className="ein-sr" id="modus-hilfe">{erklaerungen[modi.indexOf(chat.modus)]}</span>
     <Befehle key={chat.id} text={text} anzahl={anzahl} neuGesperrt={neuGesperrt} kompaktGrund={kompaktSperrgrund(chat, laeuft, projektOffen)} kontextProzent={chat.kontextProzent} ausfuehren={name => { befehl(name); schreiben(""); }}>{(feld, abfangen, befehlFehler) =>
@@ -93,7 +93,7 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false
         </Auswahl>
         <Kontext chat={chat} aendern={aendern} />
       </>} />}</Befehle>
-  </footer>;
+  </AnhangAblage>;
 }
 export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: BeispielQuelle }) {
   const eingabe = useChatEingabe(quelle);
