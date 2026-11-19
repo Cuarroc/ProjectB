@@ -23,6 +23,17 @@ const ereignis = (extra = {}) => ({ preventDefault: vi.fn(), dataTransfer: { typ
 beforeEach(() => { h.werte = []; h.refs = []; gesperrt = false; fehler = vi.fn(); aufraeumen = []; vi.stubGlobal("window", new EventTarget()); });
 afterEach(() => { aufraeumen.forEach(fn => fn?.()); vi.unstubAllGlobals(); });
 
+it("entfernt den Dateischutz für dragover und drop beim Unmount", () => {
+  ansicht();
+  const senden = typ => {
+    const event = Object.assign(new Event(typ, { cancelable: true }), { dataTransfer: { types: ["Files"], dropEffect: "copy" } });
+    window.dispatchEvent(event); return event;
+  };
+  for (const typ of ["dragover", "drop"]) expect(senden(typ).defaultPrevented).toBe(true);
+  aufraeumen.forEach(fn => fn?.()); aufraeumen = [];
+  for (const typ of ["dragover", "drop"]) expect(senden(typ).defaultPrevented).toBe(false);
+});
+
 it("verbindet die Ablage mit den Anhängen und der Chatsperre", () => {
   ansicht(); const chat = new BeispielQuelle().lesen().chats[0];
   const el = ChatEingabeAnsicht({ chat, modelle: [], text: "", fehler: "", laeuft: true, anhaenge });
