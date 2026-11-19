@@ -1,5 +1,46 @@
 import { test, expect } from "@playwright/test";
 
+test("ChatVerlauf übernimmt eine neue Fassung im offenen Dialog und gibt ihre ID frei", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Neue Fassung im offenen Dialog wird am Kandidaten geprüft.");
+  const fehler = [];
+  page.on("pageerror", e => fehler.push(e.message));
+  await page.goto("/");
+  await page.evaluate(async () => {
+    const [{ default: React }, { default: { createRoot } }, { default: ChatVerlauf }, { BeispielQuelle }, { beispiel }, { antwortPlan }] = await Promise.all([
+      import("/node_modules/.vite/deps/react.js"), import("/node_modules/.vite/deps/react-dom_client.js"),
+      import("/src/bereiche/ChatVerlauf.tsx"), import("/src/daten/quelle.ts"), import("/src/daten/beispiel.ts"), import("/src/daten/plan.ts"),
+    ]);
+    document.getElementById("root").hidden = true;
+    const element = document.createElement("div"); element.id = "test-chat"; document.body.append(element);
+    const daten = structuredClone(beispiel), a = antwortPlan("- [ ] Alter Schritt A", "fassung-a"), b = antwortPlan("- [ ] Neuer Schritt B", "fassung-b");
+    const nachricht = plan => ({ id: plan.id, von: "Orchestrator", zeit: "12:00", text: "Plan", plan, aktionen: [{ id: "plan-freigeben", text: "Freigeben und bauen" }] });
+    daten.chats[0].verlauf = [nachricht(a)]; daten.chats[0].gestartetUm = null;
+    const quelle = new BeispielQuelle(daten), root = createRoot(element);
+    window.aktionen = [];
+    const rendern = () => root.render(React.createElement(React.StrictMode, null, React.createElement(ChatVerlauf, { quelle, onAktion: (...args) => window.aktionen.push(args) })));
+    window.neueFassung = () => { daten.chats[0].verlauf.push(nachricht(b)); quelle.aktualisieren(structuredClone(daten)); rendern(); };
+    rendern();
+  });
+  const oeffner = page.locator("#test-chat").getByRole("button", { name: "Plan öffnen", exact: true }).first();
+  await oeffner.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".pl-schritt h3")).toHaveText(["Alter Schritt A"]);
+  await dialog.getByRole("button", { name: "Kommentar, Silbergrau" }).click();
+  await dialog.getByRole("textbox").fill("Kommentar zu A");
+  await dialog.getByRole("button", { name: "Simpler, Türkis" }).click();
+  await page.evaluate(() => window.neueFassung());
+  await expect(dialog).toHaveCount(1); await expect(dialog).toBeVisible();
+  await expect(dialog.locator(".pl-schritt h3")).toHaveText(["Neuer Schritt B"]);
+  await expect(dialog.getByRole("radio", { name: "B", exact: true })).toBeChecked();
+  await expect(dialog.getByRole("textbox")).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Simpler, Türkis" })).toHaveAttribute("aria-pressed", "false");
+  expect(await dialog.evaluate(e => e.contains(document.activeElement))).toBe(true);
+  await dialog.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.aktionen[0]?.slice(0, 2))).toEqual(["fassung-b", "plan-freigeben"]);
+  await expect(dialog).toHaveCount(0); await expect(oeffner).toBeFocused();
+  expect(fehler).toEqual([]);
+});
+
 test("Planfassungen: Wechsel, Vergleich, Sperren und Kopf ohne Überlauf", async ({ page }, info) => {
   test.skip(process.env.UI_BASELINE === "1", "Planfassungen werden am Kandidaten geprüft.");
   await page.goto("/?vorschau=plan"); await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();

@@ -58,7 +58,7 @@ export default function PlanAufwand({ schritte, vorher, vorherName, kontext, onZ
           <td>{i + 1}</td><td><span>{s.titel}</span>{s.dauerMinuten != null && <span className="pl-balken" style={{ width: `${maximum ? s.dauerMinuten / maximum * 100 : 0}%` }} />}</td>
           <td>{minuten(s.dauerMinuten)}</td><td><Risiko wert={s.risiko} /></td>
         </tr>)}</tbody>
-        <tfoot><tr><td /><td><div className="pl-achse"><span>0</span><span>{maximum == null ? "–" : maximum / 2}</span><span>{maximum ?? "–"} min</span></div></td><td /><td /></tr></tfoot>
+        <tfoot><tr><td /><td><div className="pl-achse"><span>0</span><span>{maximum == null ? "–" : (maximum / 2).toLocaleString("de-DE")}</span><span>{maximum?.toLocaleString("de-DE") ?? "–"} min</span></div></td><td /><td /></tr></tfoot>
       </table>
       <p className="pl-hinweis">{dauer == null ? "Keine Dauer bekannt." : `Summe ${minuten(dauer)} in ${dauern.length}${dauern.length < schritte.length ? ` von ${schritte.length}` : ""} ${schritte.length === 1 ? "Schritt" : "Schritten"}.`} Fahr über einen Balken, um den Schritt links zu sehen.</p>
     </section>
