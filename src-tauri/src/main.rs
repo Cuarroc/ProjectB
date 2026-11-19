@@ -23,6 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             einstellungen::einstellungen_speichern,
             kontingent::kontingent,
             projekt::projekt_pruefen,
+            projekt::anhang_speichern,
             projekt::projekt_oeffnen,
             projekt::projekte_zuletzt,
         ])

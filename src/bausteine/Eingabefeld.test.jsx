@@ -10,6 +10,10 @@ const aufbau = (props = {}) => {
 const taste = (werte = {}) => ({ key: "Enter", shiftKey: false, nativeEvent: { isComposing: false }, preventDefault: vi.fn(), ...werte });
 
 describe("Eingabefeld", () => {
+  it("sendet Anhänge auch ohne Text", () => {
+    const { feld, onSenden } = aufbau({ text: "", hatAnhaenge: true }); feld.props.onKeyDown(taste());
+    expect(onSenden).toHaveBeenCalledExactlyOnceWith("");
+  });
   it("sendet Enter und verhindert die neue Zeile", () => {
     const { feld, onSenden } = aufbau(), event = taste();
     feld.props.onKeyDown(event);

@@ -6,6 +6,8 @@ use std::{
     path::Path,
     process::{Command, Output},
     sync::atomic::{AtomicUsize, Ordering},
+    sync::Mutex,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +22,57 @@ pub fn oeffnen(pfad: impl AsRef<Path>, datei: impl AsRef<Path>) -> Result<Projek
     let projekt = pruefen(pfad)?;
     zuletzt_merken(datei, &projekt.pfad)?;
     Ok(projekt)
+}
+
+pub fn anhang_speichern(pfad: &Path, datei: &Path, name: &str, inhalt: &[u8]) -> io::Result<String> {
+    static SPERRE: Mutex<()> = Mutex::new(());
+    let _sperre = SPERRE.lock().unwrap(); // serialisiert den einmaligen exclude-Eintrag
+    let wurzel = fs::canonicalize(pfad)?;
+    if !zuletzt_laden(datei).iter().any(|p| schluessel(p) == schluessel(&pfad.to_string_lossy()))
+        || inhalt.len() > 10 * 1024 * 1024
+    {
+        return Err(Fehler::other("Projekt nicht geöffnet oder Anhang größer als 10 MB"));
+    }
+    let mut ordner = wurzel.clone();
+    for teil in [".projectb", "anhaenge"] {
+        ordner.push(teil);
+        if fs::symlink_metadata(&ordner).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err(Fehler::other("Anhang-Ordner darf kein Link sein"));
+        }
+        fs::create_dir_all(&ordner)?;
+        if !fs::canonicalize(&ordner)?.starts_with(&wurzel) {
+            return Err(Fehler::other("Anhang liegt außerhalb des Projekts"));
+        }
+    }
+    let exclude = text(git(&wurzel, &["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"])?)?;
+    let exclude = Path::new(&exclude);
+    if fs::symlink_metadata(exclude).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(Fehler::other("exclude darf kein Link sein"));
+    }
+    fs::create_dir_all(exclude.parent().ok_or_else(|| Fehler::other("Git-Ordner fehlt"))?)?;
+    let bisher = match fs::read_to_string(exclude) {
+        Ok(s) => s,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(e),
+    };
+    if !bisher.lines().any(|l| l == ".projectb/") {
+        OpenOptions::new().append(true).create(true).open(exclude)?.write_all(b"\n.projectb/\n")?;
+    }
+    let name = name.rsplit(['/', '\\']).next().unwrap_or("");
+    let name: String =
+        name.chars().take(120).map(|c| if c.is_ascii_alphanumeric() || "-_.".contains(c) { c } else { '_' }).collect();
+    let name = name.replace("..", "_");
+    let (dateiname, mut datei) = loop {
+        let id = SystemTime::now().duration_since(UNIX_EPOCH).map_err(Fehler::other)?.as_nanos();
+        let dateiname = format!("{id}-{}", name.trim_matches('.'));
+        match OpenOptions::new().write(true).create_new(true).open(ordner.join(&dateiname)) {
+            Ok(datei) => break (dateiname, datei),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    };
+    datei.write_all(inhalt)?;
+    Ok(format!(".projectb/anhaenge/{dateiname}"))
 }
 
 /// Ermittelt die Arbeitsbaumwurzel, auch aus Unterordnern und bei leerem Repo.
