@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "label": "main", "title": "ProjectB", "width": 960, "height": 640 }],
+    "windows": [{ "label": "main", "title": "ProjectB", "width": 960, "height": 640, "dragDropEnabled": false }],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: asset: http://asset.localhost; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
       "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"

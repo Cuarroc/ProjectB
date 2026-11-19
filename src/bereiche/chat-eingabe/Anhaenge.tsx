@@ -1,6 +1,36 @@
 import { useEffect, useRef, useState } from "react";
-import { FileText, Trash2 } from "lucide-react";
+import type { DragEvent, ReactNode } from "react";
+import { FileText, FileUp, Trash2 } from "lucide-react";
 import "./Anhaenge.css";
+
+export function AnhangAblage({ anhaenge, gesperrt = false, children }: { anhaenge?: ReturnType<typeof useAnhaenge>; gesperrt?: boolean; children: ReactNode }) {
+  const tiefe = useRef(0), [anzahl, setzen] = useState<number | null>(null);
+  const schliessen = () => { tiefe.current = 0; setzen(null); };
+  useEffect(() => { if (gesperrt) schliessen(); }, [gesperrt]);
+  useEffect(() => {
+    if (anzahl === null) return;
+    const taste = (event: KeyboardEvent) => { if (event.key === "Escape") schliessen(); };
+    window.addEventListener("keydown", taste, true); return () => window.removeEventListener("keydown", taste, true);
+  }, [anzahl]);
+  const dateien = (event: DragEvent) => Array.from(event.dataTransfer.types).includes("Files");
+  const ziehen = (event: DragEvent, betreten = false) => {
+    if (!dateien(event)) return;
+    event.preventDefault(); event.dataTransfer.dropEffect = gesperrt ? "none" : "copy";
+    if (gesperrt || !anhaenge) return;
+    if (betreten) tiefe.current++;
+    setzen(event.dataTransfer.items.length);
+  };
+  return <footer className="chat-eingabe" onDragEnter={event => ziehen(event, true)} onDragOver={event => ziehen(event)}
+    onDragLeave={() => { tiefe.current = Math.max(0, tiefe.current - 1); if (!tiefe.current) setzen(null); }}
+    onDrop={event => { if (!dateien(event)) return; event.preventDefault(); schliessen(); if (!gesperrt) void anhaenge?.hinzufuegen(Array.from(event.dataTransfer.files)); }}>
+    {children}
+    {!gesperrt && anzahl !== null && <div className="ein-ablage" role="status">
+      {!!anzahl && <span className="ein-ablage-zahl">{anzahl} {anzahl === 1 ? "Datei" : "Dateien"}</span>}
+      <span className="ein-an-stempel"><FileUp size={24} aria-hidden="true" /></span>
+      <span><strong>Loslassen zum Anhängen</strong><small>Bilder und Dateien, auch mehrere</small></span>
+    </div>}
+  </footer>;
+}
 
 type Anhang = { datei: File; zeilen?: number };
 export function useAnhaenge(fehler: (text: string) => void) {

@@ -1,6 +1,28 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
+test("zeigt die Ablage beim Ziehen und hängt zwei Dateien per Drop an", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Anhänge werden am Kandidaten geprüft.");
+  await page.goto("/"); await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => {
+    const daten = new DataTransfer();
+    daten.items.add(new File(["bild"], "entwurf.png", { type: "image/png" }));
+    daten.items.add(new File(["a,b\nc,d"], "pakete.csv", { type: "text/csv" }));
+    window.gezogeneDateien = daten;
+    document.querySelector(".chat-eingabe").dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: daten }));
+  });
+  await expect(page.getByText("Loslassen zum Anhängen", { exact: true })).toBeVisible();
+  await expect(page.getByText("Bilder und Dateien, auch mehrere", { exact: true })).toBeVisible();
+  await expect(page.getByText("2 Dateien", { exact: true })).toBeVisible();
+  if (process.env.BILD_ORDNER && info.project.name !== "1280x800") await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-8-5_ziehen_${info.project.name}.png` });
+  await page.evaluate(() => document.querySelector("#chat-nachricht").dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: window.gezogeneDateien })));
+  await expect(page.getByText("Loslassen zum Anhängen", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".ein-anhaenge li")).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "entwurf.png entfernen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "pakete.csv entfernen" })).toBeVisible();
+  await expect(page.locator(".ein-anhaenge")).toContainText("CSV · 1 KB · 2 Zeilen");
+});
+
 test("hängt PNG und CSV per Plus an und sendet ihre gespeicherten Pfade", async ({ page }, info) => {
   test.skip(process.env.UI_BASELINE === "1", "Anhänge werden am Kandidaten geprüft.");
   const csp = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8")).app.security.devCsp;
