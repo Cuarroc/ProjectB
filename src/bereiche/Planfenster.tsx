@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { AlignLeft, Check, Circle, CircleMinus, Clock, Lightbulb, ListChecks, ListTree, MessageSquare, RefreshCw, Users, X, Zap } from "lucide-react";
 import { Knopf } from "../bausteine/Knopf";
+import { Umschalter } from "../bausteine/Umschalter";
 import { Statusmarke } from "../bausteine/Statusmarke";
 import PlanAufwand from "./PlanAufwand";
 import type { Datenstand, Markierung, Plan } from "../daten/typen";
@@ -18,12 +19,20 @@ export function MarkierterText({ text, marke }: { text: string; marke?: Marke })
   return marke ? <>{text.slice(0, marke.start)}<mark style={{ "--f": farbe(marke.name) } as CSSProperties}>{text.slice(marke.start, marke.ende)}</mark>
     <span className="pl-vorlesen"> ({marke.name}, {farben.find(f => f[0] === marke.name)![2]})</span>{text.slice(marke.ende)}</> : <>{text}</>;
 }
-export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarken, onSchliessen, onEntscheiden, entscheidbar = true, freigabeGesperrt = false, laeuft = false }: {
+export default function Planfenster({ daten, plan: echterPlan, fassungen, fassungIndex = 0, gespeicherteMarken, onSchliessen, onEntscheiden, entscheidbar = true, freigabeGesperrt = false, laeuft = false }: {
+  fassungen?: Plan[]; fassungIndex?: number;
   daten: Datenstand; plan?: Plan; entscheidbar?: boolean; freigabeGesperrt?: boolean; laeuft?: boolean; gespeicherteMarken: PlanMarken; onSchliessen: () => void; onEntscheiden: (plan: Plan, marken: PlanMarken, stil: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [plan, setPlan] = useState(() => structuredClone(echterPlan ?? daten.plan));
-  const [marken, setMarken] = useState<PlanMarken>(gespeicherteMarken);
+  const [entwurf, setPlan] = useState(() => structuredClone(fassungen?.at(-1) ?? echterPlan ?? daten.plan));
+  const [index, setIndex] = useState(fassungIndex);
+  const namen = fassungen?.map((_, i) => String.fromCharCode(65 + i)) ?? [];
+  const aelter = !!fassungen?.length && index < fassungen.length - 1;
+  const grund = aelter ? "Ältere Fassung, nur zum Vergleich. Wechsle zur neuesten, um zu entscheiden." : undefined;
+  entscheidbar = entscheidbar && !aelter;
+  const plan = aelter ? fassungen![index] : entwurf;
+  const [entwurfMarken, setMarken] = useState<PlanMarken>(gespeicherteMarken);
+  const marken = aelter ? {} : entwurfMarken;
   const auswahl = useRef<{ id: string; feld: string; start: number; ende: number } | null>(null);
   const [hinweis, setHinweis] = useState("");
   const [stil, setStil] = useState(echterPlan ? "" : "Ausführlicher");
@@ -66,7 +75,8 @@ export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarke
   }}>
     <section className="pl-links">
       <header className="pl-kopf"><span className="pl-kopf-symbol"><ListChecks size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /></span>
-        <div className="pl-kopftext"><h2 id="plan-titel">Plan: {plan.titel}</h2><div className="pl-meta">Orchestrator{!echterPlan && " · 14:31"} <span>{plan.schritte.length} Schritte</span></div></div>
+        <div className="pl-kopftext"><h2 id="plan-titel">Plan: {plan.titel}</h2><div className="pl-meta">Orchestrator{!echterPlan && " · 14:31"} {namen.length > 1 && <span className="pl-einheit">Fassung {namen[index]} von {namen.length}</span>}<span>{plan.schritte.length} Schritte</span></div>
+          {namen.length > 1 && <Umschalter beschriftung="Fassung" moeglichkeiten={namen} wert={namen[index]} onChange={name => { setIndex(namen.indexOf(name)); auswahl.current = null; setHover(null); setFokus(null); setHinweis(""); }} />}</div>
         <Statusmarke zustand={plan.freigabe === "Freigegeben" ? (laeuft ? "arbeitet" : "fertig") : "wartet"} wort={plan.freigabe === "Freigegeben" && !laeuft ? "Freigegeben" : undefined} /><Knopf text="Plan schließen" symbol={X} nurSymbol variante="leise" onClick={onSchliessen} />
       </header>
       <ol className="pl-liste" tabIndex={0} aria-label="Planschritte">{plan.schritte.map((s, i) => {
@@ -91,22 +101,22 @@ export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarke
           </div>
           {!echterPlan && s.markierungen.includes("Ausarbeiten") && <div className="pl-einzug pl-feld"><strong className="pl-feld-kopf">Ausgearbeitet · Beispiel</strong><ol className="pl-bedingungen"><li>Vorhandene Daten und Schnittstellen prüfen</li><li>{s.titel}</li><li>Bedingungen mit Tests und Review prüfen</li></ol></div>}
           {s.markierungen.includes("Kommentar") && <label className="pl-einzug pl-feld pl-kommentar">Dein Kommentar
-            <textarea disabled={!entscheidbar} aria-label={`Kommentar zu ${s.titel}`} value={s.kommentar} placeholder="Schreib hier, was an diesem Schritt anders werden soll …" onChange={e => schrittAendern(s.id, { kommentar: e.target.value })} />
+            <textarea disabled={!entscheidbar} title={grund} aria-label={`Kommentar zu ${s.titel}`} value={s.kommentar} placeholder="Schreib hier, was an diesem Schritt anders werden soll …" onChange={e => schrittAendern(s.id, { kommentar: e.target.value })} />
           </label>}
           <div className="pl-einzug pl-aktionen" role="group" aria-label={`Markieren: ${s.titel}`}>
-            {farben.map(([name, , farbname, Symbol]) => <button type="button" disabled={!entscheidbar} key={name} style={{ "--f": farbe(name) } as CSSProperties}
+            {farben.map(([name, , farbname, Symbol]) => <button type="button" disabled={!entscheidbar} title={grund} key={name} style={{ "--f": farbe(name) } as CSSProperties}
               aria-label={`${name}, ${farbname}`} aria-pressed={s.markierungen.includes(name)} onClick={() => markieren(s.id, name)}><Symbol size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{name}</button>)}
           </div>
         </li>;
       })}</ol>
     </section>
     <aside className="pl-rechts" aria-label="Plan bearbeiten"><div className="pl-werkzeuge" tabIndex={0} role="region" aria-label="Planwerkzeuge">
-      <PlanAufwand schritte={plan.schritte} kontext={daten.chats?.find(c => c.id === daten.aktiverChatId)?.kontextfenster} onZeigen={zeigen} />
+      <PlanAufwand schritte={plan.schritte} vorher={index > 0 ? fassungen?.[index - 1].schritte : undefined} vorherName={namen[index - 1]} kontext={daten.chats?.find(c => c.id === daten.aktiverChatId)?.kontextfenster} onZeigen={zeigen} />
       <section className="pl-karte"><div className="pl-karte-kopf"><h3>Deine Markierungen</h3><span className="pl-einheit">{markZahl}</span></div><div className="pl-stil">{farben.map(([name]) => <span className="pl-marke" key={name} style={{ "--f": farbe(name) } as CSSProperties}><span className="pl-farbpunkt" aria-hidden="true" />{name} {plan.schritte.filter(s => s.markierungen.includes(name)).length}</span>)}</div>
         <p className="pl-hinweis">Jeder Knopf an einem Schritt färbt ihn in seiner Farbe. Mehrere Knöpfe ergeben mehrere Farben oben am Schritt.</p></section>
       <section className="pl-karte"><h3>Wie soll der Plan geschrieben sein?</h3><div className="pl-stil">{["Simpler", "Ausführlicher", "Innovativer", "Vorsichtiger", "Schneller"].map(w => <button type="button" disabled={!entscheidbar} className="pl-stilknopf" key={w} aria-pressed={stil === w} onClick={() => setStil(w)}>{w}</button>)}</div>
-        {stil && <p className="pl-hinweis">Nächste Fassung wird {stil.toLocaleLowerCase("de")}.</p>}<Knopf text="Neu schreiben lassen" vorsatz={<RefreshCw size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} disabled={!entscheidbar} onClick={() => echterPlan ? entscheiden(false) : setHinweis(`Beispiel: Der Plan wird ${stil.toLocaleLowerCase("de")} geschrieben.`)} /></section>
-    </div><footer className="pl-fuss"><p role="status">{hinweis}</p><Knopf text="Freigeben und bauen" vorsatz={<Check size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="haupt" disabled={!entscheidbar || freigabeGesperrt} grund={freigabeGesperrt ? "Das letzte Team läuft noch oder ist nicht gesichert." : undefined} onClick={() => entscheiden(true)} />
-      <button type="button" className="knopf kn kn-zweit" disabled={!entscheidbar} aria-label={`Mit Kommentaren zurückgeben, ${markZahl} markiert`} onClick={() => entscheiden(false)}>Mit Kommentaren zurückgeben<span className="pl-zaehler" aria-hidden="true">{markAnzahl}</span></button></footer></aside>
+        {stil && <p className="pl-hinweis">Nächste Fassung wird {stil.toLocaleLowerCase("de")}.</p>}<Knopf text="Neu schreiben lassen" vorsatz={<RefreshCw size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} disabled={!entscheidbar} grund={grund} onClick={() => echterPlan ? entscheiden(false) : setHinweis(`Beispiel: Der Plan wird ${stil.toLocaleLowerCase("de")} geschrieben.`)} /></section>
+    </div><footer className="pl-fuss"><p role="status">{hinweis}</p><Knopf text="Freigeben und bauen" vorsatz={<Check size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />} variante="haupt" disabled={!entscheidbar || freigabeGesperrt} grund={grund ?? (freigabeGesperrt ? "Das letzte Team läuft noch oder ist nicht gesichert." : undefined)} onClick={() => entscheiden(true)} />
+      <Knopf text="Mit Kommentaren zurückgeben" disabled={!entscheidbar} grund={grund} aria-label={`Mit Kommentaren zurückgeben, ${markZahl} markiert`} onClick={() => entscheiden(false)} nachsatz={<span className="pl-zaehler" aria-hidden="true">{markAnzahl}</span>} /></footer></aside>
   </dialog>;
 }

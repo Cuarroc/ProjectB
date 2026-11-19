@@ -115,3 +115,6 @@ export const beispiel: Datenstand = {
       "Konten anlegen oder Passwörter eingeben", "Außerhalb des Projekts endgültig löschen"],
   },
 };
+
+export const beispielFassungen = [beispiel.plan, { ...beispiel.plan, id: "csv-plan-b", freigabe: "Wartet auf dich" as const,
+  schritte: beispiel.plan.schritte.slice(1).map(s => ({ ...s, dauerMinuten: s.dauerMinuten! - 1, tokens: s.tokens! + 3000 })) }];

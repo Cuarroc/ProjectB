@@ -5,6 +5,7 @@ test("Planfenster: vier Aufwand-Pillen, neutrale Risiken und unbekannte Werte oh
   test.skip(process.env.UI_BASELINE === "1", "Aufwand-Pillen werden am Kandidaten geprüft.");
   await page.goto("/?vorschau=plan");
   await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();
+  await page.getByRole("radio", { name: "A", exact: true }).click();
   await page.evaluate(() => document.fonts.ready);
   const dialog = page.getByRole("dialog"), schritte = dialog.locator(".pl-schritt");
   const erwartet = [["Orchestrator", "– min", "– Tokens", "Risiko –"],
@@ -67,7 +68,7 @@ test("Planfenster: Zurückgeben und Schrittaktionen bleiben einzeilig", async ({
     expect(await zeile.locator("button").evaluateAll(es => new Set(es.map(e => e.offsetTop)).size)).toBe(1);
   const knopf = page.getByRole("button", { name: /^Mit Kommentaren zurückgeben,/ });
   expect(await knopf.evaluate(e => {
-    const r = document.createRange(); r.selectNode(e.firstChild); const t = r.getBoundingClientRect(), z = e.querySelector(".pl-zaehler").getBoundingClientRect(), k = e.getBoundingClientRect();
+    const r = document.createRange(); r.selectNode(e.querySelector(".knopf-inhalt").firstChild); const t = r.getBoundingClientRect(), z = e.querySelector(".pl-zaehler").getBoundingClientRect(), k = e.getBoundingClientRect();
     return r.getClientRects().length === 1 && t.left >= k.left && z.right <= k.right && z.top < t.bottom && z.bottom > t.top;
   })).toBe(true);
   if (process.env.BILD_ORDNER && info.project.name !== "1280x800")
