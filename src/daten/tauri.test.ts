@@ -10,6 +10,10 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
 
 describe("Projektbrücke", () => {
+  it("lädt beim nächsten Aufruf neue, gelöschte und umbenannte Dateien frisch", async () => {
+    const { projektDateien } = await import("./tauri"); vi.mocked(isTauri).mockReturnValue(true); vi.mocked(invoke).mockResolvedValueOnce(["alt.rs", "weg.rs"]).mockResolvedValueOnce(["umbenannt.rs", "neu.rs"]);
+    for (const liste of [["alt.rs", "weg.rs"], ["umbenannt.rs", "neu.rs"]]) await expect(projektDateien("/repo")).resolves.toEqual(liste);
+  });
   it("liefert ohne Tauri Beispieldaten und weist echte Pfade klar zurück", async () => {
     const { projekt, pfad, zweig } = beispiel.kopf;
     await expect(projektPruefen(pfad)).resolves.toEqual({ projekt, pfad, zweig });

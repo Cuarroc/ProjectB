@@ -31,7 +31,8 @@ pub async fn team_starten(
         let daten = app.path().app_data_dir().map_err(|e| e.to_string())?;
         fs::create_dir_all(&daten).map_err(|e| e.to_string())?;
         let kontingent = daten.join("kontingent.json");
-        let einstellungen = kern::einstellungen::laden(kern::einstellungen::datei_fuer(&daten, &pfad));
+        let einstellungen =
+            kern::einstellungen::laden(kern::einstellungen::datei_fuer(&daten, &pfad));
         let auftraege = auftraege
             .into_iter()
             .map(|a| kern::team::TeamAuftrag {

@@ -74,6 +74,20 @@ fn git(pfad: &Path, args: &[&str]) -> io::Result<Output> {
     })
 }
 
+pub fn dateien(pfad: impl AsRef<Path>, zuletzt: impl AsRef<Path>) -> io::Result<Vec<String>> {
+    let projekt = pruefen(pfad)?;
+    if !zuletzt_laden(zuletzt).iter().any(|p| schluessel(p) == schluessel(&projekt.pfad)) {
+        return Err(Fehler::new(io::ErrorKind::PermissionDenied, "Bitte zuerst das Projekt öffnen."));
+    }
+    let ausgabe =
+        text(git(Path::new(&projekt.pfad), &["ls-files", "--cached", "--others", "--exclude-standard", "-z"])?)?;
+    let mut pfade: Vec<String> = ausgabe.split('\0').filter(|p| !p.is_empty()).map(str::to_owned).collect();
+    pfade.sort();
+    pfade.dedup();
+    pfade.truncate(5000);
+    Ok(pfade)
+}
+
 fn git_fehler(ausgabe: &Output, hinweis: &str) -> String {
     let stderr = String::from_utf8_lossy(&ausgabe.stderr);
     let hinweis = if stderr.contains("dubious ownership") {

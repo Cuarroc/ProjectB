@@ -54,6 +54,11 @@ pub fn projekt_oeffnen(app: tauri::AppHandle, pfad: String) -> Result<Projekt, S
 }
 
 #[tauri::command(async)]
+pub fn projekt_dateien(app: tauri::AppHandle, pfad: String) -> Result<Vec<String>, String> {
+    kern::projekt::dateien(&pfad, zuletzt_datei(&app)?).map_err(|e| e.to_string())
+}
+
+#[tauri::command(async)]
 pub fn projekte_zuletzt(app: tauri::AppHandle) -> Vec<String> {
     match zuletzt_datei(&app) {
         Ok(datei) => zuletzt(&datei),
