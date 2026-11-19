@@ -7,9 +7,8 @@ use std::{
     process::{Command, Output},
     sync::atomic::{AtomicUsize, Ordering},
     sync::Mutex,
+    time::{SystemTime, UNIX_EPOCH},
 };
-
-static OFFEN: Mutex<Vec<std::path::PathBuf>> = Mutex::new(Vec::new());
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Projekt {
@@ -22,19 +21,16 @@ pub struct Projekt {
 pub fn oeffnen(pfad: impl AsRef<Path>, datei: impl AsRef<Path>) -> Result<Projekt, Fehler> {
     let projekt = pruefen(pfad)?;
     zuletzt_merken(datei, &projekt.pfad)?;
-    let wurzel = fs::canonicalize(&projekt.pfad)?;
-    let mut offen = OFFEN.lock().unwrap();
-    if !offen.contains(&wurzel) {
-        offen.push(wurzel);
-    }
     Ok(projekt)
 }
 
-pub fn anhang_speichern(pfad: impl AsRef<Path>, name: &str, inhalt: &[u8]) -> io::Result<String> {
-    use std::hash::{BuildHasher, RandomState};
-    let offen = OFFEN.lock().unwrap(); // serialisiert auch den einmaligen exclude-Eintrag
+pub fn anhang_speichern(pfad: &Path, datei: &Path, name: &str, inhalt: &[u8]) -> io::Result<String> {
+    static SPERRE: Mutex<()> = Mutex::new(());
+    let _sperre = SPERRE.lock().unwrap(); // serialisiert den einmaligen exclude-Eintrag
     let wurzel = fs::canonicalize(pfad)?;
-    if !offen.contains(&wurzel) || inhalt.len() > 10 * 1024 * 1024 {
+    if !zuletzt_laden(datei).iter().any(|p| schluessel(p) == schluessel(&pfad.to_string_lossy()))
+        || inhalt.len() > 10 * 1024 * 1024
+    {
         return Err(Fehler::other("Projekt nicht geöffnet oder Anhang größer als 10 MB"));
     }
     let mut ordner = wurzel.clone();
@@ -62,28 +58,20 @@ pub fn anhang_speichern(pfad: impl AsRef<Path>, name: &str, inhalt: &[u8]) -> io
     if !bisher.lines().any(|l| l == ".projectb/") {
         OpenOptions::new().append(true).create(true).open(exclude)?.write_all(b"\n.projectb/\n")?;
     }
-    let name: String = name
-        .rsplit(['/', '\\'])
-        .next()
-        .unwrap_or("")
-        .chars()
-        .take(120)
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' { c } else { '_' })
-        .collect();
+    let name = name.rsplit(['/', '\\']).next().unwrap_or("");
+    let name: String =
+        name.chars().take(120).map(|c| if c.is_ascii_alphanumeric() || "-_.".contains(c) { c } else { '_' }).collect();
     let name = name.replace("..", "_");
-    // RandomState liefert zufällige Schlüssel aus dem Betriebssystem, ohne neue UUID-Abhängigkeit.
-    let a = RandomState::new().hash_one(0);
-    let b = RandomState::new().hash_one(1);
-    let id = format!(
-        "{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}",
-        a >> 32,
-        (a >> 16) & 0xffff,
-        a & 0xfff,
-        0x8000 | ((b >> 48) & 0x3fff),
-        b & 0xffffffffffff
-    );
-    let dateiname = format!("{id}-{}", name.trim_matches('.'));
-    OpenOptions::new().write(true).create_new(true).open(ordner.join(&dateiname))?.write_all(inhalt)?;
+    let (dateiname, mut datei) = loop {
+        let id = SystemTime::now().duration_since(UNIX_EPOCH).map_err(Fehler::other)?.as_nanos();
+        let dateiname = format!("{id}-{}", name.trim_matches('.'));
+        match OpenOptions::new().write(true).create_new(true).open(ordner.join(&dateiname)) {
+            Ok(datei) => break (dateiname, datei),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    };
+    datei.write_all(inhalt)?;
     Ok(format!(".projectb/anhaenge/{dateiname}"))
 }
 

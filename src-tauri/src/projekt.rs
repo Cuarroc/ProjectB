@@ -30,8 +30,14 @@ fn zuletzt(datei: &Path) -> Vec<String> {
 }
 
 #[tauri::command(async)]
-pub fn anhang_speichern(pfad: String, name: String, inhalt: Vec<u8>) -> Result<String, String> {
-    kern::projekt::anhang_speichern(pfad, &name, &inhalt).map_err(|e| e.to_string())
+pub fn anhang_speichern(
+    app: tauri::AppHandle,
+    pfad: String,
+    name: String,
+    inhalt: Vec<u8>,
+) -> Result<String, String> {
+    kern::projekt::anhang_speichern(Path::new(&pfad), &zuletzt_datei(&app)?, &name, &inhalt)
+        .map_err(|e| e.to_string())
 }
 
 fn datei_im_ordner(ordner: PathBuf) -> Result<PathBuf, String> {

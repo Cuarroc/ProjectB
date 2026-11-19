@@ -44,7 +44,7 @@ function textMitVerlauf(chat: Chat, pfad: string, text: string) {
   const anbieter = chat.modell === "gpt-6.1-sol" ? "codex" : "claude";
   if (!chat.verlauf.length || (chat.sitzung?.anbieter.toLowerCase() === anbieter && chat.sitzung.pfad === pfad)) return text;
   const anfang = chat.verlauf.findIndex(n => n.id === chat.zusammenfassung);
-  const nachrichten = chat.verlauf.slice(anfang < 0 ? -20 : anfang).map(n => `${n.von}: ${n.text}`);
+  const nachrichten = chat.verlauf.slice(anfang < 0 ? -20 : anfang).map(n => `${n.von}: ${n.text}${n.anhaenge?.length ? `\n\nAnhänge:\n${n.anhaenge.join("\n")}` : ""}`);
   let gekuerzt = anfang < 0 && chat.verlauf.length > 20;
   const kontext = () => `Bisheriger Verlauf dieses Chats (zur Einordnung):\n\n${gekuerzt ? "[Verlauf gekürzt: Älteste Nachrichten ausgelassen.]\n\n" : ""}${nachrichten.join("\n\n")}`;
   while (kontext().length > 20000 && nachrichten.length > (anfang < 0 ? 0 : 1)) { nachrichten.splice(anfang < 0 ? 0 : 1, 1); gekuerzt = true; }
@@ -123,7 +123,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (werte.kontextfenster && !Object.hasOwn(werte, "kontextProzent")) werte.kontextProzent = ziel.kontextProzent * ziel.kontextfenster / werte.kontextfenster;
     Object.assign(ziel, werte); quelle.aktualisieren(neu);
   };
-  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt, kompakt = false) => {
+  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt, kompakt = false, mitAnhaengen = false) => {
     if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
     if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
     if (freigabe) {
@@ -133,19 +133,18 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       nachricht.aktionen = []; ziel.modus = "Ausführen"; quelle.aktualisieren(neu);
     }
     const alterVerlauf = quelle.lesen().chats.find(c => c.id === chat.id)?.verlauf ?? [];
-    let gesendet = inhalt;
+    let gesendet = inhalt; const pfade: string[] = [];
     laufende.current.add(chat.id);
     try {
-      if (anhaenge.dateien.length) {
-        setSpeichert(true);
-        const pfade = [], projekt = quelle.lesen().kopf.pfad;
+      if (mitAnhaengen && anhaenge.dateien.length) {
+        setSpeichert(true); const projekt = quelle.lesen().kopf.pfad;
         for (const { datei } of anhaenge.dateien) pfade.push(await anhangSpeichern(projekt, datei));
         if (quelle.lesen().aktiverChatId !== chat.id || quelle.lesen().kopf.pfad !== projekt) throw new Error("Chat oder Projekt gewechselt.");
         inhalt += `\n\nAnhänge:\n${pfade.join("\n")}`;
       }
       const vorher = quelle.lesen(), ziel = vorher.chats.find(c => c.id === chat.id);
       if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, inhalt);
-      nachrichtAblegen(quelle, anzeige, kompakt, anhaenge.dateien.map(a => a.datei.name)); schreiben(""); anhaenge.leeren(); setFehler("");
+      nachrichtAblegen(quelle, anzeige, kompakt, pfade); if (mitAnhaengen) { schreiben(aktuell => aktuell === anzeige ? "" : aktuell); anhaenge.leeren(); } setFehler("");
     }
     catch (e) { laufende.current.delete(chat.id); setFehler(`Nicht gesendet: ${e instanceof Error ? e.message : String(e)}`); return; }
     finally { setSpeichert(false); }
@@ -227,5 +226,5 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       if (name === "neu") chatAnlegen(quelle);
       else if (name === "anhalten") allesAnhalten.setzen(true);
       else if (name === "planen" || name === "interview") aendern({ modus: name === "planen" ? "Planen" : "Interview" }); },
-    text, fehler, anhaenge, laeuft: speichert || laufende.current.has(chat.id), aendern, schreiben, senden, onAktion };
+    text, fehler, anhaenge, laeuft: speichert || laufende.current.has(chat.id), aendern, schreiben, senden: (inhalt: string) => senden(inhalt, undefined, inhalt, false, true), onAktion };
 }

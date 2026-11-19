@@ -21,8 +21,7 @@ test("hängt PNG und CSV per Plus an und sendet ihre gespeicherten Pfade", async
     } };
   });
   await page.goto("/"); await page.evaluate(() => document.fonts.ready);
-  const auswahl = page.waitForEvent("filechooser"); await page.getByRole("button", { name: "Bild oder Datei anhängen" }).click();
-  expect((await auswahl).isMultiple()).toBe(true);
+  const auswahl = page.waitForEvent("filechooser"); await page.getByRole("button", { name: "Bild oder Datei anhängen" }).click(); expect((await auswahl).isMultiple()).toBe(true);
   const png = await page.evaluate(() => {
     const c = document.createElement("canvas"); c.width = 96; c.height = 96; const x = c.getContext("2d"), t = getComputedStyle(document.documentElement);
     x.fillStyle = t.getPropertyValue("--flaeche-2"); x.fillRect(0, 0, 96, 96); x.fillStyle = t.getPropertyValue("--text-2"); x.fillRect(12, 16, 65, 5); x.fillRect(12, 29, 48, 5);
@@ -41,9 +40,12 @@ test("hängt PNG und CSV per Plus an und sendet ihre gespeicherten Pfade", async
   const feld = page.getByRole("textbox", { name: "Nachricht an den Orchestrator" });
   await feld.fill("Der Knopf soll so aussehen wie auf dem Bild. Die Testdaten stehen in der CSV.");
   expect(await page.getByRole("button", { name: "Senden", exact: true }).evaluate(b => b.getBoundingClientRect().top === document.querySelector('.ein-leiste button').getBoundingClientRect().top)).toBe(true);
+  const weitere = Array.from({ length: 8 }, (_, i) => ({ ...dateien[1], name: `anhang-${i}.csv` })); await page.locator('input[type="file"]').setInputFiles(weitere);
+  expect(await page.locator(".ein-anhaenge").evaluate(e => e.scrollHeight > e.clientHeight && e.clientHeight <= 2 * e.firstElementChild.offsetHeight + parseFloat(getComputedStyle(e).gap))).toBe(true);
+  await expect(feld).toBeInViewport(); await expect(page.getByRole("button", { name: "Senden", exact: true })).toBeInViewport();
   if (process.env.BILD_ORDNER && info.project.name !== "1280x800") await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-8-4_anhaenge_${info.project.name}.png` });
-  await page.getByRole("button", { name: "knopf-entwurf.png entfernen" }).click(); await expect(page.locator(".ein-anhaenge img")).toHaveCount(0);
-  await page.getByRole("button", { name: "pakete-beispiel.csv entfernen" }).click(); await page.locator('input[type="file"]').setInputFiles(dateien);
+  for (const d of weitere) await page.getByRole("button", { name: `${d.name} entfernen` }).click();
+  await page.getByRole("button", { name: "knopf-entwurf.png entfernen" }).click(); await expect(page.locator(".ein-anhaenge img")).toHaveCount(0); await page.getByRole("button", { name: "pakete-beispiel.csv entfernen" }).click(); await page.locator('input[type="file"]').setInputFiles(dateien);
   await feld.press("Enter"); await expect.poll(() => page.evaluate(() => window.auftraege.length)).toBe(1);
   expect(await page.evaluate(() => window.auftraege[0].text)).toContain("Anhänge:\n.projectb/anhaenge/beispiel-knopf-entwurf.png\n.projectb/anhaenge/beispiel-pakete-beispiel.csv");
   expect(await page.evaluate(() => window.gespeichert.map(d => d.name))).toEqual(["knopf-entwurf.png", "pakete-beispiel.csv"]);
