@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AnhangAblage, useAnhaenge } from "./Anhaenge";
 import { ChatEingabeAnsicht } from "../ChatEingabe";
 import { BeispielQuelle } from "../../daten/quelle";
+import App from "../../App";
 
 const h = vi.hoisted(() => ({ werte: [], refs: [], effekte: [], i: 0, r: 0 }));
 vi.mock("react", async original => ({ ...await original(),
@@ -23,8 +24,10 @@ const ereignis = (extra = {}) => ({ preventDefault: vi.fn(), dataTransfer: { typ
 beforeEach(() => { h.werte = []; h.refs = []; gesperrt = false; fehler = vi.fn(); aufraeumen = []; vi.stubGlobal("window", new EventTarget()); });
 afterEach(() => { aufraeumen.forEach(fn => fn?.()); vi.unstubAllGlobals(); });
 
-it("entfernt den Dateischutz für dragover und drop beim Unmount", () => {
-  ansicht();
+it("schützt ohne gerenderte AnhangAblage und entfernt den Dateischutz beim App-Unmount", () => {
+  window.location = { search: "?vorschau=bausteine" };
+  h.i = 0; h.effekte = [];
+  App(); aufraeumen = h.effekte.map(fn => fn());
   const senden = typ => {
     const event = Object.assign(new Event(typ, { cancelable: true }), { dataTransfer: { types: ["Files"], dropEffect: "copy" } });
     window.dispatchEvent(event); return event;

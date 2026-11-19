@@ -1,5 +1,22 @@
 import { test, expect } from "@playwright/test";
 
+test("blockiert Datei-Drops auf body auch ohne Chat-Eingabe", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Anhänge werden am Kandidaten geprüft.");
+  await page.goto("/?vorschau=bausteine");
+  await expect(page.getByRole("heading", { name: "Bausteine · Vorschau" })).toBeVisible();
+  await expect(page.locator(".chat-eingabe")).toHaveCount(0);
+  const verhindert = await page.evaluate(() => {
+    const daten = new DataTransfer();
+    daten.items.add(new File(["inhalt"], "probe.txt", { type: "text/plain" }));
+    return ["dragover", "drop"].map(typ => {
+      const event = new DragEvent(typ, { bubbles: true, cancelable: true, dataTransfer: daten });
+      document.body.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+  });
+  expect(verhindert).toEqual([true, true]);
+});
+
 for (const dateien of [true, false]) {
   test(`${dateien ? "blockiert Dateien" : "erlaubt Text"} außerhalb der Ablage`, async ({ page }) => {
     test.skip(process.env.UI_BASELINE === "1", "Anhänge werden am Kandidaten geprüft.");

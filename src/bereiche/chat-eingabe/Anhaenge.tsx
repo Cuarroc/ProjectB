@@ -8,20 +8,6 @@ export function AnhangAblage({ anhaenge, gesperrt = false, children }: { anhaeng
   const schliessen = () => { tiefe.current = 0; setzen(null); };
   useEffect(() => { if (gesperrt) schliessen(); }, [gesperrt]);
   useEffect(() => {
-    const abfangen = (event: globalThis.DragEvent) => {
-      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return;
-      event.preventDefault();
-      // Vor der Eingabe abfangen, damit deren Handler anschließend copy setzen kann.
-      if (event.type === "dragover" && event.dataTransfer) event.dataTransfer.dropEffect = "none";
-    };
-    window.addEventListener("dragover", abfangen, { capture: true });
-    window.addEventListener("drop", abfangen, { capture: true });
-    return () => {
-      window.removeEventListener("dragover", abfangen, { capture: true });
-      window.removeEventListener("drop", abfangen, { capture: true });
-    };
-  }, []);
-  useEffect(() => {
     if (anzahl === null) return;
     const taste = (event: KeyboardEvent) => { if (event.key === "Escape") schliessen(); };
     window.addEventListener("keydown", taste, true); return () => window.removeEventListener("keydown", taste, true);
