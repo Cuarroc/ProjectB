@@ -37,6 +37,28 @@ test("Planfenster: vier Aufwand-Pillen, neutrale Risiken und unbekannte Werte oh
     await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-9-1a_plan_${info.project.name}.png`, animations: "disabled" });
 });
 
+test("Planfenster: Risikostriche steigen unten bündig an und leere bleiben sichtbar", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Risikostriche werden am Kandidaten geprüft.");
+  await page.goto("/?vorschau=plan");
+  await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();
+  const stufen = await page.locator(".pl-risiko").evaluateAll(es => es.map(e => [...e.children].map(i => {
+    const r = i.getBoundingClientRect(), stil = getComputedStyle(i);
+    return { hoehe: r.height, unten: r.bottom, breite: r.width, schatten: stil.boxShadow, farbe: stil.backgroundColor, voll: i.dataset.voll === "true" };
+  })));
+  expect(stufen.length).toBeGreaterThan(0);
+  for (const balken of stufen) {
+    expect(balken[0].hoehe).toBeGreaterThan(0);
+    expect(balken[1].hoehe).toBeGreaterThan(balken[0].hoehe);
+    expect(balken[2].hoehe).toBeGreaterThan(balken[1].hoehe);
+    expect(new Set(balken.map(b => b.unten)).size).toBe(1);
+    for (const b of balken.filter(b => !b.voll)) {
+      expect(b.breite).toBeGreaterThanOrEqual(2);
+      expect(b.schatten).not.toBe("none");
+      expect(b.schatten).not.toContain(b.farbe);
+    }
+  }
+});
+
 test("Planfenster: Zurückgeben und Schrittaktionen bleiben einzeilig", async ({ page }, info) => {
   test.skip(process.env.UI_BASELINE === "1", "Einzeiliger Knopf wird am Kandidaten geprüft.");
   await page.goto("/"); await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();

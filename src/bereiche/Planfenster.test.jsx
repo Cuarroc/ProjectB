@@ -10,7 +10,7 @@ it.each([1, 2, 3, null])("zeigt vier Pillen und neutrale Risikostufen: %s", risi
   for (const text of ["Codex · gpt-6.1-sol", "~6 min", "~40k Tokens"]) expect(html).toContain(text);
   expect(html).toContain('class="pl-risiko" aria-hidden="true"');
   expect(html.match(/data-voll="true"/g) ?? []).toHaveLength(risiko ?? 0);
-  expect(html.replace(/<span class="pl-risiko"[^>]*>.*?<\/span>/, "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ")).toContain(`Risiko ${["–", "Niedrig", "Mittel", "Hoch"][risiko ?? 0]}`);
+  expect(html).toMatch(new RegExp(`<span class="pl-chip">Risiko <span class="pl-risiko" aria-hidden="true">(?:<i data-voll="(?:true|false)"></i>){3}</span> ${["–", "Niedrig", "Mittel", "Hoch"][risiko ?? 0]}</span>`));
 });
 it("zeigt unbekannte Werte ohne Null oder Schätzzeichen und behält Agenten-Tokens als Ersatz", () => {
   const schritt = { ...beispiel.plan.schritte[0], dauerMinuten: null, tokens: null, risiko: null };
