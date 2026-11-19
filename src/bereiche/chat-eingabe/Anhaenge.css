@@ -5,3 +5,9 @@
 .ein-an-name { min-width: 0; }
 .ein-an-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--schrift-ueberschrift); }
 .ein-an-name small { display: block; color: var(--text-2); font: var(--schrift-klein); }
+.chat-eingabe { position: relative; }
+.ein-ablage { position: absolute; inset: 0; z-index: var(--ebene-menue); display: flex; align-items: center; justify-content: center; gap: var(--abstand-6); box-sizing: border-box; padding: var(--abstand-8); border: calc(var(--abstand-1) / 2) dashed var(--akzent); border-radius: var(--rund-eingabe); background: linear-gradient(var(--akzent-grund), var(--akzent-grund)), var(--flaeche-2); box-shadow: var(--schatten-auswahl); pointer-events: none; }
+.ein-ablage .ein-an-stempel { color: var(--akzent-text); background: var(--akzent-grund); }
+.ein-ablage strong { display: block; font: var(--schrift-ueberschrift); }
+.ein-ablage small { display: block; margin-top: var(--abstand-1); color: var(--text-2); font: var(--schrift-klein); }
+.ein-ablage-zahl { position: absolute; bottom: calc(100% + var(--abstand-1)); right: var(--abstand-8); padding: var(--abstand-2) var(--abstand-4); border-radius: var(--rund-knopf); background: var(--flaeche-3); color: var(--text-1); font: var(--schrift-text); box-shadow: var(--schatten-schwebend); }
