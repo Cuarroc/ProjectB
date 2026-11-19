@@ -5,7 +5,8 @@ import { teamLauf } from "../../daten/tauri";
 import type { Chat } from "../../daten/typen";
 import { useAnhalten } from "../anhalten";
 
-export const kompaktSperrgrund = (chat: Chat, laeuft: boolean, projektOffen: boolean) => laeuft || !!chat.gestartetUm
+export const kompaktSperrgrund = (chat: Chat, laeuft: boolean, projektOffen: boolean) => !isTauri()
+  ? "Nur in der Desktop-App" : laeuft || !!chat.gestartetUm
   ? "Dieser Chat läuft bereits. Bitte warte auf die Antwort." : !chat.verlauf.some(n => n.von === "Orchestrator")
     ? "Noch nichts zusammenzufassen" : !projektOffen ? "Bitte zuerst oben ein Projekt öffnen." : "";
 

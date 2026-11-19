@@ -69,6 +69,24 @@ test("/anhalten ist ohne Lauf gesperrt und hält den echten Teamweg an", async (
   await feld.fill("/anhalten"); await expect(option).toBeDisabled();
 });
 
+test("/kompakt ist im Browser mit Grund gesperrt und lässt den Verlauf unverändert", async ({ page }, info) => {
+  await page.evaluate(() => { window.isTauri = false; });
+  const feld = page.locator("#chat-nachricht"), nachrichten = page.locator(".chat-nachrichten > li"), vorher = await nachrichten.count();
+  await feld.fill("/"); const option = page.getByRole("option").first();
+  await expect(option).toBeDisabled(); await expect(option).toContainText("Nur in der Desktop-App");
+  await feld.press("Enter");
+  await expect(page.locator(".ein-meldung")).toHaveText("Nur in der Desktop-App");
+  await expect(nachrichten).toHaveCount(vorher); await expect(feld).toHaveValue("/");
+  await page.evaluate(() => document.fonts.ready);
+  const hoehen = await page.getByRole("option").evaluateAll(zeilen => zeilen.map(z => z.getBoundingClientRect().height));
+  expect(hoehen).toEqual(hoehen.map(() => hoehen[1]));
+  const beschreibung = await option.locator("span small").evaluate(el => ({ hoehe: el.getBoundingClientRect().height, zeile: parseFloat(getComputedStyle(el).lineHeight) }));
+  expect(beschreibung.hoehe).toBe(beschreibung.zeile);
+  if (process.env.BILD_ORDNER && info.project.name !== "1280x800") {
+    await page.evaluate(() => document.fonts.ready); await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-8-2_kompakt_browser_${info.project.name}.png`, animations: "disabled" });
+  }
+});
 test("/kompakt speichert die Zusammenfassung und gibt den Kontext frei", async ({ page }, info) => {
   test.skip(process.env.UI_BASELINE === "1", "Zusammenfassen fehlt im Basisstand.");
   await page.evaluate(() => {

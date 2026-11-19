@@ -49,10 +49,10 @@ function textMitVerlauf(chat: Chat, pfad: string, text: string) {
   while (kontext().length > 20000 && nachrichten.length > (anfang < 0 ? 0 : 1)) { nachrichten.splice(anfang < 0 ? 0 : 1, 1); gekuerzt = true; }
   return `${kontext()}\n\nNeue Nachricht:\n${text}`;
 }
-export function nachrichtAblegen(quelle: BeispielQuelle, text: string) {
+export function nachrichtAblegen(quelle: BeispielQuelle, text: string, aktionenBehalten = false) {
   const daten = quelle.lesen(), chat = daten.chats.find(c => c.id === daten.aktiverChatId);
   if (!chat) throw new Error("Kein Chat ausgewählt.");
-  chat.verlauf.forEach(n => { n.aktionen = []; });
+  if (!aktionenBehalten) chat.verlauf.forEach(n => { n.aktionen = []; });
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Du", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
   quelle.aktualisieren(daten);
 }
@@ -134,7 +134,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     try {
       const vorher = quelle.lesen(), ziel = vorher.chats.find(c => c.id === chat.id);
       if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, inhalt);
-      nachrichtAblegen(quelle, anzeige); schreiben(""); setFehler("");
+      nachrichtAblegen(quelle, anzeige, kompakt); schreiben(""); setFehler("");
     }
     catch { setFehler("Nicht gesendet. Dein Text bleibt stehen."); return; }
     if (!isTauri()) return;

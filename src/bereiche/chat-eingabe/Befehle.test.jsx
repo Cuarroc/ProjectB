@@ -1,10 +1,12 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { isTauri } from "@tauri-apps/api/core";
 import { Befehle } from "./Befehle";
 import { Eingabefeld } from "../../bausteine/Eingabefeld";
 import { ChatEingabeAnsicht } from "../ChatEingabe";
 import { BeispielQuelle } from "../../daten/quelle";
 const h = vi.hoisted(() => ({ werte: [], i: 0 }));
+vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn(() => true) }));
 vi.mock("react", async original => ({ ...await original(),
   useState: initial => { const i = h.i++; return [h.werte[i] ??= initial, wert => { h.werte[i] = wert; }]; },
   useSyncExternalStore: (_ab, lesen) => lesen(),
@@ -20,6 +22,7 @@ const tippen = wert => feld().props.onChange({ target: { value: wert } });
 const taste = (key, extra = {}) => { const e = { key, nativeEvent: {}, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...extra };
   feld().props.onKeyDown(e); return e; };
 beforeEach(() => { h.werte = []; text = "/"; chat = new BeispielQuelle().lesen().chats[0]; anzahl = 2; neuGesperrt = false; laeuft = false; projektOffen = true; chat.gestartetUm = null;
+  vi.mocked(isTauri).mockReturnValue(true);
   ausfuehren = vi.fn(name => { if (name === "planen") chat.modus = "Planen"; }); senden = vi.fn(); });
 it.each(["/planen", "  /PLANEN \n"])("führt %j mit Senden aus und leert das Feld", wert => {
   tippen(wert); abschicken(); expect(chat.modus).toBe("Planen");
@@ -69,11 +72,12 @@ it("führt während IME oder mit Umschalt+Enter keinen Befehl aus", () => {
   expect(ausfuehren).not.toHaveBeenCalled(); expect(senden).not.toHaveBeenCalled();
 });
 
-it.each(["läuft", "leer", "Projekt"])("sperrt /kompakt bei %s in Liste und Fehlerzeile", fall => {
-  const grund = fall === "läuft" ? "Dieser Chat läuft bereits" : fall === "leer" ? "Noch nichts zusammenzufassen" : "Bitte zuerst oben ein Projekt öffnen";
+it.each(["läuft", "leer", "Projekt", "Browser"])("sperrt /kompakt bei %s in Liste und Fehlerzeile", fall => {
+  const grund = fall === "läuft" ? "Dieser Chat läuft bereits" : fall === "leer" ? "Noch nichts zusammenzufassen" : fall === "Browser" ? "Nur in der Desktop-App" : "Bitte zuerst oben ein Projekt öffnen";
   if (fall === "läuft") laeuft = true;
   if (fall === "leer") chat.verlauf = [{ von: "Du", text: "Hallo", aktionen: [] }];
   if (fall === "Projekt") projektOffen = false;
+  if (fall === "Browser") vi.mocked(isTauri).mockReturnValue(false);
   tippen("/kompakt"); const html = renderToStaticMarkup(ansicht()); expect(html).toContain('disabled=""'); expect(html).toContain(grund);
   taste("Enter"); expect(renderToStaticMarkup(eingabe())).toContain(grund); expect(ausfuehren).not.toHaveBeenCalled(); expect(senden).not.toHaveBeenCalled();
 });

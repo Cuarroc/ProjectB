@@ -181,6 +181,12 @@ describe("/kompakt", () => {
     const d = quelle.lesen(); Object.assign(d.chats[0], { gestartetUm: null,
       sitzung: { id: "alt", anbieter: "Claude", pfad: d.kopf.pfad } }); quelle.aktualisieren(d);
   });
+  it("sperrt im Browser ohne neue Nachricht und nennt den Grund", async () => {
+    vi.mocked(isTauri).mockReturnValue(false); const vorher = chat();
+    await ansicht().props.befehl("kompakt");
+    expect(chat()).toEqual(vorher); expect(auftragSenden).not.toHaveBeenCalled();
+    expect(ansicht().props.fehler).toBe("Nur in der Desktop-App");
+  });
   it.each(["Opus 5.5", "gpt-6.1-sol"])("fasst für %s zusammen und startet danach mit freiem Kontext", async modell => {
     const d = quelle.lesen(); d.chats[0].modell = modell; d.chats[0].sitzung.anbieter = modell === "Opus 5.5" ? "Claude" : "Codex"; quelle.aktualisieren(d);
     const vorher = chat(), zusammenfassung = "Ziel: CSV. Entscheidung: UTF-8. Offen: Export. Datei: export.rs.";
