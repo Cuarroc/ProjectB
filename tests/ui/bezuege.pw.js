@@ -34,5 +34,5 @@ test("@exp einfügen und mit Dateibezug senden", async ({ page }, info) => {
   await expect(page.locator(".r-du .r-msg-text").last()).toHaveText("@src/export/csv.rs");
   await feld.fill("@exp"); await expect(liste).toBeVisible(); await expect.poll(() => page.evaluate(() => window.dateiladungen)).toBe(3);
   await liste.getByRole("option").last().click(); await expect(feld).toHaveValue("@CSV-Export im Kern "); await expect(feld).toBeFocused();
-  await page.getByRole("button", { name: "Bezug CSV-Export im Kern entfernen", exact: true }).click(); await expect(feld).toHaveValue(" ");
+  await page.getByRole("button", { name: "Bezug CSV-Export im Kern entfernen", exact: true }).click(); await expect(feld).toHaveValue(" "); await page.evaluate(() => { window.dateiladungen = 0; }); await feld.fill("@exp"); await expect(liste).toBeVisible(); await feld.press("Enter"); await expect(feld).toHaveValue("@src/export/csv.rs "); await expect.poll(() => page.evaluate(() => window.dateiladungen)).toBe(1); await feld.pressSequentially("@"); await expect.poll(() => page.evaluate(() => window.dateiladungen)).toBe(2);
 });

@@ -102,13 +102,13 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
 export function useChatEingabe(quelle = chatEingabeQuelle) {
   const [daten, setDaten] = useState(() => quelle.lesen()), [text, schreiben] = useState(""), [fehler, setFehler] = useState("");
   const [dateiliste, dateienSetzen] = useState({ pfad: "", dateien: [] as string[] });
-  const bezugGetippt = /(?:^|\s)@/.test(text), projektPfad = daten.kopf.pfad;
+  const bezugAnzahl = (String(text).match(/(?:^|\s)@/g) ?? []).length, projektPfad = daten.kopf.pfad;
   useEffect(() => {
     let aktuell = true;
-    if (bezugGetippt && (!isTauri() || daten.kopf.geoeffnet)) projektDateien(projektPfad).then(
+    if (bezugAnzahl > 0 && (!isTauri() || daten.kopf.geoeffnet)) projektDateien(projektPfad).then(
       dateien => { if (aktuell) dateienSetzen({ pfad: projektPfad, dateien }); }, e => { if (aktuell) setFehler(`Dateien nicht geladen: ${String(e)}`); });
     return () => { aktuell = false; };
-  }, [bezugGetippt, projektPfad, daten.kopf.geoeffnet]);
+  }, [bezugAnzahl, projektPfad, daten.kopf.geoeffnet]);
   const kompaktAntworten = useRef(new Map<string, string[]>());
   const laufende = useRef(new Set<string>()), empfang = useRef<Promise<() => void>>(Promise.resolve(() => {}));
   useEffect(() => { const lesen = () => setDaten(quelle.lesen()); const ab = quelle.abonnieren(lesen); lesen(); return ab; }, [quelle]);
