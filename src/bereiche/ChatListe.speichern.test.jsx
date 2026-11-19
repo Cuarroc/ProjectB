@@ -113,3 +113,10 @@ it("wendet nach dem Abmelden kein Ladeergebnis mehr an", async () => {
   aufraeumen.forEach(fn => fn?.()); const vorher = quelle.lesen(); offen.resolve(gespeichert); await warten();
   expect(quelle.lesen()).toEqual(vorher); expect(invoke).toHaveBeenCalledTimes(1);
 });
+
+it("erhält die Zusammenfassung beim Speichern und erneuten Laden", async () => {
+  auf(); await warten(); const d = quelle.lesen(); d.chats[0].zusammenfassung = d.chats[0].verlauf.at(-1).id;
+  quelle.aktualisieren(d); await warten(); gespeichert = JSON.parse(JSON.stringify(invoke.mock.calls.at(-1)[1].daten));
+  auf("Projekt B"); await warten(); auf(); await warten();
+  expect(quelle.lesen().chats[0].zusammenfassung).toBe(d.chats[0].zusammenfassung);
+});
