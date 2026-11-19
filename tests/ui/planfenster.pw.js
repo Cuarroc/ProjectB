@@ -1,6 +1,64 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test("Planfenster: vier Aufwand-Pillen, neutrale Risiken und unbekannte Werte ohne Überlauf", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Aufwand-Pillen werden am Kandidaten geprüft.");
+  await page.goto("/?vorschau=plan");
+  await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();
+  await page.evaluate(() => document.fonts.ready);
+  const dialog = page.getByRole("dialog"), schritte = dialog.locator(".pl-schritt");
+  const erwartet = [["Orchestrator", "– min", "– Tokens", "Risiko –"],
+    ["Codex · gpt-6.1-sol", "~4 min", "~25k Tokens", "Risiko Niedrig"],
+    ["Codex · gpt-6.1-sol", "~6 min", "~40k Tokens", "Risiko Niedrig"],
+    ["Claude · Sonnet 5.5", "~5 min", "~30k Tokens", "Risiko Mittel"],
+    ["Orchestrator", "~3 min", "~20k Tokens", "Risiko Niedrig"]];
+  for (let i = 0; i < erwartet.length; i++) {
+    const chips = schritte.nth(i).locator(".pl-chip");
+    await expect(chips).toHaveCount(4);
+    for (let j = 0; j < 4; j++) await expect(chips.nth(j)).toHaveText(erwartet[i][j]);
+    await expect(chips.last()).toMatchAriaSnapshot(`- text: ${erwartet[i][3]}`);
+    await expect(schritte.nth(i).locator(".pl-risiko")).toHaveAttribute("aria-hidden", "true");
+    await expect(schritte.nth(i).locator(".pl-risiko i")).toHaveCount(3);
+    const voll = [0, 1, 1, 2, 1][i];
+    await expect(schritte.nth(i).locator('[data-voll="true"]')).toHaveCount(voll);
+  }
+  expect((await dialog.locator(".pl-chips").allTextContents()).join(" ")).not.toMatch(/0 min|~–/);
+  expect(await dialog.locator(".pl-risiko i").evaluateAll(es => es.every(e => {
+    const token = e.dataset.voll === "true" ? "--neutral-2" : "--neutral-4";
+    const probe = document.createElement("i"); probe.style.backgroundColor = `var(${token})`; e.append(probe);
+    const erwartet = getComputedStyle(probe).backgroundColor; probe.remove();
+    return getComputedStyle(e).backgroundColor === erwartet;
+  }))).toBe(true);
+  expect(await dialog.locator(".pl-chips,.pl-chip").evaluateAll(es => es.every(e => {
+    const r = e.getBoundingClientRect(), karte = e.closest(".pl-schritt").getBoundingClientRect();
+    return e.scrollWidth <= e.clientWidth && r.left >= karte.left && r.right <= karte.right && parseFloat(getComputedStyle(e).fontSize) >= 12;
+  }))).toBe(true);
+  if (process.env.BILD_ORDNER && info.project.name !== "1280x800")
+    await page.screenshot({ path: `${process.env.BILD_ORDNER}/P-9-1a_plan_${info.project.name}.png`, animations: "disabled" });
+});
+
+test("Planfenster: Risikostriche steigen unten bündig an und leere bleiben sichtbar", async ({ page }) => {
+  test.skip(process.env.UI_BASELINE === "1", "Risikostriche werden am Kandidaten geprüft.");
+  await page.goto("/?vorschau=plan");
+  await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();
+  const stufen = await page.locator(".pl-risiko").evaluateAll(es => es.map(e => [...e.children].map(i => {
+    const r = i.getBoundingClientRect(), stil = getComputedStyle(i);
+    return { hoehe: r.height, unten: r.bottom, breite: r.width, schatten: stil.boxShadow, farbe: stil.backgroundColor, voll: i.dataset.voll === "true" };
+  })));
+  expect(stufen.length).toBeGreaterThan(0);
+  for (const balken of stufen) {
+    expect(balken[0].hoehe).toBeGreaterThan(0);
+    expect(balken[1].hoehe).toBeGreaterThan(balken[0].hoehe);
+    expect(balken[2].hoehe).toBeGreaterThan(balken[1].hoehe);
+    expect(new Set(balken.map(b => b.unten)).size).toBe(1);
+    for (const b of balken.filter(b => !b.voll)) {
+      expect(b.breite).toBeGreaterThanOrEqual(2);
+      expect(b.schatten).not.toBe("none");
+      expect(b.schatten).not.toContain(b.farbe);
+    }
+  }
+});
+
 test("Planfenster: Zurückgeben und Schrittaktionen bleiben einzeilig", async ({ page }, info) => {
   test.skip(process.env.UI_BASELINE === "1", "Einzeiliger Knopf wird am Kandidaten geprüft.");
   await page.goto("/"); await page.getByRole("button", { name: "Plan öffnen", exact: true }).click();

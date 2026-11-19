@@ -1,6 +1,8 @@
 import type { Plan } from "./typen";
 import type { PlanMarken } from "../bereiche/Planfenster";
 
+const schaetzZeile = /^(?:-\s*)?(?:Dauer|Tokens|Risiko):/i;
+
 export function markdownKlartext(text: string) {
   return text.replace(/(\*\*|\*|`)(.+?)\1/g, (ganz, _zeichen, innen: string) => innen.trim() === innen ? innen : ganz);
 }
@@ -17,7 +19,7 @@ export function aufgabenListe(text: string) {
     if (zaun) { codeZaun = zaun[1]; continue; }
     const punkt = zeile.match(/^[ \t]*[-*][ \t]+\[([ xX])\][ \t]+(\S.*)$/);
     if (punkt && neueListe) { zeilen.length = 0; neueListe = false; }
-    if (!punkt && /^\S/.test(zeile) && (/^#{1,6}(?:[ \t]|$)/.test(zeile) || zeile.trimEnd().endsWith(":"))) neueListe = true;
+    if (!punkt && !schaetzZeile.test(zeile.trim()) && /^\S/.test(zeile) && (/^#{1,6}(?:[ \t]|$)/.test(zeile) || zeile.trimEnd().endsWith(":"))) neueListe = true;
     zeilen.push({ zeile, punkt });
   }
   return zeilen;
@@ -28,10 +30,17 @@ export function antwortPlan(text: string, id: string): Plan | undefined {
   for (const [i, { zeile, punkt }] of zeilen.entries()) {
     if (punkt) {
       schritte.push({ id: `${id}-${schritte.length + 1}`, titel: markdownKlartext(punkt[2].trimEnd()),
-        beschreibung: "", fertigWenn: [], agentId: null, zustand: "Offen", dauerMinuten: 0, kommentar: "", markierungen: [] });
+        beschreibung: "", fertigWenn: [], agentId: null, zustand: "Offen", dauerMinuten: null, tokens: null, risiko: null, kommentar: "", markierungen: [] });
       continue;
     }
     const schritt = schritte.at(-1), kriterium = zeile.trim().match(/^(?:-\s*)?Fertig, wenn\s*:?\s*(.+)$/i);
+    const dauer = zeile.trim().match(/^(?:-\s*)?Dauer:\s*~?\s*(\d+)(?:\s*[-–]\s*(\d+))?\s*min$/i);
+    const tokens = zeile.trim().match(/^(?:-\s*)?Tokens:\s*~?\s*(\d+(?:[.,]\d+)?)\s*(k)?$/i);
+    const risiko = zeile.trim().match(/^(?:-\s*)?Risiko:\s*(Niedrig|Mittel|Hoch)$/i);
+    if (schritt && dauer) { schritt.dauerMinuten = Math.max(Number(dauer[1]), Number(dauer[2] ?? dauer[1])); continue; }
+    if (schritt && tokens) { schritt.tokens = Number(tokens[1].replace(",", ".")) * (tokens[2] ? 1000 : 1); continue; }
+    if (schritt && risiko) { schritt.risiko = risiko[1].toLowerCase() === "niedrig" ? 1 : risiko[1].toLowerCase() === "mittel" ? 2 : 3; continue; }
+    if (schaetzZeile.test(zeile.trim())) continue;
     if (schritt && kriterium) schritt.fertigWenn.push({ text: kriterium[1], erfuellt: false });
     else if (schritt && zeile.trim() && (i < letzterPunkt || /^[ \t]+\S/.test(zeile))) schritt.beschreibung += `${schritt.beschreibung ? "\n" : ""}${zeile.trim()}`;
   }

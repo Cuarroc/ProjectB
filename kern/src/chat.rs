@@ -3,7 +3,8 @@ use std::{io, path::Path};
 
 const PLANEN_ROLLE: &str = "Erstelle nur einen Plan. Ändere keine Dateien. Höchstens 3 Teilaufgaben, \
     jede mit Abnahme-Kriterien (\"Fertig, wenn …\"). Frage am Ende, ob der Plan freigegeben \
-    oder mit Kommentaren zurückgegeben wird. Schreibe Teilaufgaben als Aufgabenliste (- [ ] …).";
+    oder mit Kommentaren zurückgegeben wird. Schreibe Teilaufgaben als Aufgabenliste (- [ ] …). \
+    Schreibe unter jede Teilaufgabe die Zeilen Dauer: ~N min, Tokens: ~Nk und Risiko: Niedrig|Mittel|Hoch.";
 const INTERVIEW_ROLLE: &str = "Stelle genau eine Frage pro Antwort, wenn möglich mit 2–4 kurzen \
     Antwortvorschlägen als Liste. Frage weiter, bis du sicher bist. Fasse dann den Auftrag zusammen \
     und bitte um Bestätigung. Ändere keine Dateien.";
@@ -122,6 +123,13 @@ pub fn chat_text(e: &Ereignis, letzter_text: Option<&str>) -> Option<String> {
 mod tests {
     use super::chat_text;
     use crate::{verbrauch::Stand, Ereignis};
+
+    #[test]
+    fn planen_fordert_risiko_und_aufwand_je_teilaufgabe() {
+        for feld in ["Dauer: ~N min", "Tokens: ~Nk", "Risiko: Niedrig|Mittel|Hoch"] {
+            assert!(super::PLANEN_ROLLE.contains(feld), "{feld}");
+        }
+    }
 
     #[test]
     fn gleicher_fehlertext_erscheint_nur_einmal() {

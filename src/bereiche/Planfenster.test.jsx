@@ -1,6 +1,25 @@
 import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import Planfenster, { farben, MarkierterText } from "./Planfenster";
+import { beispiel } from "../daten/beispiel";
+
+it.each([1, 2, 3, null])("zeigt vier Pillen und neutrale Risikostufen: %s", risiko => {
+  const schritt = { ...beispiel.plan.schritte[0], agentId: "kern", dauerMinuten: 6, tokens: 40000, risiko };
+  const html = renderToStaticMarkup(<Planfenster daten={beispiel} plan={{ ...beispiel.plan, schritte: [schritt] }} gespeicherteMarken={{}} />);
+  expect(html.match(/class="pl-chip"/g)).toHaveLength(4);
+  for (const text of ["Codex · gpt-6.1-sol", "~6 min", "~40k Tokens"]) expect(html).toContain(text);
+  expect(html).toContain('class="pl-risiko" aria-hidden="true"');
+  expect(html.match(/data-voll="true"/g) ?? []).toHaveLength(risiko ?? 0);
+  expect(html).toMatch(new RegExp(`<span class="pl-chip">Risiko <span class="pl-risiko" aria-hidden="true">(?:<i data-voll="(?:true|false)"></i>){3}</span> ${["–", "Niedrig", "Mittel", "Hoch"][risiko ?? 0]}</span>`));
+});
+it("zeigt unbekannte Werte ohne Null oder Schätzzeichen und behält Agenten-Tokens als Ersatz", () => {
+  const schritt = { ...beispiel.plan.schritte[0], dauerMinuten: null, tokens: null, risiko: null };
+  const anzeigen = agentId => renderToStaticMarkup(<Planfenster daten={beispiel} plan={{ ...beispiel.plan, schritte: [{ ...schritt, agentId }] }} gespeicherteMarken={{}} />);
+  const html = anzeigen(null);
+  for (const text of ["Orchestrator", "– min", "– Tokens"]) expect(html).toContain(text);
+  expect(html).not.toMatch(/0 min|~–/);
+  expect(anzeigen("kern")).toContain("132k Tokens");
+});
 
 const textInhalt = k => Array.isArray(k) ? k.map(textInhalt).join("") : k && typeof k === "object" ? textInhalt(k.props.children) : k ?? "";
 it.each(farben)("markiert Text als %s und benennt die Farbe für Screenreader", (name, token, farbname) => {
