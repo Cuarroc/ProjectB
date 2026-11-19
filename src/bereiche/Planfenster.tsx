@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { AlignLeft, Check, Circle, CircleMinus, Lightbulb, ListChecks, ListTree, MessageSquare, RefreshCw, Users, X, Zap } from "lucide-react";
+import { AlignLeft, Check, Circle, CircleMinus, Clock, Lightbulb, ListChecks, ListTree, MessageSquare, RefreshCw, Users, X, Zap } from "lucide-react";
 import { Knopf } from "../bausteine/Knopf";
 import { Statusmarke } from "../bausteine/Statusmarke";
 import type { Datenstand, Markierung, Plan } from "../daten/typen";
@@ -70,7 +70,13 @@ export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarke
           <div className="pl-kopfzeile"><span className="pl-nr">{i + 1}</span><div className="pl-kopftext">
             <div className="pl-titelzeile"><h3 onMouseUp={e => erfassen(s.id, e.currentTarget)}><MarkierterText text={s.titel} marke={marken[`${s.id}:titel`] ?? (titelfarbe ? { name: titelfarbe, start: 0, ende: s.titel.length } : undefined)} /></h3>
               {s.markierungen.map(m => <span className="pl-marke" key={m} style={{ "--f": farbe(m) } as CSSProperties}><span className="pl-farbpunkt" aria-hidden="true" />{m}</span>)}</div>
-            {(!echterPlan || s.beschreibung) && <p className="pl-warum" onMouseUp={e => erfassen(s.id, e.currentTarget, "beschreibung")}><MarkierterText text={s.beschreibung} marke={marken[`${s.id}:beschreibung`]} /></p>}{(!echterPlan || agent) && <div className="pl-chips"><span className="pl-chip"><Users size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{agent ? `${agent.anbieter} · ${agent.modell}` : "Orchestrator"}</span>{agent && <span className="pl-chip"><Zap size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{Math.round(agent.tokens / 1000)}k Tokens</span>}</div>}
+            {(!echterPlan || s.beschreibung) && <p className="pl-warum" onMouseUp={e => erfassen(s.id, e.currentTarget, "beschreibung")}><MarkierterText text={s.beschreibung} marke={marken[`${s.id}:beschreibung`]} /></p>}
+            <div className="pl-chips">
+              <span className="pl-chip"><Users size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{agent ? `${agent.anbieter} · ${agent.modell}` : "Orchestrator"}</span>
+              <span className="pl-chip"><Clock size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{s.dauerMinuten == null ? "–" : `~${s.dauerMinuten}`} min</span>
+              <span className="pl-chip"><Zap size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />{s.tokens != null ? `~${s.tokens >= 1000 ? `${Math.round(s.tokens / 1000)}k` : s.tokens}` : agent ? `${Math.round(agent.tokens / 1000)}k` : "–"} Tokens</span>
+              <span className="pl-chip">Risiko <span className="pl-risiko" aria-hidden="true">{[1, 2, 3].map(stufe => <i key={stufe} data-voll={stufe <= (s.risiko ?? 0)} />)}</span> {["–", "Niedrig", "Mittel", "Hoch"][s.risiko ?? 0]}</span>
+            </div>
           </div></div>
           <div className="pl-einzug pl-feld"><div className="pl-feld-kopf">Fertig, wenn <span>{s.fertigWenn.filter(b => b.erfuellt).length} / {s.fertigWenn.length} erfüllt</span></div>
             <ul className="pl-bedingungen">{s.fertigWenn.map((b, j) => <li key={j} data-erfuellt={b.erfuellt}>{b.erfuellt ? <Check size={16} strokeWidth={1.5} absoluteStrokeWidth aria-label="Erfüllt" /> : <Circle size={16} strokeWidth={1.5} absoluteStrokeWidth aria-label="Offen" />}<span onMouseUp={e => erfassen(s.id, e.currentTarget, `bedingung${j}`)}><MarkierterText text={b.text} marke={marken[`${s.id}:bedingung${j}`]} /></span></li>)}</ul>

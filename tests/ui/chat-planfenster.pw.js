@@ -47,7 +47,7 @@ test("Echten Plan öffnen, kommentieren und freigeben", async ({ page }, testInf
   await expect(dialog.locator("h3").filter({ hasText: /^(Export bauen|Testen|Prüfen)$/ })).toHaveCount(3);
   for (const kriterium of ["Umlaute stimmen.", "Tests grün sind.", "Review fertig ist."]) await expect(dialog.getByText(kriterium, { exact: true })).toBeVisible();
   await expect(schritt.getByText("CSV ergänzen.", { exact: true })).toBeVisible();
-  await expect(dialog.locator(".pl-chip")).toHaveCount(0);
+  await expect(dialog.locator(".pl-chip")).toHaveCount(12);
   await expect(dialog.locator('.pl-stilknopf[aria-pressed="true"]')).toHaveCount(0);
   await expect(dialog.getByText(/^Nächste Fassung wird/)).toHaveCount(0);
   await schritt.getByRole("button", { name: "Ausarbeiten, Violett", exact: true }).click();

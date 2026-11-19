@@ -26,7 +26,8 @@ it("leitet Fenster-Freigabe und Chat-Freigabe an dieselbe Nachrichtenaktion weit
 it("gibt den echten Plan ohne Stilvorgabe zurück", () => {
   h.werte = []; h.i = 0; const onEntscheiden = vi.fn(), plan = antwortPlan("- [ ] Export", "n");
   const baum = knoten(Planfenster({ daten: { agenten: [] }, plan, gespeicherteMarken: {}, onSchliessen: vi.fn(), onEntscheiden }));
-  expect(baum.filter(n => ["pl-warum", "pl-chips"].includes(n.props.className))).toEqual([]);
+  expect(baum.filter(n => n.props.className === "pl-warum")).toEqual([]);
+  expect(baum.filter(n => n.props.className === "pl-chip")).toHaveLength(4);
   baum.find(n => n.props.text === "Neu schreiben lassen").props.onClick();
   expect(onEntscheiden).toHaveBeenCalledWith(plan, {}, "");
 });
