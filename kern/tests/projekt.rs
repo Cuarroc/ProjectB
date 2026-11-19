@@ -34,6 +34,39 @@ impl Drop for Ordner {
 }
 
 #[test]
+fn anhaenge_nur_geoeffnet_bereinigt_und_einmal_ausgeschlossen() {
+    use projectb_kern::projekt::anhang_speichern;
+    let repo = Ordner::neu();
+    repo.git(&["init"]);
+    assert!(anhang_speichern(&repo.0, "../test.csv", b"a,b").is_err());
+    oeffnen(&repo.0, repo.0.join("zuletzt.json")).unwrap();
+    for name in ["../test.csv", "..\\..\\test.csv"] {
+        let pfad = anhang_speichern(&repo.0, name, b"a,b").unwrap();
+        assert!(pfad.starts_with(".projectb/anhaenge/"));
+        assert!(!pfad.contains(".."));
+        assert!(pfad.ends_with("-test.csv"));
+        assert_eq!(fs::read(repo.0.join(pfad)).unwrap(), b"a,b");
+    }
+    assert_eq!(
+        fs::read_to_string(repo.0.join(".git/info/exclude")).unwrap().lines().filter(|l| *l == ".projectb/").count(),
+        1
+    );
+    assert_eq!(repo.git(&["check-ignore", ".projectb/anhaenge/test"]), ".projectb/anhaenge/test");
+}
+
+#[cfg(unix)]
+#[test]
+fn anhang_folgt_keinem_link_aus_dem_projekt() {
+    let repo = Ordner::neu();
+    let fremd = Ordner::neu();
+    repo.git(&["init"]);
+    oeffnen(&repo.0, repo.0.join("zuletzt.json")).unwrap();
+    std::os::unix::fs::symlink(&fremd.0, repo.0.join(".projectb")).unwrap();
+    assert!(projectb_kern::projekt::anhang_speichern(&repo.0, "a.csv", b"a").is_err());
+    assert_eq!(fs::read_dir(&fremd.0).unwrap().count(), 0);
+}
+
+#[test]
 fn oeffnen_merkt_nur_die_gepruefte_wurzel_und_meldet_fehler() {
     let repo = Ordner::neu();
     repo.git(&["init", "-b", "projekt-test"]);

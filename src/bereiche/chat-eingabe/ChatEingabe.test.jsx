@@ -12,7 +12,7 @@ it("startet mit Ausführen, Opus 5.5, Hoch und 1M aus den Beispieldaten", () => 
   expect(ausfuehren).toContain('aria-checked="true"');
   for (const label of ["Modell: Opus 5.5", "Effort: Hoch", "Kontext 10 % · 1M"]) expect(html).toContain(`aria-label="${label}"`);
   expect(html).toContain('aria-describedby="modus-hilfe"');
-  expect(html).not.toContain("Bild oder Datei anhängen");
+  expect(html).toContain("Bild oder Datei anhängen");
 });
 it("verdrahtet Enter mit dem Beispielzustand; Umschalt+Enter und IME senden nicht", () => {
   const quelle = new BeispielQuelle(), daten = quelle.lesen(), chat = daten.chats[0], senden = vi.fn(text => nachrichtAblegen(quelle, text));

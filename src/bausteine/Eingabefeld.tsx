@@ -14,11 +14,12 @@ type Props = {
   werkzeuge?: ReactNode;
   beschreibungId?: string;
   ohneAnhaengen?: boolean;
+  hatAnhaenge?: boolean;
   feld?: TextareaHTMLAttributes<HTMLTextAreaElement>;
 };
 
-export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, sendet = false, fehler, kopf, werkzeuge, beschreibungId, ohneAnhaengen, feld }: Props) {
-  const senden = () => { if (!sendet && text.trim()) onSenden(text); };
+export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, sendet = false, fehler, kopf, werkzeuge, beschreibungId, ohneAnhaengen, hatAnhaenge, feld }: Props) {
+  const senden = () => { if (!sendet && (text.trim() || hatAnhaenge)) onSenden(text); };
   const tastatur = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     feld?.onKeyDown?.(event); if (event.defaultPrevented) return;
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;

@@ -1,0 +1,7 @@
+.ein-anhaenge { display: flex; flex-wrap: wrap; gap: var(--abstand-2); margin: 0; padding: 0; list-style: none; }
+.ein-anhaenge li { display: flex; align-items: center; gap: var(--abstand-3); min-width: 0; max-width: 100%; box-sizing: border-box; padding: var(--abstand-2); background: var(--flaeche-3); border-radius: var(--rund-knopf); box-shadow: var(--schatten-kante); }
+.ein-an-stempel { display: grid; place-items: center; flex: none; width: calc(2 * var(--abstand-8)); height: calc(2 * var(--abstand-8)); border-radius: var(--rund-segment); background: var(--flaeche-2); color: var(--text-2); overflow: hidden; }
+.ein-an-stempel img { width: 100%; height: 100%; object-fit: cover; }
+.ein-an-name { min-width: 0; }
+.ein-an-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--schrift-ueberschrift); }
+.ein-an-name small { display: block; color: var(--text-2); font: var(--schrift-klein); }

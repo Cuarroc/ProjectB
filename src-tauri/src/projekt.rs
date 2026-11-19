@@ -29,6 +29,11 @@ fn zuletzt(datei: &Path) -> Vec<String> {
     kern::projekt::zuletzt_laden(datei)
 }
 
+#[tauri::command(async)]
+pub fn anhang_speichern(pfad: String, name: String, inhalt: Vec<u8>) -> Result<String, String> {
+    kern::projekt::anhang_speichern(pfad, &name, &inhalt).map_err(|e| e.to_string())
+}
+
 fn datei_im_ordner(ordner: PathBuf) -> Result<PathBuf, String> {
     fs::create_dir_all(&ordner)
         .map_err(|e| format!("App-Datenordner konnte nicht angelegt werden: {e}"))?;

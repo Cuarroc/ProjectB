@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { auftragSenden, chatNachrichtenHoeren, teamStarten } from "../daten/tauri";
+import { anhangSpeichern, auftragSenden, chatNachrichtenHoeren, teamStarten } from "../daten/tauri";
+import { Anhaenge, useAnhaenge } from "./chat-eingabe/Anhaenge";
 import { teamAuftraege } from "../daten/team-plan";
 import { antwortPlan, aufgabenListe, markdownKlartext } from "../daten/plan";
 import { BeispielQuelle } from "../daten/quelle";
@@ -49,11 +50,11 @@ function textMitVerlauf(chat: Chat, pfad: string, text: string) {
   while (kontext().length > 20000 && nachrichten.length > (anfang < 0 ? 0 : 1)) { nachrichten.splice(anfang < 0 ? 0 : 1, 1); gekuerzt = true; }
   return `${kontext()}\n\nNeue Nachricht:\n${text}`;
 }
-export function nachrichtAblegen(quelle: BeispielQuelle, text: string, aktionenBehalten = false) {
+export function nachrichtAblegen(quelle: BeispielQuelle, text: string, aktionenBehalten = false, anhaenge?: string[]) {
   const daten = quelle.lesen(), chat = daten.chats.find(c => c.id === daten.aktiverChatId);
   if (!chat) throw new Error("Kein Chat ausgewählt.");
   if (!aktionenBehalten) chat.verlauf.forEach(n => { n.aktionen = []; });
-  chat.verlauf.push({ id: crypto.randomUUID(), von: "Du", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
+  chat.verlauf.push({ id: crypto.randomUUID(), von: "Du", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [], ...(anhaenge?.length ? { anhaenge } : {}) });
   quelle.aktualisieren(daten);
 }
 function orchestratorNachricht(quelle: BeispielQuelle, id: string, text: string, todos?: Todo[]) {
@@ -68,9 +69,10 @@ function orchestratorNachricht(quelle: BeispielQuelle, id: string, text: string,
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Orchestrator", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
   quelle.aktualisieren(daten);
 }
-export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false, aendern, schreiben, senden, befehl = () => {}, anzahl = 0, neuGesperrt = false, projektOffen = true }: {
+export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false, aendern, schreiben, senden, befehl = () => {}, anzahl = 0, neuGesperrt = false, projektOffen = true, anhaenge }: {
   chat: Chat; modelle: string[]; text: string; fehler: string;
   laeuft?: boolean;
+  anhaenge?: ReturnType<typeof useAnhaenge>;
   befehl?: (name: string) => void; anzahl?: number; neuGesperrt?: boolean; projektOffen?: boolean;
   aendern: (werte: Partial<Chat>) => void; schreiben: (text: string) => void; senden: (text: string) => void;
 }) {
@@ -80,8 +82,8 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false
     <Befehle key={chat.id} text={text} anzahl={anzahl} neuGesperrt={neuGesperrt} kompaktGrund={kompaktSperrgrund(chat, laeuft, projektOffen)} kontextProzent={chat.kontextProzent} ausfuehren={name => { befehl(name); schreiben(""); }}>{(feld, abfangen, befehlFehler) =>
     <Eingabefeld feld={feld} id="chat-nachricht" text={text} onTextAendern={schreiben}
       onSenden={inhalt => { if (!abfangen(inhalt)) senden(inhalt); }} fehler={befehlFehler || fehler}
-      ohneAnhaengen sendet={laeuft} beschreibungId={laeuft ? "modus-hilfe chat-arbeitet" : "modus-hilfe"}
-      kopf={<div className="ein-moduszeile"><Modi wert={chat.modus} aendern={modus => aendern({ modus: modus as Chat["modus"] })} /><Einstellungen modus={chat.modus} /></div>}
+      onAnhaengen={() => anhaenge?.eingabe.current?.click()} hatAnhaenge={!!anhaenge?.dateien.length} sendet={laeuft} beschreibungId={laeuft ? "modus-hilfe chat-arbeitet" : "modus-hilfe"}
+      kopf={<><div className="ein-moduszeile"><Modi wert={chat.modus} aendern={modus => aendern({ modus: modus as Chat["modus"] })} /><Einstellungen modus={chat.modus} /></div>{anhaenge && <Anhaenge {...anhaenge} gesperrt={laeuft} />}</>}
       werkzeuge={<>
         <Auswahl name="Modell" wert={chat.modell} werte={modelle} aendern={modell => aendern({ modell, kontextfenster: modell === "Opus 5.5" ? chat.kontextfenster : 256000 })}>
           <span className="modell-punkt" /><span className="lang">{chat.modell}</span><span className="kurz">{chat.modell.split(/[ .-]/)[0]}</span>
@@ -99,6 +101,7 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
 }
 export function useChatEingabe(quelle = chatEingabeQuelle) {
   const [daten, setDaten] = useState(() => quelle.lesen()), [text, schreiben] = useState(""), [fehler, setFehler] = useState("");
+  const anhaenge = useAnhaenge(setFehler), [speichert, setSpeichert] = useState(false);
   const kompaktAntworten = useRef(new Map<string, string[]>());
   const laufende = useRef(new Set<string>()), empfang = useRef<Promise<() => void>>(Promise.resolve(() => {}));
   useEffect(() => { const lesen = () => setDaten(quelle.lesen()); const ab = quelle.abonnieren(lesen); lesen(); return ab; }, [quelle]);
@@ -131,14 +134,22 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     }
     const alterVerlauf = quelle.lesen().chats.find(c => c.id === chat.id)?.verlauf ?? [];
     let gesendet = inhalt;
+    laufende.current.add(chat.id);
     try {
+      if (anhaenge.dateien.length) {
+        setSpeichert(true);
+        const pfade = [], projekt = quelle.lesen().kopf.pfad;
+        for (const { datei } of anhaenge.dateien) pfade.push(await anhangSpeichern(projekt, datei));
+        if (quelle.lesen().aktiverChatId !== chat.id || quelle.lesen().kopf.pfad !== projekt) throw new Error("Chat oder Projekt gewechselt.");
+        inhalt += `\n\nAnhänge:\n${pfade.join("\n")}`;
+      }
       const vorher = quelle.lesen(), ziel = vorher.chats.find(c => c.id === chat.id);
       if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, inhalt);
-      nachrichtAblegen(quelle, anzeige, kompakt); schreiben(""); setFehler("");
+      nachrichtAblegen(quelle, anzeige, kompakt, anhaenge.dateien.map(a => a.datei.name)); schreiben(""); anhaenge.leeren(); setFehler("");
     }
-    catch { setFehler("Nicht gesendet. Dein Text bleibt stehen."); return; }
-    if (!isTauri()) return;
-    laufende.current.add(chat.id);
+    catch (e) { laufende.current.delete(chat.id); setFehler(`Nicht gesendet: ${e instanceof Error ? e.message : String(e)}`); return; }
+    finally { setSpeichert(false); }
+    if (!isTauri()) { laufende.current.delete(chat.id); return; }
     if (kompakt) kompaktAntworten.current.set(chat.id, []);
     aendern({ gestartetUm: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) });
     const aktuell = quelle.lesen(), ziel = aktuell.chats.find(c => c.id === chat.id)!;
@@ -216,5 +227,5 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       if (name === "neu") chatAnlegen(quelle);
       else if (name === "anhalten") allesAnhalten.setzen(true);
       else if (name === "planen" || name === "interview") aendern({ modus: name === "planen" ? "Planen" : "Interview" }); },
-    text, fehler, laeuft: laufende.current.has(chat.id), aendern, schreiben, senden, onAktion };
+    text, fehler, anhaenge, laeuft: speichert || laufende.current.has(chat.id), aendern, schreiben, senden, onAktion };
 }

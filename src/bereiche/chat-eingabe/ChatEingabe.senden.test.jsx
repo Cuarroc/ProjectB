@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isTauri } from "@tauri-apps/api/core";
 import { BeispielQuelle } from "../../daten/quelle";
-import { auftragSenden, chatNachrichtenHoeren } from "../../daten/tauri";
+import { anhangSpeichern, auftragSenden, chatNachrichtenHoeren } from "../../daten/tauri";
+import { Anhaenge } from "./Anhaenge";
+import { renderToStaticMarkup } from "react-dom/server";
 import ChatEingabe from "../ChatEingabe";
 
 const h = vi.hoisted(() => ({ werte: [], refs: [], effekte: [], i: 0, r: 0 }));
@@ -12,10 +14,40 @@ vi.mock("react", async original => ({ ...await original(),
   useEffect: fn => h.effekte.push(fn),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn(() => true) }));
-vi.mock("../../daten/tauri", () => ({ auftragSenden: vi.fn(), chatNachrichtenHoeren: vi.fn() }));
+vi.mock("../../daten/tauri", () => ({ anhangSpeichern: vi.fn(), auftragSenden: vi.fn(), chatNachrichtenHoeren: vi.fn() }));
 let quelle, empfangen, abmelden, aufraeumen;
 const ansicht = () => { h.i = 0; h.r = 0; h.effekte = []; return ChatEingabe({ quelle }); };
 const chat = () => quelle.lesen().chats[0];
+const datei = (name = "daten.csv", size = 3072) => new File(["a,b\n".repeat(23) + "c,d" + " ".repeat(size - 95)], name, { type: "text/csv" });
+it("begrenzt Auswahl auf zehn Dateien mit je 10 MB und erlaubt Entfernen", async () => {
+  await ansicht().props.anhaenge.hinzufuegen([datei("gross.csv", 10 * 1024 * 1024 + 1)]);
+  expect(ansicht().props.anhaenge.dateien).toHaveLength(0); expect(ansicht().props.fehler).toContain("10 MB");
+  await ansicht().props.anhaenge.hinzufuegen([datei("max.csv", 10 * 1024 * 1024), ...Array.from({ length: 10 }, (_, i) => datei(`${i}.csv`))]);
+  expect(ansicht().props.anhaenge.dateien).toHaveLength(10); expect(ansicht().props.fehler).toContain("10");
+  ansicht().props.anhaenge.entfernen(0); expect(ansicht().props.anhaenge.dateien).toHaveLength(9);
+});
+it("zeigt Karte mit Name, Typ, Größe und Textzeilen", async () => {
+  await ansicht().props.anhaenge.hinzufuegen([datei(), new File(["bild"], "bild.csv", { type: "image/png" })]);
+  const html = renderToStaticMarkup(<Anhaenge {...ansicht().props.anhaenge} />);
+  expect(html).toContain("daten.csv"); expect(html).toContain("CSV · 3 KB · 24 Zeilen"); expect(html).toContain('aria-label="daten.csv entfernen"');
+  expect(html.match(/Zeilen/g)).toHaveLength(1);
+});
+it.each([false, true])("speichert vor Senden, Fehler behält Text und Dateien: %s", async fehler => {
+  ansicht().props.schreiben("Prüfe"); await ansicht().props.anhaenge.hinzufuegen([datei()]);
+  vi.mocked(anhangSpeichern).mockImplementation(async () => { expect(auftragSenden).not.toHaveBeenCalled(); if (fehler) throw new Error("Platte voll"); return ".projectb/anhaenge/id-daten.csv"; });
+  vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  await ansicht().props.senden("Prüfe");
+  if (fehler) { expect(auftragSenden).not.toHaveBeenCalled(); expect(ansicht().props.text).toBe("Prüfe"); expect(ansicht().props.anhaenge.dateien).toHaveLength(1); expect(ansicht().props.fehler).toBe("Nicht gesendet: Platte voll"); }
+  else { expect(auftragSenden).toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining("Prüfe\n\nAnhänge:\n.projectb/anhaenge/id-daten.csv") })); expect(chat().verlauf.at(-1)).toMatchObject({ text: "Prüfe", anhaenge: ["daten.csv"] }); expect(ansicht().props.anhaenge.dateien).toHaveLength(0); }
+});
+it("sendet während des Speicherns weder doppelt noch in einen gewechselten Chat", async () => {
+  await ansicht().props.anhaenge.hinzufuegen([datei()]);
+  let fertig; vi.mocked(anhangSpeichern).mockReturnValue(new Promise(resolve => { fertig = resolve; }));
+  const senden = ansicht().props.senden(""); await ansicht().props.senden(""); expect(anhangSpeichern).toHaveBeenCalledOnce();
+  const d = quelle.lesen(); d.chats.push({ ...chat(), id: "anderer", verlauf: [] }); d.aktiverChatId = "anderer"; quelle.aktualisieren(d);
+  fertig(".projectb/anhaenge/datei.csv"); await senden;
+  expect(auftragSenden).not.toHaveBeenCalled(); expect(quelle.lesen().chats[1].verlauf).toHaveLength(0); expect(ansicht().props.anhaenge.dateien).toHaveLength(1);
+});
 beforeEach(() => {
   h.werte = []; h.refs = []; quelle = new BeispielQuelle(); abmelden = vi.fn();
   const daten = quelle.lesen(); daten.kopf.geoeffnet = true; quelle.aktualisieren(daten);
