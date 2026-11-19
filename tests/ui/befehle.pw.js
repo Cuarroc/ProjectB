@@ -64,7 +64,7 @@ test("/anhalten ist ohne Lauf gesperrt und hält den echten Teamweg an", async (
   const option = page.getByRole("option"); await expect(option).toBeDisabled(); await expect(option).toContainText("Kein Agent läuft");
   await feld.press("Enter"); await expect(feld).toHaveValue("/anhalten");
   await expect.poll(() => page.evaluate(() => [...window.listener.values()].includes("team-agent"))).toBe(true);
-  await page.evaluate(() => window.agent("Arbeitet")); await expect(option).toBeEnabled(); await expect(option).toContainText("1 laufen");
+  await page.evaluate(() => window.agent("Arbeitet")); await expect(option).toBeEnabled(); await expect(option).toContainText("1 läuft");
   await option.click(); await expect.poll(() => page.evaluate(() => window.stopps)).toEqual([{}]); await expect(feld).toHaveValue("");
   await feld.fill("/anhalten"); await expect(option).toBeDisabled();
 });

@@ -46,7 +46,7 @@ export function Befehle({ text, anzahl = 0, neuGesperrt = false, kompaktGrund = 
           <span className="ein-befehl-symbol"><Symbol size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /></span>
           <span><code>/{name}</code><small>{text}</small></span>
           {name === "kompakt" && <small>{kompaktGrund || `${Math.round(kontextProzent)} % belegt`}</small>}
-          {name === "anhalten" && <small>{laufend ? `${laufend} laufen` : "Kein Agent läuft"}</small>}
+          {name === "anhalten" && <small>{laufend ? `${laufend} ${laufend === 1 ? "läuft" : "laufen"}` : "Kein Agent läuft"}</small>}
           {name === "neu" && neuGesperrt && <small>Rollen laden …</small>}
         </button>)}
       </div>
