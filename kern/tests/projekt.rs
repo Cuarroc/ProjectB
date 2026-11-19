@@ -32,6 +32,19 @@ impl Drop for Ordner {
         }
     }
 }
+#[test]
+fn dateiliste_nur_fuer_geoeffnete_projekte_ohne_ignorierte_dateien() {
+    let repo = Ordner::neu();
+    repo.git(&["init", "-b", "test"]);
+    let zuletzt = repo.0.join("zuletzt.json");
+    fs::write(repo.0.join(".gitignore"), "geheim\nzuletzt.json\n").unwrap();
+    fs::write(repo.0.join("geheim"), "ignoriert").unwrap();
+    fs::write(repo.0.join("neu ü.rs"), "neu").unwrap();
+    repo.git(&["add", ".gitignore"]);
+    assert!(projectb_kern::projekt::dateien(&repo.0, &zuletzt).is_err());
+    oeffnen(&repo.0, &zuletzt).unwrap();
+    assert_eq!(projectb_kern::projekt::dateien(&repo.0, &zuletzt).unwrap(), [".gitignore", "neu ü.rs"]);
+}
 
 #[test]
 fn oeffnen_merkt_nur_die_gepruefte_wurzel_und_meldet_fehler() {

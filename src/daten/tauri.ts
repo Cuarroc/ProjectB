@@ -73,6 +73,13 @@ export async function projektOeffnen(pfad: string): Promise<Projekt> {
 export async function projekteZuletzt(): Promise<string[]> {
   return isTauri() ? invoke<string[]>("projekte_zuletzt") : [...beispiel.kopf.projekte];
 }
+const dateilisten = new Map<string, Promise<string[]>>();
+export function projektDateien(pfad: string): Promise<string[]> {
+  if (!dateilisten.has(pfad)) dateilisten.set(pfad, (isTauri() ? invoke<string[]>("projekt_dateien", { pfad })
+    : Promise.resolve(["src/export/csv.rs", "src/export/mod.rs", "tests/export.rs"]))
+    .catch(e => { dateilisten.delete(pfad); throw e; }));
+  return dateilisten.get(pfad)!;
+}
 
 export async function kontingentLesen(): Promise<Kontingent> {
   return isTauri() ? invoke<Kontingent>("kontingent") : beispiel.kopf.kontingent;

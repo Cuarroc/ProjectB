@@ -24,6 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             kontingent::kontingent,
             projekt::projekt_pruefen,
             projekt::projekt_oeffnen,
+            projekt::projekt_dateien,
             projekt::projekte_zuletzt,
         ])
         .run(tauri::generate_context!())

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isTauri } from "@tauri-apps/api/core";
 import { BeispielQuelle } from "../../daten/quelle";
-import { auftragSenden, chatNachrichtenHoeren } from "../../daten/tauri";
+import { auftragSenden, chatNachrichtenHoeren, projektDateien } from "../../daten/tauri";
 import ChatEingabe from "../ChatEingabe";
 
 const h = vi.hoisted(() => ({ werte: [], refs: [], effekte: [], i: 0, r: 0 }));
@@ -12,7 +12,7 @@ vi.mock("react", async original => ({ ...await original(),
   useEffect: fn => h.effekte.push(fn),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn(() => true) }));
-vi.mock("../../daten/tauri", () => ({ auftragSenden: vi.fn(), chatNachrichtenHoeren: vi.fn() }));
+vi.mock("../../daten/tauri", () => ({ auftragSenden: vi.fn(), chatNachrichtenHoeren: vi.fn(), projektDateien: vi.fn() }));
 let quelle, empfangen, abmelden, aufraeumen;
 const ansicht = () => { h.i = 0; h.r = 0; h.effekte = []; return ChatEingabe({ quelle }); };
 const chat = () => quelle.lesen().chats[0];
@@ -86,6 +86,19 @@ it("legt im Browser nur die Nachricht ab", async () => {
   await ansicht().props.senden("Beispiel");
   expect(chat().verlauf.at(-1)).toMatchObject({ von: "Du", text: "Beispiel" });
   expect(chat().gestartetUm).toBe("14:30"); expect(auftragSenden).not.toHaveBeenCalled();
+});
+it("hängt Dateibezüge nur an den Auftrag an, Agenten bleiben Text", async () => {
+  vi.mocked(projektDateien).mockResolvedValue(["src/export/csv.rs"]);
+  vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  const text = "Prüfe @src/export/csv.rs mit @CSV-Export im Kern"; await ansicht().props.senden(text);
+  expect(auftragSenden.mock.calls[0][0].text).toMatch(/Bezüge:\n- src\/export\/csv.rs$/);
+  expect(chat().verlauf.at(-1).text).toBe(text);
+});
+it("sperrt Doppelsenden bereits beim Laden der Dateiliste", async () => {
+  let laden; vi.mocked(projektDateien).mockReturnValue(new Promise(resolve => { laden = resolve; }));
+  vi.mocked(auftragSenden).mockResolvedValue({ sitzung: null, erfolg: true });
+  const erstes = ansicht().props.senden("@src/export/csv.rs"); await ansicht().props.senden("Zweiter Auftrag");
+  expect(auftragSenden).not.toHaveBeenCalled(); laden(["src/export/csv.rs"]); await erstes; expect(auftragSenden).toHaveBeenCalledOnce();
 });
 it("meldet einen erst nach dem Unmount bereitstehenden Listener ab", async () => {
   aufraeumen.forEach(fn => fn?.()); await Promise.resolve();

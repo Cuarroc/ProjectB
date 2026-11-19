@@ -5,6 +5,7 @@ import { Befehle } from "./Befehle";
 import { Eingabefeld } from "../../bausteine/Eingabefeld";
 import { ChatEingabeAnsicht } from "../ChatEingabe";
 import { BeispielQuelle } from "../../daten/quelle";
+import { bezugEinfuegen } from "./Bezuege";
 const h = vi.hoisted(() => ({ werte: [], i: 0 }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn(() => false) }));
 vi.mock("react", async original => ({ ...await original(),
@@ -13,6 +14,7 @@ vi.mock("react", async original => ({ ...await original(),
 }));
 let text, ausfuehren, senden, chat, anzahl, neuGesperrt, laeuft, projektOffen;
 const ansicht = () => { h.i = 0; const el = ChatEingabeAnsicht({ chat, modelle: [chat.modell], text, anzahl, neuGesperrt, laeuft, projektOffen, fehler: "",
+  dateien: ["src/export/csv.rs", "src/export/mod.rs", "tests/export.rs"], agenten: [{ name: "CSV-Export im Kern", anbieter: "Codex", zustand: "Arbeitet" }],
   aendern: vi.fn(), schreiben: wert => { text = wert; }, senden, befehl: ausfuehren }).props.children.find(el => el?.type === Befehle);
   return Befehle(el.props); };
 const eingabe = () => Eingabefeld(ansicht().props.children.at(-1).props);
@@ -90,4 +92,30 @@ it("zeigt /kompakt zuerst mit gerundetem Kontext und führt es aus", () => {
   chat.kontextProzent = 37.6; const html = renderToStaticMarkup(ansicht());
   expect(html.indexOf("/kompakt")).toBeLessThan(html.indexOf("/neu")); expect(html).toContain("38 % belegt");
   taste("Enter"); expect(ausfuehren).toHaveBeenCalledWith("kompakt"); expect(senden).not.toHaveBeenCalled();
+});
+it("filtert @ ohne Beachtung der Schreibweise, gruppiert und markiert Fundstellen", () => {
+  tippen("Prüfe @EXP"); const html = renderToStaticMarkup(ansicht());
+  expect(html).toContain("Dateien"); expect(html).toContain("Agenten"); expect(html).toContain("csv.rs");
+  expect(html).toContain("<mark>exp</mark>"); expect(html).toContain("Agent · Codex"); expect(html).toContain("Arbeitet");
+});
+it("fügt am Cursor ein und erhält den übrigen Text", () => {
+  expect(bezugEinfuegen("Prüfe @exp danach", 10, "src/export/csv.rs")).toEqual({ text: "Prüfe @src/export/csv.rs  danach", cursor: 25 });
+});
+it("wählt @ mit Pfeilen ohne Senden; Esc schließt, ohne Treffer sendet Enter", () => {
+  vi.stubGlobal("requestAnimationFrame", vi.fn());
+  tippen("@exp"); taste("ArrowDown"); taste("Enter"); expect(text).toBe("@src/export/mod.rs "); expect(senden).not.toHaveBeenCalled();
+  tippen("@exp"); taste("Escape"); expect(renderToStaticMarkup(ansicht())).not.toContain('role="listbox"');
+  tippen("@unbekannt"); expect(renderToStaticMarkup(ansicht())).toContain("Nichts gefunden"); taste("Enter");
+  expect(senden).toHaveBeenCalledWith("@unbekannt"); vi.unstubAllGlobals();
+});
+it("öffnet / und @ nie gleichzeitig und ignoriert E-Mail-Adressen", () => {
+  for (const wert of ["/planen @exp", "@"]) { tippen(wert); const html = renderToStaticMarkup(ansicht());
+    expect(html.match(/role="listbox"/g)).toHaveLength(1); expect(html).not.toContain('aria-label="Befehle"'); }
+  tippen("mail@exp"); expect(renderToStaticMarkup(ansicht())).not.toContain('role="listbox"');
+});
+it("entfernt eine gewählte Marke samt Text", () => {
+  vi.stubGlobal("requestAnimationFrame", vi.fn()); tippen("@exp"); taste("Enter");
+  expect(renderToStaticMarkup(eingabe())).toContain('aria-label="Bezug src/export/csv.rs entfernen"');
+  eingabe().props.children[2].props.children[0].props.onClick(); expect(text).toBe(" ");
+  expect(renderToStaticMarkup(eingabe())).not.toContain("Bezug src/export/csv.rs entfernen"); vi.unstubAllGlobals();
 });

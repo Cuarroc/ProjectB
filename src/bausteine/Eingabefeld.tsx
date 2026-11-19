@@ -15,9 +15,10 @@ type Props = {
   beschreibungId?: string;
   ohneAnhaengen?: boolean;
   feld?: TextareaHTMLAttributes<HTMLTextAreaElement>;
+  marken?: ReactNode;
 };
 
-export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, sendet = false, fehler, kopf, werkzeuge, beschreibungId, ohneAnhaengen, feld }: Props) {
+export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, sendet = false, fehler, kopf, werkzeuge, beschreibungId, ohneAnhaengen, feld, marken }: Props) {
   const senden = () => { if (!sendet && text.trim()) onSenden(text); };
   const tastatur = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     feld?.onKeyDown?.(event); if (event.defaultPrevented) return;
@@ -30,6 +31,7 @@ export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, se
     <textarea {...feld} id={id} rows={2} placeholder="Schreib, was gebaut werden soll …" value={text}
       onChange={event => { feld?.onChange?.(event); onTextAendern(event.target.value); }} onKeyDown={tastatur}
       aria-describedby={[beschreibungId, fehler ? `${id}-meldung` : undefined].filter(Boolean).join(" ") || undefined} />
+    {marken}
     <div className="ein-leiste">
       {!ohneAnhaengen && <button type="button" className="kn kn-leise kn-symbol" aria-label="Bild oder Datei anhängen"
         title="Bild oder Datei anhängen" disabled={!onAnhaengen || sendet} onClick={onAnhaengen}>

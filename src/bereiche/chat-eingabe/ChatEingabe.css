@@ -33,11 +33,16 @@
 .ein-befehle header { display: flex; justify-content: space-between; padding: var(--abstand-2) var(--abstand-3); }
 .ein-befehle header, .ein-befehle footer, .ein-befehle small, .ein-befehle p { color: var(--text-2); font: var(--schrift-klein); }
 .ein-befehle button { display: flex; align-items: center; gap: var(--abstand-3); padding: var(--abstand-3); }
-.ein-befehle button > span:nth-child(2) { flex: 1; }
+.ein-befehle button > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .ein-befehle code, .ein-befehle small { display: block; }
 .ein-befehle code { font: var(--schrift-text); font-family: var(--familie-mono); }
+.ein-befehle mark { color: var(--akzent-text); background: var(--akzent-grund); border-radius: var(--rund-segment); }
+.ein-befehle [role=listbox] { max-height: 50vh; overflow-y: auto; }
+.ein-bezugmarken { display: flex; flex-wrap: wrap; gap: var(--abstand-2); margin-bottom: var(--abstand-3); }
+.ein-bezugmarken button { background: var(--akzent-grund); color: var(--akzent-text); height: auto; min-height: var(--steuer-hoehe); white-space: normal; overflow-wrap: anywhere; }
 .ein-befehl-symbol { display: grid; place-items: center; flex: none; width: var(--steuer-hoehe); height: var(--steuer-hoehe); background: var(--flaeche-3); border-radius: var(--rund-knopf); box-shadow: var(--schatten-kante); }
 .ein-befehle button[aria-selected=true] { background: var(--akzent-grund); box-shadow: inset 0 0 0 1px var(--akzent); }
+.ein-befehle button[aria-selected=true] .ein-befehl-symbol { color: var(--akzent-text); background: var(--akzent-grund); }
 .ein-befehle button:disabled { color: var(--text-aus); cursor: not-allowed; }
 .ein-befehle button:disabled small { color: inherit; }
 .ein-befehle button:hover:not(:disabled) { background: var(--akzent-grund); }

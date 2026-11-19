@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { auftragSenden, chatNachrichtenHoeren, teamStarten } from "../daten/tauri";
+import { auftragSenden, chatNachrichtenHoeren, teamStarten, projektDateien } from "../daten/tauri";
 import { teamAuftraege } from "../daten/team-plan";
 import { antwortPlan, aufgabenListe, markdownKlartext } from "../daten/plan";
 import { BeispielQuelle } from "../daten/quelle";
-import type { Chat, Todo } from "../daten/typen";
+import type { Agent, Chat, Todo } from "../daten/typen";
 import { Eingabefeld } from "../bausteine/Eingabefeld";
 import { Modi, Auswahl, Kontext, EffortSymbol, efforts, erklaerungen, modi } from "./chat-eingabe/Auswahlen";
 import "./chat-eingabe/ChatEingabe.css";
@@ -12,6 +12,7 @@ import { Einstellungen } from "./chat-eingabe/Einstellungen";
 import { Befehle, kompaktSperrgrund } from "./chat-eingabe/Befehle";
 import { chatAnlegen, neuerChatGesperrt } from "../daten/chats";
 import { allesAnhalten } from "./anhalten";
+import { mitBezuegen } from "./chat-eingabe/Bezuege";
 
 export const chatEingabeQuelle = new BeispielQuelle();
 const planAktionen = [
@@ -68,17 +69,18 @@ function orchestratorNachricht(quelle: BeispielQuelle, id: string, text: string,
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Orchestrator", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
   quelle.aktualisieren(daten);
 }
-export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false, aendern, schreiben, senden, befehl = () => {}, anzahl = 0, neuGesperrt = false, projektOffen = true }: {
+export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false, aendern, schreiben, senden, befehl = () => {}, anzahl = 0, neuGesperrt = false, projektOffen = true, dateien = [], agenten = [] }: {
   chat: Chat; modelle: string[]; text: string; fehler: string;
   laeuft?: boolean;
+  dateien?: string[]; agenten?: Agent[];
   befehl?: (name: string) => void; anzahl?: number; neuGesperrt?: boolean; projektOffen?: boolean;
   aendern: (werte: Partial<Chat>) => void; schreiben: (text: string) => void; senden: (text: string) => void;
 }) {
   return <footer className="chat-eingabe">
     {laeuft && <p className="ein-arbeitet" id="chat-arbeitet" role="status">Orchestrator arbeitet … Bitte warte vor dem nächsten Senden.</p>}
     <span className="ein-sr" id="modus-hilfe">{erklaerungen[modi.indexOf(chat.modus)]}</span>
-    <Befehle key={chat.id} text={text} anzahl={anzahl} neuGesperrt={neuGesperrt} kompaktGrund={kompaktSperrgrund(chat, laeuft, projektOffen)} kontextProzent={chat.kontextProzent} ausfuehren={name => { befehl(name); schreiben(""); }}>{(feld, abfangen, befehlFehler) =>
-    <Eingabefeld feld={feld} id="chat-nachricht" text={text} onTextAendern={schreiben}
+    <Befehle key={chat.id} text={text} dateien={dateien} agenten={agenten} schreiben={schreiben} anzahl={anzahl} neuGesperrt={neuGesperrt} kompaktGrund={kompaktSperrgrund(chat, laeuft, projektOffen)} kontextProzent={chat.kontextProzent} ausfuehren={name => { befehl(name); schreiben(""); }}>{(feld, abfangen, befehlFehler, marken) =>
+    <Eingabefeld feld={feld} marken={marken} id="chat-nachricht" text={text} onTextAendern={schreiben}
       onSenden={inhalt => { if (!abfangen(inhalt)) senden(inhalt); }} fehler={befehlFehler || fehler}
       ohneAnhaengen sendet={laeuft} beschreibungId={laeuft ? "modus-hilfe chat-arbeitet" : "modus-hilfe"}
       kopf={<div className="ein-moduszeile"><Modi wert={chat.modus} aendern={modus => aendern({ modus: modus as Chat["modus"] })} /><Einstellungen modus={chat.modus} /></div>}
@@ -99,6 +101,14 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
 }
 export function useChatEingabe(quelle = chatEingabeQuelle) {
   const [daten, setDaten] = useState(() => quelle.lesen()), [text, schreiben] = useState(""), [fehler, setFehler] = useState("");
+  const [dateiliste, dateienSetzen] = useState({ pfad: "", dateien: [] as string[] });
+  const bezugGetippt = /(?:^|\s)@/.test(text), projektPfad = daten.kopf.pfad;
+  useEffect(() => {
+    let aktuell = true;
+    if (bezugGetippt && (!isTauri() || daten.kopf.geoeffnet)) projektDateien(projektPfad).then(
+      dateien => { if (aktuell) dateienSetzen({ pfad: projektPfad, dateien }); }, e => { if (aktuell) setFehler(`Dateien nicht geladen: ${String(e)}`); });
+    return () => { aktuell = false; };
+  }, [bezugGetippt, projektPfad, daten.kopf.geoeffnet]);
   const kompaktAntworten = useRef(new Map<string, string[]>());
   const laufende = useRef(new Set<string>()), empfang = useRef<Promise<() => void>>(Promise.resolve(() => {}));
   useEffect(() => { const lesen = () => setDaten(quelle.lesen()); const ab = quelle.abonnieren(lesen); lesen(); return ab; }, [quelle]);
@@ -130,15 +140,17 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       nachricht.aktionen = []; ziel.modus = "Ausführen"; quelle.aktualisieren(neu);
     }
     const alterVerlauf = quelle.lesen().chats.find(c => c.id === chat.id)?.verlauf ?? [];
+    laufende.current.add(chat.id);
     let gesendet = inhalt;
     try {
       const vorher = quelle.lesen(), ziel = vorher.chats.find(c => c.id === chat.id);
-      if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, inhalt);
+      const auftrag = /(?:^|\s)@/.test(inhalt) ? mitBezuegen(inhalt, await projektDateien(vorher.kopf.pfad)) : inhalt;
+      if (quelle.lesen().kopf.pfad !== vorher.kopf.pfad || quelle.lesen().aktiverChatId !== chat.id) throw new Error("Chat oder Projekt gewechselt");
+      if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, auftrag);
       nachrichtAblegen(quelle, anzeige, kompakt); schreiben(""); setFehler("");
     }
-    catch { setFehler("Nicht gesendet. Dein Text bleibt stehen."); return; }
-    if (!isTauri()) return;
-    laufende.current.add(chat.id);
+    catch { laufende.current.delete(chat.id); setFehler("Nicht gesendet. Dein Text bleibt stehen."); return; }
+    if (!isTauri()) { laufende.current.delete(chat.id); return; }
     if (kompakt) kompaktAntworten.current.set(chat.id, []);
     aendern({ gestartetUm: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) });
     const aktuell = quelle.lesen(), ziel = aktuell.chats.find(c => c.id === chat.id)!;
@@ -203,7 +215,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (kommentar !== undefined) return senden(kommentar);
     schreiben(text.startsWith("Kommentare zum Plan: ") ? text : `Kommentare zum Plan: ${text}`); document.getElementById("chat-nachricht")?.focus();
   };
-  return { chat, projektOffen: !isTauri() || !!daten.kopf.geoeffnet, neuGesperrt: neuerChatGesperrt(daten), modelle: ["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"],
+  return { chat, agenten: daten.agenten, dateien: dateiliste.pfad === projektPfad ? dateiliste.dateien : [], projektOffen: !isTauri() || !!daten.kopf.geoeffnet, neuGesperrt: neuerChatGesperrt(daten), modelle: ["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"],
     anzahl: daten.agenten.filter(a => a.zustand === "Arbeitet").length,
     befehl: (name: string) => {
       if (name === "kompakt") {
