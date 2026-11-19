@@ -44,3 +44,19 @@
 .pl-zaehler{margin-inline-start:var(--abstand-1);padding:0 var(--abstand-1);border-radius:var(--rund-knopf);background:var(--akzent-grund);color:var(--akzent-text);font:var(--schrift-klein);font-variant-numeric:tabular-nums}
 .pl-vorlesen{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @starting-style{.pl-marke{opacity:0}}
+.pl-kacheln{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--abstand-2)}
+.pl-kachel{min-width:0;padding:var(--abstand-2);gap:var(--abstand-2)}
+.pl-kachel h3{display:flex;align-items:center;gap:var(--abstand-1);font:var(--schrift-klein);color:var(--text-2)}.pl-kachel h3 svg{flex:none;color:var(--akzent)}
+.pl-kachel strong{font:var(--schrift-zahl-mittel);font-variant-numeric:tabular-nums;letter-spacing:var(--laufweite-zahl-gross)}
+@media(min-width:1280px){.pl-kachel strong{font:var(--schrift-zahl-gross)}}
+@media(max-width:1279px){.pl-kachel{padding-inline:var(--abstand-1)}}
+.pl-kachel p{margin:0;font:var(--schrift-klein);color:var(--text-2);overflow-wrap:anywhere}
+.pl-anteil{display:flex;align-items:center;justify-content:space-between;gap:var(--abstand-1);font:var(--schrift-klein);font-variant-numeric:tabular-nums}
+.pl-messbalken{flex:1;min-width:0;height:var(--abstand-1);border-radius:var(--rund-voll);background:var(--flaeche-4);overflow:hidden}.pl-messbalken i{display:block;height:100%;background:var(--akzent)}
+.pl-diagramm{width:100%;table-layout:fixed;border-collapse:collapse;font:var(--schrift-klein);color:var(--text-2);font-variant-numeric:tabular-nums}
+.pl-spalte-nr{width:var(--abstand-8)}.pl-spalte-dauer{width:calc(var(--abstand-8) * 2)}.pl-spalte-risiko{width:calc(var(--abstand-7) * 2)}
+.pl-diagramm th{text-align:left;font-weight:400;padding-bottom:var(--abstand-2)}.pl-diagramm td{padding:var(--abstand-2) 0;vertical-align:middle;overflow-wrap:anywhere}
+.pl-diagramm td:nth-child(2){padding-right:var(--abstand-2)}.pl-diagramm td:nth-child(3){color:var(--text-1);white-space:nowrap}
+.pl-balken{display:block;height:var(--abstand-2);margin-top:var(--abstand-1);border-radius:var(--rund-voll);background:color-mix(in srgb,var(--akzent) 65%,var(--akzent-grund))}
+.pl-achse{display:flex;justify-content:space-between;gap:var(--abstand-1);border-top:1px solid var(--neutral-4);padding-top:var(--abstand-1)}.pl-achse span{white-space:nowrap}
+.pl-schritt[data-hervorgehoben=true]{box-shadow:var(--schatten-auswahl)}

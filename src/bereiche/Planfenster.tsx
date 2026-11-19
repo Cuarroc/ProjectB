@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { AlignLeft, Check, Circle, CircleMinus, Clock, Lightbulb, ListChecks, ListTree, MessageSquare, RefreshCw, Users, X, Zap } from "lucide-react";
 import { Knopf } from "../bausteine/Knopf";
 import { Statusmarke } from "../bausteine/Statusmarke";
+import PlanAufwand from "./PlanAufwand";
 import type { Datenstand, Markierung, Plan } from "../daten/typen";
 import "./Planfenster.css";
 
@@ -26,6 +27,12 @@ export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarke
   const auswahl = useRef<{ id: string; feld: string; start: number; ende: number } | null>(null);
   const [hinweis, setHinweis] = useState("");
   const [stil, setStil] = useState(echterPlan ? "" : "Ausführlicher");
+  const schrittElemente = useRef(new Map<string, HTMLLIElement>());
+  const [hover, setHover] = useState<string | null>(null), [fokus, setFokus] = useState<string | null>(null);
+  const zeigen = (id: string | null, quelle: "hover" | "fokus") => {
+    (quelle === "hover" ? setHover : setFokus)(id);
+    if (id != null) schrittElemente.current.get(id)?.scrollIntoView({ block: "nearest" });
+  };
   const markAnzahl = plan.schritte.filter(s => s.markierungen.length || s.kommentar.trim()).length;
   const markZahl = `${markAnzahl} ${markAnzahl === 1 ? "Schritt" : "Schritte"}`;
   useEffect(() => { const fenster = dialog.current!, vorher = document.activeElement as HTMLElement;
@@ -65,7 +72,8 @@ export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarke
       <ol className="pl-liste" tabIndex={0} aria-label="Planschritte">{plan.schritte.map((s, i) => {
         const agent = daten.agenten.find(a => a.id === s.agentId);
         const titelfarbe = s.markierungen.find(m => m !== "Kommentar");
-        return <li className="pl-schritt" key={s.id}>
+        return <li className="pl-schritt" key={s.id} data-hervorgehoben={(hover ?? fokus) === s.id}
+          ref={el => { if (el) schrittElemente.current.set(s.id, el); else schrittElemente.current.delete(s.id); }}>
           <div className="pl-streifen" aria-hidden="true">{s.markierungen.map(m => <span key={m} style={{ background: farbe(m) }} />)}</div>
           <div className="pl-kopfzeile"><span className="pl-nr">{i + 1}</span><div className="pl-kopftext">
             <div className="pl-titelzeile"><h3 onMouseUp={e => erfassen(s.id, e.currentTarget)}><MarkierterText text={s.titel} marke={marken[`${s.id}:titel`] ?? (titelfarbe ? { name: titelfarbe, start: 0, ende: s.titel.length } : undefined)} /></h3>
@@ -93,6 +101,7 @@ export default function Planfenster({ daten, plan: echterPlan, gespeicherteMarke
       })}</ol>
     </section>
     <aside className="pl-rechts" aria-label="Plan bearbeiten"><div className="pl-werkzeuge" tabIndex={0} role="region" aria-label="Planwerkzeuge">
+      <PlanAufwand schritte={plan.schritte} kontext={daten.chats?.find(c => c.id === daten.aktiverChatId)?.kontextfenster} onZeigen={zeigen} />
       <section className="pl-karte"><div className="pl-karte-kopf"><h3>Deine Markierungen</h3><span className="pl-einheit">{markZahl}</span></div><div className="pl-stil">{farben.map(([name]) => <span className="pl-marke" key={name} style={{ "--f": farbe(name) } as CSSProperties}><span className="pl-farbpunkt" aria-hidden="true" />{name} {plan.schritte.filter(s => s.markierungen.includes(name)).length}</span>)}</div>
         <p className="pl-hinweis">Jeder Knopf an einem Schritt färbt ihn in seiner Farbe. Mehrere Knöpfe ergeben mehrere Farben oben am Schritt.</p></section>
       <section className="pl-karte"><h3>Wie soll der Plan geschrieben sein?</h3><div className="pl-stil">{["Simpler", "Ausführlicher", "Innovativer", "Vorsichtiger", "Schneller"].map(w => <button type="button" disabled={!entscheidbar} className="pl-stilknopf" key={w} aria-pressed={stil === w} onClick={() => setStil(w)}>{w}</button>)}</div>
