@@ -71,6 +71,19 @@ it("entfernt bei einem neuen Auftrag alle alten Aktionen nur in diesem Chat", as
   expect(chat().verlauf.at(-1).aktionen).toHaveLength(2);
   await ansicht().onAktion(a.id, "plan-freigeben"); expect(auftragSenden).toHaveBeenCalledTimes(2);
 });
+it.each([true, false])("behält nach /kompakt mit Erfolg %s alle Aktionen und lässt den Plan freigeben", async erfolg => {
+  const start = ansicht().senden("Plane"); await Promise.resolve();
+  empfangen(chat().id, "- [ ] Export"); beenden({ sitzung: null, erfolg: true }); await start;
+  const vorher = chat().verlauf, n = vorher.at(-1);
+  expect(n.aktionen.some(a => a.id === "plan-freigeben")).toBe(true);
+  expect(n.plan.freigabe).toBe("Wartet auf dich");
+  const lauf = ansicht().befehl("kompakt"); await Promise.resolve();
+  empfangen(chat().id, "Zusammenfassung"); beenden({ sitzung: null, erfolg }); await lauf;
+  expect(chat().verlauf.slice(0, vorher.length)).toEqual(vorher);
+  await ansicht().onAktion(n.id, "plan-freigeben");
+  expect(teamStarten).toHaveBeenCalledOnce();
+  expect(chat().verlauf.find(v => v.id === n.id).plan.freigabe).toBe("Freigegeben");
+});
 it("leert bei einer Freigabe auch die Aktionen anderer alter Nachrichten", async () => {
   await plan(); const d = quelle.lesen();
   d.chats[0].verlauf.push({ ...d.chats[0].verlauf.at(-1), id: "plan-b", text: "Plan B" }); quelle.aktualisieren(d);

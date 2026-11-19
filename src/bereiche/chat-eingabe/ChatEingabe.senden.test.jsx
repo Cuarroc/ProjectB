@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isTauri } from "@tauri-apps/api/core";
 import { BeispielQuelle } from "../../daten/quelle";
 import { auftragSenden, chatNachrichtenHoeren } from "../../daten/tauri";
@@ -174,4 +174,55 @@ it("sendet im leeren Chat keinen Kontextblock", async () => {
 it("sperrt /neu bis die Rollen zum aktuellen Projekt geladen sind", () => {
   expect(ansicht().props.neuGesperrt).toBe(true); const d = quelle.lesen(); d.rollenPfad = d.kopf.pfad; quelle.aktualisieren(d);
   expect(ansicht().props.neuGesperrt).toBe(false);
+});
+
+describe("/kompakt", () => {
+  beforeEach(() => {
+    const d = quelle.lesen(); Object.assign(d.chats[0], { gestartetUm: null,
+      sitzung: { id: "alt", anbieter: "Claude", pfad: d.kopf.pfad } }); quelle.aktualisieren(d);
+  });
+  it("sperrt im Browser ohne neue Nachricht und nennt den Grund", async () => {
+    vi.mocked(isTauri).mockReturnValue(false); const vorher = chat();
+    await ansicht().props.befehl("kompakt");
+    expect(chat()).toEqual(vorher); expect(auftragSenden).not.toHaveBeenCalled();
+    expect(ansicht().props.fehler).toBe("Nur in der Desktop-App");
+  });
+  it.each(["Opus 5.5", "gpt-6.1-sol"])("fasst für %s zusammen und startet danach mit freiem Kontext", async modell => {
+    const d = quelle.lesen(); d.chats[0].modell = modell; d.chats[0].sitzung.anbieter = modell === "Opus 5.5" ? "Claude" : "Codex"; quelle.aktualisieren(d);
+    const vorher = chat(), zusammenfassung = "Ziel: CSV. Entscheidung: UTF-8. Offen: Export. Datei: export.rs.";
+    let beenden; vi.mocked(auftragSenden).mockReturnValueOnce(new Promise(resolve => { beenden = resolve; }));
+    const lauf = ansicht().props.befehl("kompakt"); await Promise.resolve(); await Promise.resolve();
+    expect(auftragSenden).toHaveBeenCalledWith(expect.objectContaining({ sitzung: vorher.sitzung, text: expect.stringMatching(/300 Wörter/) }));
+    expect(chat().verlauf.at(-1).text).toBe("Verlauf wird zusammengefasst …");
+    empfangen(chat().id, zusammenfassung); expect(chat().sitzung).toEqual(vorher.sitzung);
+    beenden({ erfolg: true, sitzung: { ...vorher.sitzung, id: "neu" } }); await lauf;
+    expect(chat()).toMatchObject({ sitzung: null, kontextProzent: 0, zusammenfassung: chat().verlauf.at(-1).id });
+    expect(chat().verlauf.at(-1)).toMatchObject({ von: "Orchestrator", text: zusammenfassung, aktionen: [] });
+    vi.mocked(auftragSenden).mockResolvedValue({ erfolg: true, sitzung: null });
+    await ansicht().props.senden("Weiter"); const gesendet = auftragSenden.mock.calls.at(-1)[0];
+    expect(gesendet.sitzung).toBeNull(); expect(gesendet.text).toContain(zusammenfassung);
+    expect(gesendet.text).not.toContain(vorher.verlauf[0].text);
+  });
+  it("sendet nur die Zusammenfassung und alle Nachrichten danach, auch über 20", async () => {
+    const d = quelle.lesen(), ziel = d.chats[0]; ziel.sitzung = null;
+    ziel.verlauf.push({ id: "kurz", von: "Orchestrator", text: "Zusammengefasst", aktionen: [] }); ziel.zusammenfassung = "kurz";
+    for (let i = 0; i < 22; i++) ziel.verlauf.push({ id: `n${i}`, von: "Du", text: `Danach ${i}`, aktionen: [] });
+    quelle.aktualisieren(d); vi.mocked(auftragSenden).mockResolvedValue({ erfolg: true, sitzung: null });
+    await ansicht().props.senden("Weiter"); const text = auftragSenden.mock.calls.at(-1)[0].text;
+    expect(text).toContain("Zusammengefasst"); expect(text).toContain("Danach 0"); expect(text).toContain("Danach 21"); expect(text).not.toContain(ziel.verlauf[0].text);
+  });
+  it.each(["Fehler", "Exit-Code", "leer"])("behält bei Fehlschlag %s Sitzung und Verlauf unverändert", async art => {
+    const vorher = chat(); vi.mocked(auftragSenden).mockImplementation(async () => {
+      if (art !== "leer") empfangen(chat().id, "Fehlversuch");
+      if (art === "Fehler") throw new Error("kaputt");
+      return { erfolg: art === "leer", sitzung: null };
+    });
+    await ansicht().props.befehl("kompakt"); expect(chat()).toEqual(vorher);
+    expect(ansicht().props.fehler).toMatch(/^Problem: /);
+  });
+});
+
+it("fängt Senden aus einer alten Ansicht nach Entfernen des Chats ab", async () => {
+  const senden = ansicht().props.senden, d = quelle.lesen(); d.chats = []; d.aktiverChatId = null; quelle.aktualisieren(d);
+  await expect(senden("Weiter")).resolves.toBeUndefined(); expect(auftragSenden).not.toHaveBeenCalled();
 });
