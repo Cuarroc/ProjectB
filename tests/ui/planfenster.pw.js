@@ -172,7 +172,7 @@ test("Planfenster: Farben, Kommentar, Entscheidungen, Tastatur und bild-und-axe"
   const dritter = dialog.locator(".pl-schritt").nth(2); await dritter.getByRole("button", { name: "Kommentar, Silbergrau", exact: true }).click();
   await dritter.getByRole("textbox").fill("Frag mich vorher nach dem Speicherort."); await dritter.getByRole("button", { name: "Ausarbeiten, Violett", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "Mit Kommentaren zurückgeben, 2 Schritte markiert", exact: true })).toContainText("2");
-  await expect(dialog.locator(".pl-einheit")).toHaveText("2 Schritte"); await expect(dialog.locator(".pl-werkzeuge .pl-farbpunkt")).toHaveCount(5);
+  await expect(dialog.locator(".pl-karte").filter({ has: page.getByRole("heading", { name: "Deine Markierungen", exact: true }) }).locator(".pl-einheit")).toHaveText("2 Schritte"); await expect(dialog.locator(".pl-werkzeuge .pl-farbpunkt")).toHaveCount(5);
   await dialog.locator(".pl-liste").evaluate(e => e.scrollTop = 0);
   await page.evaluate(() => document.documentElement.dataset.bewegung = "voll");
   const bild = process.env.PLAN_BILD ? `${process.env.PLAN_BILD}_${testInfo.project.name}.png` : testInfo.outputPath("plan.png");
