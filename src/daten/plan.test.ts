@@ -5,9 +5,19 @@ const text = "Mein Plan:\n- [ ] Export bauen\n  Vorhandenen Export ergänzen.\n 
 it("erkennt drei Schritte mit Beschreibung, Kriterien und leeren Arbeitsfeldern", () => {
   const plan = antwortPlan(text, "antwort")!;
   expect(plan.id).toBe("antwort"); expect(plan.schritte).toHaveLength(3);
-  expect(plan.schritte[0]).toMatchObject({ titel: "Export bauen", beschreibung: "Vorhandenen Export ergänzen.", agentId: null, zustand: "Offen", dauerMinuten: 0, kommentar: "", markierungen: [],
+  expect(plan.schritte[0]).toMatchObject({ titel: "Export bauen", beschreibung: "Vorhandenen Export ergänzen.", agentId: null, zustand: "Offen", dauerMinuten: null, tokens: null, risiko: null, kommentar: "", markierungen: [],
     fertigWenn: [{ text: "CSV stimmt.", erfuellt: false }, { text: "Umlaute stimmen.", erfuellt: false }] });
   expect(plan.schritte[1].titel).toBe("Testen"); expect(plan.schritte[2].beschreibung).toBe("");
+});
+it.each([["~40k", "Niedrig", 1], ["40000", "Mittel", 2], ["40 k", "Hoch", 3]])("liest Aufwand und Risiko ohne Beschreibungstext: %s, %s", (tokens, risiko, stufe) => {
+  for (const praefix of ["", "  - "]) {
+    const plan = antwortPlan(`- [ ] Export\r\n${praefix}dAuEr: ~6 MIN\r\n${praefix}tOkEnS: ${tokens}\r\n${praefix}rIsIkO: ${risiko.toUpperCase()}\r\n  CSV ergänzen.\r\n- [ ] Prüfen\nDauer: ~3 min\nTokens: ~20k\nRisiko: Niedrig`, "n")!;
+    expect(plan.schritte[0]).toMatchObject({ dauerMinuten: 6, tokens: 40000, risiko: stufe, beschreibung: "CSV ergänzen." });
+    expect(plan.schritte[1]).toMatchObject({ dauerMinuten: 3, tokens: 20000, risiko: 1, beschreibung: "" });
+  }
+});
+it("lässt fehlende Schätzungen in jedem Schritt unbekannt", () => {
+  expect(antwortPlan("- [ ] A\n- [ ] B", "n")!.schritte.map(({ dauerMinuten, tokens, risiko }) => [dauerMinuten, tokens, risiko])).toEqual([[null, null, null], [null, null, null]]);
 });
 it.each(["Kein Plan.", "```md\n- [ ] Beispiel\n```", "~~~md\n- [x] Beispiel\n~~~"])("erzeugt ohne echte Liste keinen Plan: %s", text => {
   expect(antwortPlan(text, "n")).toBeUndefined();

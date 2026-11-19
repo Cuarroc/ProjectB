@@ -23,7 +23,8 @@ export type Nachricht = {
 export type Markierung = "Kommentar" | "Ausarbeiten" | "Simpler" | "Ausführlicher" | "Innovativer";
 export type Planschritt = {
   id: string; titel: string; agentId: string | null; zustand: Zustand | "Offen";
-  dauerMinuten: number; fertigWenn: { text: string; erfuellt: boolean }[];
+  dauerMinuten: number | null; tokens: number | null; risiko: 1 | 2 | 3 | null;
+  fertigWenn: { text: string; erfuellt: boolean }[];
   beschreibung: string;
   kommentar: string; markierungen: Markierung[];
 };

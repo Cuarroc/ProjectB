@@ -26,8 +26,9 @@ export const agentenTestverlauf: Record<string, { zeit: string; gruen: number }[
 };
 
 const schritt = (id: string, titel: string, agentId: string | null,
-  zustand: Planschritt["zustand"], beschreibung: string): Planschritt => ({
-  id, titel, agentId, zustand, beschreibung, dauerMinuten: 5, kommentar: "", markierungen: [],
+  zustand: Planschritt["zustand"], beschreibung: string,
+  dauerMinuten: number | null = null, tokens: number | null = null, risiko: Planschritt["risiko"] = null): Planschritt => ({
+  id, titel, agentId, zustand, beschreibung, dauerMinuten, tokens, risiko, kommentar: "", markierungen: [],
   fertigWenn: [{ text: "Tests grün und Review durch die andere Modellfamilie", erfuellt: zustand === "Fertig" }],
 });
 
@@ -76,10 +77,10 @@ export const beispiel: Datenstand = {
   ],
   plan: { id: "csv-plan", titel: "CSV-Export", freigabe: "Freigegeben", schritte: [
     schritt("lesen", "Paketliste lesen", null, "Fertig", "Die vorhandenen Paketdaten und Zustände erfassen."),
-    schritt("dauer", "Spalte „Dauer“ berechnen", "dauer", "Fertig", "Laufende Pakete brauchen eine Dauer bis jetzt."),
-    schritt("kern", "CSV-Export im Kern, mit Tests", "kern", "Arbeitet", "Der Kern liefert die Daten, alles andere baut darauf auf."),
-    schritt("knopf", "Knopf „Als CSV speichern“", "knopf", "Wartet auf dich", "Der Speicherort ist noch unklar."),
-    schritt("review", "Gesamtergebnis prüfen", null, "Offen", "Export und Knopf gemeinsam prüfen."),
+    schritt("dauer", "Spalte „Dauer“ berechnen", "dauer", "Fertig", "Laufende Pakete brauchen eine Dauer bis jetzt.", 4, 25000, 1),
+    schritt("kern", "CSV-Export im Kern, mit Tests", "kern", "Arbeitet", "Der Kern liefert die Daten, alles andere baut darauf auf.", 6, 40000, 1),
+    schritt("knopf", "Knopf „Als CSV speichern“", "knopf", "Wartet auf dich", "Der Speicherort ist noch unklar.", 5, 30000, 2),
+    schritt("review", "Gesamtergebnis prüfen", null, "Offen", "Export und Knopf gemeinsam prüfen.", 3, 20000, 1),
   ] },
   fragen: [{ id: "speicherort", agentId: "knopf",
     text: "Wo soll die CSV-Datei standardmäßig gespeichert werden?",
