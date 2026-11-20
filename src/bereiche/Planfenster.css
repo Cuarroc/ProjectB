@@ -6,6 +6,7 @@
 .pl-kopf-symbol{display:inline-flex;align-items:center;justify-content:center;flex:none;width:calc(var(--steuer-hoehe) + var(--abstand-1));height:calc(var(--steuer-hoehe) + var(--abstand-1));border-radius:var(--rund-liste);background:var(--akzent);color:var(--akzent-tinte);box-shadow:var(--schatten-senden)}
 .pl-kopftext{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--abstand-1)}
 .pl-kopf h2{font:var(--schrift-abschnitt);margin:0}.pl-meta{display:flex;gap:var(--abstand-4);color:var(--text-2);font:var(--schrift-klein)}
+.pl-meta{align-items:center;flex-wrap:wrap;gap:var(--abstand-2)}.pl-kopftext>.umschalter{align-self:flex-start;max-width:100%;flex-wrap:wrap}.pl-kopf h2{overflow-wrap:anywhere}
 .pl-liste{flex:1;min-height:0;overflow:auto;list-style:none;margin:0;padding:var(--abstand-1) var(--abstand-7) var(--abstand-7);display:flex;flex-direction:column;gap:var(--abstand-4)}
 .pl-schritt,.pl-karte{position:relative;flex:none;display:flex;flex-direction:column;gap:var(--abstand-4);padding:var(--abstand-6);border-radius:var(--rund-karte);background:linear-gradient(var(--flaeche-2),var(--flaeche-1-oben));box-shadow:var(--schatten-kante),inset 0 0 0 1px var(--flaeche-3)}
 .pl-schritt{overflow:hidden}.pl-streifen{position:absolute;top:0;left:0;right:0;height:var(--abstand-1);display:flex;gap:calc(var(--abstand-1) / 2)}.pl-streifen span{flex:1}

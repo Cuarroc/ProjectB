@@ -6,6 +6,10 @@ import { beispiel } from "../daten/beispiel";
 const anzeigen = (schritte = beispiel.plan.schritte, chats = beispiel.chats) => renderToStaticMarkup(
   <Planfenster daten={{ ...beispiel, chats }} plan={{ ...beispiel.plan, schritte }} gespeicherteMarken={{}} />);
 const kachel = (html, name) => html.match(new RegExp(`<section[^>]*aria-label="${name}"[^>]*>(.*?)</section>`))[1];
+it("zeigt Dezimalzahlen auf der Achse mit deutschem Komma", () => {
+  const html = anzeigen([{ ...beispiel.plan.schritte[0], dauerMinuten: 5 }]);
+  expect(html).toContain('<span>0</span><span>2,5</span><span>5 min</span>');
+});
 it("summiert nur bekannte Schätzungen und nutzt das Kontextfenster des aktiven Chats", () => {
   const html = anzeigen(undefined, [{ ...beispiel.chats[0], id: "anderer", kontextfenster: 1 }, { ...beispiel.chats[0], kontextfenster: 500000 }]);
   expect(kachel(html, "Aufwand")).toContain("~18 min");
