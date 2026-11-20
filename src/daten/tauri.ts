@@ -85,9 +85,10 @@ export async function kontingentLesen(): Promise<Kontingent> {
 const felder = {
   Ausführen: [["agentenGleichzeitig", ["einer", "bisZu3", "bisZu5"]], ["pruefungDurch", ["andereModellfamilie", "gleicheFamilie"]], ["pruefrundenHoechstens", ["eins", "zwei", "drei"]]],
   Planen: [["plan", ["kurz", "normal", "ausfuehrlich"]], ["dauerUndTokensSchaetzen", ["an", "aus"]], ["beiUnklaremNachfragen", ["an", "aus"]]],
+  "Prompt bauen": [["laenge", ["kurz", "mittel", "ausfuehrlich"]], ["auftragFuer", ["orchestrator", "codex", "claude"]], ["abnahmePunkteErgaenzen", ["an", "aus"]]],
 } as const;
-type Kernwerte = { rollen?: Rollen; ausfuehren?: Record<string, string>; planen?: Record<string, string>; berechtigung?: Berechtigungsstufe };
-const modusSchluessel = (modus: string) => modus === "Ausführen" ? "ausfuehren" : "planen";
+type Kernwerte = { rollen?: Rollen; ausfuehren?: Record<string, string>; planen?: Record<string, string>; prompt_bauen?: Record<string, string>; berechtigung?: Berechtigungsstufe };
+const modusSchluessel = (modus: string) => modus === "Ausführen" ? "ausfuehren" : modus === "Prompt bauen" ? "prompt_bauen" : "planen";
 function anzeigen(daten: Kernwerte): Record<string, string[]> {
   return Object.fromEntries(Object.entries(felder).map(([modus, zeilen]) => [modus, zeilen.map(([feld, texte], i) => {
     const z = modusEinstellungen[modus as keyof typeof modusEinstellungen][i];

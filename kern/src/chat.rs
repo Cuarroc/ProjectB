@@ -16,6 +16,35 @@ const PROMPT_ROLLE: &str = "Mach aus den Stichworten einen ausführlichen Auftra
     Jede Überschrift steht auf einer eigenen Zeile. Unter Ziel steht ein Satz. \
     Unter Was genau und Fertig, wenn steht eine Liste, bei Fertig, wenn mit prüfbaren Punkten.";
 
+pub fn prompt_rolle(e: &crate::einstellungen::PromptBauen) -> String {
+    use crate::einstellungen::{AuftragFuer, Laenge, Schalter};
+    let mut rolle = PROMPT_ROLLE.to_owned();
+    for satz in [
+        match e.laenge {
+            Laenge::Kurz => "Halte jeden Abschnitt knapp, höchstens 2 Punkte.",
+            Laenge::Ausfuehrlich => "Schreib jeden Abschnitt ausführlich.",
+            Laenge::Mittel => "",
+        },
+        match e.auftrag_fuer {
+            AuftragFuer::Codex => "Der Auftrag geht direkt an Codex, nicht an einen Orchestrator.",
+            AuftragFuer::Claude => "Der Auftrag geht direkt an Claude, nicht an einen Orchestrator.",
+            AuftragFuer::Orchestrator => "",
+        },
+        if e.abnahme_punkte_ergaenzen == Schalter::Aus {
+            "Unter Fertig, wenn nur das, was der Nutzer selbst nennt."
+        } else {
+            ""
+        },
+    ]
+    .into_iter()
+    .filter(|s| !s.is_empty())
+    {
+        rolle.push(' ');
+        rolle.push_str(satz);
+    }
+    rolle
+}
+
 pub fn startwunsch(
     modell: &str,
     effort: &str,
@@ -31,7 +60,7 @@ pub fn startwunsch(
         "Ausführen" => None,
         "Planen" => Some(PLANEN_ROLLE.into()),
         "Interview" => Some(INTERVIEW_ROLLE.into()),
-        "Prompt bauen" => Some(PROMPT_ROLLE.into()),
+        "Prompt bauen" => Some(prompt_rolle(&Default::default())),
         _ => return Err(format!("Unbekannter Modus: {modus}")),
     };
     let fortsetzen = sitzung
@@ -164,6 +193,24 @@ mod tests {
                 assert!(rolle.contains(format));
             }
         }
+    }
+
+    #[test]
+    fn prompt_rolle_beachtet_einstellungen() {
+        use crate::einstellungen::{aus_json, PromptBauen};
+        let saetze = [
+            "Halte jeden Abschnitt knapp, höchstens 2 Punkte.",
+            "Der Auftrag geht direkt an Codex, nicht an einen Orchestrator.",
+            "Unter Fertig, wenn nur das, was der Nutzer selbst nennt.",
+        ];
+        let e = aus_json(&serde_json::json!({"prompt_bauen": {
+            "laenge": "kurz", "auftragFuer": "codex", "abnahmePunkteErgaenzen": "aus"
+        }}));
+        let rolle = super::prompt_rolle(&e.prompt_bauen);
+        assert_eq!(rolle, format!("{} {}", super::PROMPT_ROLLE, saetze.join(" ")));
+        assert_eq!(super::prompt_rolle(&PromptBauen::default()), super::PROMPT_ROLLE);
+        let e = aus_json(&serde_json::json!({"prompt_bauen": {"laenge": "ausfuehrlich", "auftragFuer": "claude"}}));
+        assert_eq!(super::prompt_rolle(&e.prompt_bauen), format!("{} Schreib jeden Abschnitt ausführlich. Der Auftrag geht direkt an Claude, nicht an einen Orchestrator.", super::PROMPT_ROLLE));
     }
 
     #[test]

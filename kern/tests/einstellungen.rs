@@ -51,6 +51,7 @@ fn speichern_laden_rundreise_und_ersetzen() {
     ] {
         let e = Einstellungen {
             rollen: Default::default(),
+            prompt_bauen: Default::default(),
             berechtigung: Default::default(),
             ausfuehren: Ausfuehren {
                 agenten_gleichzeitig: agenten,
@@ -134,6 +135,7 @@ fn json_rundreise_aller_wertekombinationen() {
                         for nachfragen in [Schalter::An, Schalter::Aus] {
                             let e = Einstellungen {
                                 rollen: Default::default(),
+                                prompt_bauen: Default::default(),
                                 berechtigung: Default::default(),
                                 ausfuehren: Ausfuehren {
                                     agenten_gleichzeitig: agenten,
@@ -163,6 +165,7 @@ fn json_schluessel_und_rueckfall_je_feld_wie_beim_laden() {
         "ausfuehren": {"agentenGleichzeitig": "einer", "pruefungDurch": "gleicheFamilie", "pruefrundenHoechstens": "zwei"},
         "planen": {"plan": "ausfuehrlich", "dauerUndTokensSchaetzen": "aus", "beiUnklaremNachfragen": "aus"}
     });
+    gueltig["prompt_bauen"] = als_json(&Einstellungen::default())["prompt_bauen"].clone();
     gueltig["rollen"] = standardrollen();
     assert_eq!(als_json(&aus_json(&gueltig)), gueltig);
     let mut empfohlen = json!({
@@ -170,6 +173,7 @@ fn json_schluessel_und_rueckfall_je_feld_wie_beim_laden() {
         "ausfuehren": {"agentenGleichzeitig": "bisZu3", "pruefungDurch": "andereModellfamilie", "pruefrundenHoechstens": "drei"},
         "planen": {"plan": "normal", "dauerUndTokensSchaetzen": "an", "beiUnklaremNachfragen": "an"}
     });
+    empfohlen["prompt_bauen"] = gueltig["prompt_bauen"].clone();
     empfohlen["rollen"] = standardrollen();
     for modus in ["ausfuehren", "planen"] {
         for feld in gueltig[modus].as_object().unwrap().keys() {
@@ -373,4 +377,26 @@ fn rollen_aendern_nur_gueltiges_und_andere_werte_erhalten() {
     assert_eq!(als_json(&aendern(&datei.0, &json!({"rollen": false})).unwrap()), erwartet);
     assert_eq!(laden(datei.0.with_file_name("anderes-projekt.json")), Einstellungen::default());
     assert_eq!(als_json(&e), erwartet);
+}
+
+#[test]
+fn prompt_bauen_altdatei_delta_und_empfehlung() {
+    let datei = Datei::neu();
+    fs::write(&datei.0, r#"{"planen":{"plan":"kurz"}}"#).unwrap();
+    let alt = laden(&datei.0);
+    assert_eq!(alt.prompt_bauen.laenge, Laenge::Mittel);
+    assert_eq!(alt.prompt_bauen.auftrag_fuer, AuftragFuer::Orchestrator);
+    assert_eq!(alt.prompt_bauen.abnahme_punkte_ergaenzen, Schalter::An);
+    assert!(alt.prompt_bauen.ist_empfohlen());
+    let mut erwartet = als_json(&alt);
+    for (feld, wert) in [("laenge", "kurz"), ("auftragFuer", "codex"), ("abnahmePunkteErgaenzen", "aus")] {
+        erwartet["prompt_bauen"][feld] = json!(wert);
+        let neu = aendern(&datei.0, &json!({"prompt_bauen": {feld: wert}})).unwrap();
+        assert_eq!(als_json(&neu), erwartet);
+        assert_eq!(laden(&datei.0), neu);
+        assert!(!neu.prompt_bauen.ist_empfohlen());
+    }
+    for (feld, wert) in [("laenge", "kurz"), ("auftragFuer", "claude"), ("abnahmePunkteErgaenzen", "aus")] {
+        assert!(!aus_json(&json!({"prompt_bauen": {feld: wert}})).prompt_bauen.ist_empfohlen());
+    }
 }

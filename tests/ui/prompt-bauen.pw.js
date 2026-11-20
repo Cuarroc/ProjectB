@@ -64,3 +64,19 @@ test("Prompt bauen: Rückfragen aus dem Soll und sichtbare Knopfleiste", async (
   expect(await dialog.evaluate(e => e.getBoundingClientRect().bottom <= innerHeight && [e, ...e.querySelectorAll("section,textarea,footer")].every(k => k.scrollWidth <= k.clientWidth))).toBe(true);
   if (bilder && info.project.name !== "1280x800") await page.screenshot({ path: `${bilder}/P-9-2b_fenster_${info.project.name}.png` });
 });
+
+test("Prompt bauen: Einstellungen ohne Überlauf", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Neue Einstellungen werden am Kandidaten geprüft.");
+  await page.goto("/"); await page.evaluate(() => document.fonts.ready);
+  await page.getByRole("radio", { name: "Prompt bauen", exact: true }).click();
+  await page.getByRole("button", { name: /^Einstellungen für Prompt bauen/ }).click();
+  const menue = page.getByRole("dialog", { name: "Einstellungen für Prompt bauen", exact: true });
+  for (const name of ["Länge", "Auftrag für", "Abnahme-Punkte ergänzen"]) await expect(menue.getByRole("radiogroup", { name, exact: true })).toBeVisible();
+  expect(await menue.evaluate(e => {
+    const r = e.getBoundingClientRect();
+    return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight &&
+      [e, ...e.querySelectorAll(".kopf,.um,button")].every(k => k.scrollWidth <= k.clientWidth);
+  })).toBe(true);
+  await expect(menue.getByRole("button", { name: "Auf Empfohlen zurücksetzen" })).toBeInViewport();
+  if (bilder && info.project.name === "1440x900") await page.screenshot({ path: `${bilder}/P-9-2c1_einstellungen_1440x900.png` });
+});

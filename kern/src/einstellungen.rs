@@ -34,6 +34,8 @@ auswahl!(AgentenGleichzeitig, BisZu3 = "bisZu3", Einer = "einer", BisZu5 = "bisZ
 auswahl!(PruefungDurch, AndereModellfamilie = "andereModellfamilie", GleicheFamilie = "gleicheFamilie");
 auswahl!(Pruefrunden, Drei = "drei", Eins = "eins", Zwei = "zwei");
 auswahl!(Plan, Normal = "normal", Kurz = "kurz", Ausfuehrlich = "ausfuehrlich");
+auswahl!(Laenge, Mittel = "mittel", Kurz = "kurz", Ausfuehrlich = "ausfuehrlich");
+auswahl!(AuftragFuer, Orchestrator = "orchestrator", Codex = "codex", Claude = "claude");
 auswahl!(Schalter, An = "an", Aus = "aus");
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -55,6 +57,18 @@ pub struct Planen {
     pub bei_unklarem_nachfragen: Schalter,
 }
 impl Planen {
+    pub fn ist_empfohlen(&self) -> bool {
+        self == &Self::default()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PromptBauen {
+    pub laenge: Laenge,
+    pub auftrag_fuer: AuftragFuer,
+    pub abnahme_punkte_ergaenzen: Schalter,
+}
+impl PromptBauen {
     pub fn ist_empfohlen(&self) -> bool {
         self == &Self::default()
     }
@@ -126,6 +140,7 @@ pub struct Einstellungen {
     pub berechtigung: Berechtigung,
     pub ausfuehren: Ausfuehren,
     pub planen: Planen,
+    pub prompt_bauen: PromptBauen,
 }
 
 /// Fehlende/unlesbare Dateien und ungültiges JSON liefern die Empfehlungen.
@@ -146,7 +161,7 @@ pub fn aendern(pfad: impl AsRef<Path>, aenderung: &Value) -> io::Result<Einstell
         Err(e) => return Err(e),
     };
     let mut werte = als_json(&aus_json(&basis));
-    for modus in ["ausfuehren", "planen"] {
+    for modus in ["ausfuehren", "planen", "prompt_bauen"] {
         if let (Some(ziel), Some(delta)) = (werte[modus].as_object_mut(), aenderung[modus].as_object()) {
             for (feld, wert) in delta {
                 if let Some(alt) = ziel.get_mut(feld) {
@@ -168,6 +183,7 @@ pub fn aendern(pfad: impl AsRef<Path>, aenderung: &Value) -> io::Result<Einstell
 pub fn aus_json(v: &Value) -> Einstellungen {
     let a = &v["ausfuehren"];
     let p = &v["planen"];
+    let b = &v["prompt_bauen"];
     let mut rollen = Rollen::default();
     rollen.uebernehmen(&v["rollen"]);
     Einstellungen {
@@ -177,6 +193,11 @@ pub fn aus_json(v: &Value) -> Einstellungen {
             agenten_gleichzeitig: AgentenGleichzeitig::lesen(&a["agentenGleichzeitig"]),
             pruefung_durch: PruefungDurch::lesen(&a["pruefungDurch"]),
             pruefrunden_hoechstens: Pruefrunden::lesen(&a["pruefrundenHoechstens"]),
+        },
+        prompt_bauen: PromptBauen {
+            laenge: Laenge::lesen(&b["laenge"]),
+            auftrag_fuer: AuftragFuer::lesen(&b["auftragFuer"]),
+            abnahme_punkte_ergaenzen: Schalter::lesen(&b["abnahmePunkteErgaenzen"]),
         },
         planen: Planen {
             plan: Plan::lesen(&p["plan"]),
@@ -190,6 +211,7 @@ pub fn aus_json(v: &Value) -> Einstellungen {
 pub fn als_json(e: &Einstellungen) -> Value {
     let a = &e.ausfuehren;
     let p = &e.planen;
+    let b = &e.prompt_bauen;
     json!({
         "rollen": e.rollen.als_json(),
         "berechtigung": e.berechtigung.text(),
@@ -197,6 +219,11 @@ pub fn als_json(e: &Einstellungen) -> Value {
             "agentenGleichzeitig": a.agenten_gleichzeitig.text(),
             "pruefungDurch": a.pruefung_durch.text(),
             "pruefrundenHoechstens": a.pruefrunden_hoechstens.text()
+        },
+        "prompt_bauen": {
+            "laenge": b.laenge.text(),
+            "auftragFuer": b.auftrag_fuer.text(),
+            "abnahmePunkteErgaenzen": b.abnahme_punkte_ergaenzen.text()
         },
         "planen": {
             "plan": p.plan.text(),

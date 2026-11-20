@@ -22,12 +22,12 @@ beforeEach(() => { vi.mocked(isTauri).mockReturnValue(true); h.werte = []; h.ref
   Object.assign(d.chats[0], { modus: "Prompt bauen", verlauf: [], gestartetUm: null }); d.kopf.geoeffnet = true; quelle.aktualisieren(d);
   vi.mocked(auftragSenden).mockResolvedValue({ erfolg: true, sitzung: null }); vi.mocked(chatNachrichtenHoeren).mockResolvedValue(() => {}); });
 afterEach(() => vi.clearAllMocks());
-it("hat den vierten Modus mit Erklärung und Platzhalter, ohne neue Einstellungen", () => {
+it("hat den vierten Modus mit Erklärung, Platzhalter und Einstellungen", () => {
   expect(modi[3]).toBe("Prompt bauen");
   const html = renderToStaticMarkup(<ChatEingabeAnsicht {...eingabe()} />);
   expect(html).toContain("Stichworte reichen, zum Beispiel: Paketliste, CSV, Status und Dauer …");
   expect(html).toContain("Aus Stichworten wird ein ausführlicher Auftrag. Du prüfst ihn, bevor er losgeht.");
-  expect(html).not.toContain("Einstellungen für Prompt bauen");
+  expect(html).toContain("Einstellungen für Prompt bauen: Empfohlen");
 });
 it("öffnet beim Senden das Fenster, sendet die Idee zum Kern und später den bearbeiteten Auftrag", async () => {
   eingabe().schreiben("CSV Export"); await eingabe().senden("CSV Export");
