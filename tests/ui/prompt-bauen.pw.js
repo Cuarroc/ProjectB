@@ -1,6 +1,26 @@
 import { test, expect } from "@playwright/test";
 const bilder = process.env.BILD_ORDNER;
 
+test("Prompt bauen: Auftragsprüfung reagiert live ohne Überlauf", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Auftragsprüfung wird am Kandidaten geprüft.");
+  await page.goto("/?vorschau=prompt"); await page.evaluate(() => document.fonts.ready);
+  const dialog = page.getByRole("dialog", { name: "Prompt bauen", exact: true });
+  const pruefung = dialog.getByRole("region", { name: "Prüfung des Auftrags", exact: true });
+  await expect(pruefung).toContainText("4 / 4 erfüllt");
+  await expect(pruefung.getByRole("listitem")).toHaveCount(4);
+  await dialog.getByRole("textbox", { name: "Nicht tun", exact: true }).fill("");
+  await expect(pruefung).toContainText("3 / 4 erfüllt");
+  await expect(pruefung.getByRole("listitem", { name: "Nicht tun ausgefüllt: offen", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Als Auftrag senden", exact: true })).toBeEnabled();
+  await pruefung.scrollIntoViewIfNeeded();
+  await expect(dialog.getByRole("button", { name: "Als Auftrag senden", exact: true })).toBeInViewport();
+  expect(await dialog.evaluate(e => {
+    const r = e.getBoundingClientRect(), inhalt = e.querySelector(".pb-inhalt"), fuss = e.querySelector("footer").getBoundingClientRect();
+    return r.top >= 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && fuss.bottom <= r.bottom && inhalt.getBoundingClientRect().bottom <= fuss.top && [e, ...e.querySelectorAll("section,textarea,footer,.pb-inhalt")].every(k => k.scrollWidth <= k.clientWidth);
+  })).toBe(true);
+  if (bilder && info.project.name !== "1280x800") await page.screenshot({ path: `${bilder}/P-9-2c2_fenster_${info.project.name}.png` });
+});
+
 test("Prompt bauen: Modus und Platzhalter", async ({ page }, info) => {
   test.skip(process.env.UI_BASELINE === "1", "Neuer Modus wird am Kandidaten geprüft.");
   await page.goto("/"); await page.getByRole("radio", { name: "Prompt bauen", exact: true }).click();

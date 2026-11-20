@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircleReply, MessageCircleQuestion, Pencil, X } from "lucide-react";
+import { Check, Circle, MessageCircleReply, MessageCircleQuestion, Pencil, X } from "lucide-react";
 import { Knopf } from "../bausteine/Knopf";
+import { auftragPruefen } from "../daten/promptAuftrag";
 import "./PromptBauen.css";
 
 const titel = ["Ziel", "Hintergrund", "Was genau", "Fertig, wenn", "Nicht tun"];
@@ -13,6 +14,7 @@ export default function PromptBauen({ idee, abschnitte, abschnittId = "", rueckf
   const dialog = useRef<HTMLDialogElement>(null), [ideeText, setIdee] = useState(idee);
   const [bearbeitet, setTexte] = useState(() => ({ id: abschnittId, texte: abschnitte ?? [idee, "", "", "", ""] })), [antwort, setAntwort] = useState("");
   const texte = bearbeitet.id === abschnittId ? bearbeitet.texte : abschnitte!;
+  const pruefung = auftragPruefen(texte), erfuellt = pruefung.filter(p => p.erfuellt).length;
   const grund = laeuft ? "Bitte warte auf die Antwort des Orchestrators." : undefined;
   const antworten = (text: string) => { if (!laeuft && text.trim()) { return onAntwort?.(text.trim(), () => setAntwort("")); } };
   useEffect(() => { const fenster = dialog.current!, vorher = document.activeElement as HTMLElement;
@@ -29,14 +31,20 @@ export default function PromptBauen({ idee, abschnitte, abschnittId = "", rueckf
       <div><h2 id="prompt-titel">Prompt bauen</h2><p id="prompt-hilfe">Aus deiner groben Idee wird ein ausführlicher Auftrag. Du prüfst und änderst ihn, bevor er an den Orchestrator geht.</p></div>
       <Knopf text="Prompt bauen schließen" symbol={X} nurSymbol variante="leise" onClick={onSchliessen} /></header>
     <div className="pb-inhalt"><div className="pb-links"><section className="pb-idee"><div className="pb-zeile"><h3>Deine Idee</h3><span className="pb-marke">Stichworte</span></div>
-      <textarea aria-label="Deine Idee" readOnly={laeuft} rows={3} value={ideeText} onChange={e => setIdee(e.target.value)} />{fehler && <p className="ein-meldung" role="alert">{fehler}</p>}{onStart && fehler && <Knopf text="Idee senden" disabled={laeuft || !ideeText.trim()} grund={grund ?? (!ideeText.trim() ? "Bitte gib eine Idee ein." : undefined)} onClick={() => { if (!laeuft && ideeText.trim()) return onStart(ideeText.trim()); }} />}</section>
+      <textarea aria-label="Deine Idee" readOnly={laeuft} rows={3} value={ideeText} onChange={e => setIdee(e.target.value)} />{fehler && <p className="ein-meldung" role="alert">{fehler}</p>}{onStart && !laeuft && <Knopf text="Idee senden" disabled={!ideeText.trim()} grund={!ideeText.trim() ? "Bitte gib eine Idee ein." : undefined} onClick={() => { if (!laeuft && ideeText.trim()) return onStart(ideeText.trim()); }} />}</section>
       {!!rueckfragen.length && <section className="pb-idee" aria-label="Rückfragen"><div className="pb-zeile"><h3>Rückfragen</h3><span className="pb-marke">{rueckfragen.length} beantwortet</span></div>
         <ul className="pb-rueckfragen">{rueckfragen.map((f, i) => <li className="pb-karte" key={i}><p><MessageCircleReply size={16} aria-hidden="true" />{f.text}</p><span className="pb-antwort">{f.antwort}</span></li>)}</ul></section>}
       {frage ? <section className="pb-idee pb-frage" aria-label="Frage an dich"><div className="pb-zeile"><MessageCircleQuestion size={16} aria-hidden="true" /><h3>Frage an dich</h3></div>
         {laeuft && <p role="status">Orchestrator schreibt …</p>}{frage && <><p>{frage.text}</p><div className="pb-vorschlaege">
           {frage.aktionen.map(a => <Knopf key={a.antwort} text={a.text} variante="antwort" disabled={laeuft} grund={grund} onClick={() => antworten(a.antwort)} />)}</div>
           <textarea aria-label="Deine Antwort" placeholder="Eigene Antwort …" rows={1} value={antwort} disabled={laeuft} onChange={e => setAntwort(e.target.value)} />
-          <Knopf text="Antwort senden" disabled={laeuft || !antwort.trim()} grund={grund ?? (!antwort.trim() ? "Bitte gib eine Antwort ein." : undefined)} onClick={() => antworten(antwort)} /></>}</section> : laeuft && <p role="status">Orchestrator schreibt …</p>}</div>
+          <Knopf text="Antwort senden" disabled={laeuft || !antwort.trim()} grund={grund ?? (!antwort.trim() ? "Bitte gib eine Antwort ein." : undefined)} onClick={() => antworten(antwort)} /></>}</section> : laeuft && <p role="status">Orchestrator schreibt …</p>}
+      <section className="pb-idee pb-pruefung" aria-labelledby="pb-pruefung-titel"><div className="pb-zeile"><h3 id="pb-pruefung-titel">Prüfung des Auftrags</h3>
+        <span className="pb-striche" aria-hidden="true">{pruefung.map(p => <span key={p.text} data-erfuellt={p.erfuellt} />)}</span>
+        <span className="pb-marke" role="status">{`${erfuellt} / 4 erfüllt`}</span></div>
+        <ul>{pruefung.map(p => <li key={p.text} data-erfuellt={p.erfuellt} aria-label={`${p.text}: ${p.erfuellt ? "erfüllt" : "offen"}`}>
+          {p.erfuellt ? <Check size={16} aria-hidden="true" /> : <Circle size={16} aria-hidden="true" />}{p.text}</li>)}</ul>
+      </section></div>
       <section className="pb-auftrag"><div className="pb-zeile"><h3>Fertiger Auftrag</h3><span className="pb-marke">5 Abschnitte</span><span className="pb-marke">Direkt bearbeitbar</span></div>
         {titel.map((name, i) => <label className="pb-karte" key={name}><span className="pb-kartentitel"><span className="pb-nummer">{i + 1}</span>{name}</span>
           <textarea aria-label={name} readOnly={laeuft} rows={1} placeholder="Noch leer" value={texte[i]} onChange={e => setTexte(v => ({ id: abschnittId, texte: (v.id === abschnittId ? v.texte : abschnitte!).map((text, j) => j === i ? e.target.value : text) }))} /></label>)}

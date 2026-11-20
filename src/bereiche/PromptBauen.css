@@ -28,3 +28,8 @@
 .pb-frage{background:radial-gradient(120% 140% at 0% 0%,var(--status-wartet-grund),transparent 62%),var(--flaeche-1);box-shadow:var(--b-leuchten-wartet)}
 .pb-frage .pb-zeile{color:var(--status-wartet)}.pb-frage p{overflow-wrap:anywhere}.pb-vorschlaege{display:flex;flex-wrap:wrap;gap:var(--abstand-2);margin-bottom:var(--abstand-3)}
 .pb-vorschlaege .knopf{max-width:100%;height:auto;min-height:var(--steuer-hoehe);white-space:normal}.pb-frage textarea{margin-bottom:var(--abstand-2)}
+.pb-striche{display:flex;gap:var(--abstand-1)}.pb-striche>span{width:var(--abstand-4);height:var(--abstand-1);border-radius:var(--rund-voll);background:var(--neutral-4)}
+.pb-striche>span[data-erfuellt=true]{background:var(--status-fertig)}
+.pb-pruefung ul{display:grid;gap:var(--abstand-3);list-style:none;padding:0;margin:0}
+.pb-pruefung li{display:flex;align-items:center;gap:var(--abstand-3)}.pb-pruefung svg{flex:none;color:var(--status-offen)}
+.pb-pruefung li[data-erfuellt=true] svg{color:var(--status-fertig);background:var(--status-fertig-grund);border-radius:var(--rund-voll)}
