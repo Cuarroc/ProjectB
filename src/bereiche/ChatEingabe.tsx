@@ -28,20 +28,22 @@ function antwortTodos(text: string) {
   return liste.length ? liste : undefined;
 }
 
-function interviewAktionen(text: string) {
-  const punkte: string[] = [];
-  for (const zeile of text.trimEnd().split(/\r?\n/).reverse()) {
-    if (!zeile.trim()) continue;
+function interviewAntwort(text: string) {
+  const punkte: string[] = [], zeilen = text.split(/\r?\n/);
+  while (zeilen.length) {
+    const zeile = zeilen.at(-1)!;
+    if (!zeile.trim()) { zeilen.pop(); continue; }
     const punkt = zeile.match(/^[ \t]*(?:[-*]|\d+\.)[ \t]+(\S.*)$/);
     if (!punkt) break;
-    punkte.unshift(punkt[1].trimEnd());
+    punkte.push(punkt[1].trimEnd()); zeilen.pop();
   }
-  return punkte.length >= 2 && punkte.length <= 4
-    ? punkte.map((antwort, i) => {
+  const aktionen = punkte.length >= 2 && punkte.length <= 4
+    ? punkte.reverse().map((antwort, i) => {
       const klartext = markdownKlartext(antwort), zeichen = Array.from(klartext);
       // Ganze Wörter erhalten, damit sichtbarer Text und zugänglicher Name übereinstimmen.
       return { id: `antwort-${i}`, text: zeichen.length > 80 ? zeichen.slice(0, 79).join("").replace(/\s+\S*$/, "") + "…" : klartext, antwort };
     }) : [];
+  return { text: aktionen.length ? zeilen.join("\n").trim() : text, aktionen };
 }
 function textMitVerlauf(chat: Chat, pfad: string, text: string) {
   const anbieter = chat.modell === "gpt-6.1-sol" ? "codex" : "claude";
@@ -173,7 +175,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       } else aendern({ sitzung: antwort.sitzung });
       if (!kompakt && (modus === "Planen" || modus === "Interview") && antwort.erfolg) {
         const neu = quelle.lesen(), letzter = neu.chats.find(c => c.id === chat.id)?.verlauf.slice(anfang).reverse().find(n => n.von === "Orchestrator");
-        if (letzter) { if (modus === "Planen") letzter.plan = antwortPlan(letzter.text, letzter.id); letzter.aktionen = modus === "Planen" ? planAktionen : interviewAktionen(letzter.text); quelle.aktualisieren(neu); }
+        if (letzter) { if (modus === "Planen") letzter.plan = antwortPlan(letzter.text, letzter.id); letzter.aktionen = modus === "Planen" ? planAktionen : interviewAntwort(letzter.text).aktionen; quelle.aktualisieren(neu); }
       }
     } catch (e) {
       const problem = `Problem: ${e instanceof Error ? e.message : String(e)}`;
@@ -221,12 +223,15 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     schreiben(text.startsWith("Kommentare zum Plan: ") ? text : `Kommentare zum Plan: ${text}`); document.getElementById("chat-nachricht")?.focus();
   };
   const stand: { abschnitte?: string[]; abschnittId: string; rueckfragen: { text: string; antwort: string }[]; frage?: PromptFrage } = { abschnitte: prompt?.abschnitte, abschnittId: "", rueckfragen: [] };
-  for (const n of prompt?.chatId === chat.id ? chat.verlauf.slice(prompt.anfang) : prompt?.verlauf ?? []) {
+  const verlauf = prompt?.chatId === chat.id ? chat.verlauf.slice(prompt.anfang) : prompt?.verlauf ?? [];
+  const letzteNachricht = verlauf.at(-1);
+  for (const n of verlauf) {
     if (n.von === "Orchestrator") {
+      if (laufende.current.has(chat.id) && n === letzteNachricht) continue;
       const abschnitte = auftragAbschnitte(n.text);
       if (abschnitte) { stand.abschnitte = Object.values(abschnitte); stand.abschnittId = n.id; stand.frage = undefined; }
-      else { const aktionen = interviewAktionen(n.text); stand.frage = { text: aktionen.length ? n.text.replace(/(?:\r?\n[ \t]*(?:[-*]|\d+\.)[ \t]+[^\r\n]+[ \t\r\n]*)+$/, "").trim() : n.text, aktionen }; }
-    } else if (n.von === "Du" && stand.frage) { stand.rueckfragen.push({ text: stand.frage.text, antwort: n.text }); stand.frage = undefined; }
+      else stand.frage = interviewAntwort(n.text);
+    } else if (n.von === "Du" && stand.frage && !n.text.startsWith("Verfeinere diesen Auftrag.")) { stand.rueckfragen.push({ text: stand.frage.text, antwort: n.text }); stand.frage = undefined; }
   }
   return { chat, projektOffen: !isTauri() || !!daten.kopf.geoeffnet, neuGesperrt: neuerChatGesperrt(daten), modelle: ["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"],
     anzahl: daten.agenten.filter(a => a.zustand === "Arbeitet").length,
@@ -241,7 +246,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       if (name === "neu") chatAnlegen(quelle);
       else if (name === "anhalten") allesAnhalten.setzen(true);
       else if (name === "planen" || name === "interview") aendern({ modus: name === "planen" ? "Planen" : "Interview" }); },
-    promptBauen: prompt && (!prompt.chatId || prompt.chatId === chat.id) ? <PromptBauen {...prompt} {...stand} laeuft={speichert || laufende.current.has(chat.id)} onAntwort={inhalt => senden(inhalt, undefined, inhalt, false, false, undefined, true)} fehler={fehler} onSchliessen={() => setPrompt(null)} onSenden={inhalt => senden(inhalt, undefined, inhalt, false, true, () => { aendern({ modus: "Ausführen" }); setPrompt(null); })} /> : null,
+    promptBauen: prompt && (!prompt.chatId || prompt.chatId === chat.id) ? <PromptBauen {...prompt} {...stand} laeuft={speichert || laufende.current.has(chat.id)} onStart={verlauf.some(n => n.von === "Du") ? undefined : inhalt => senden(inhalt, undefined, inhalt, false, false, undefined, true)} onAntwort={(inhalt, abgelegt) => senden(inhalt, undefined, inhalt, false, false, abgelegt, true)} fehler={fehler} onSchliessen={() => setPrompt(null)} onSenden={inhalt => senden(inhalt, undefined, inhalt, false, true, () => { aendern({ modus: "Ausführen" }); setPrompt(null); })} /> : null,
     text, fehler, anhaenge, laeuft: speichert || laufende.current.has(chat.id), aendern, schreiben, senden: (inhalt: string) => {
       if (chat.modus === "Prompt bauen") { if (!laufende.current.has(chat.id)) { setPrompt({ idee: inhalt, chatId: chat.id, anfang: chat.verlauf.length }); schreiben(""); return senden(inhalt, undefined, inhalt, false, false, undefined, true); } return; }
       return senden(inhalt, undefined, inhalt, false, true); }, onAktion };

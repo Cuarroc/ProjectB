@@ -162,3 +162,78 @@ it("gibt Prompt-Rückfragen im Chat keine Interview-Knöpfe", async () => {
   await eingabe().onAktion(quelle.lesen().chats[0].verlauf.at(-1).id, "antwort-0");
   expect(quelle.lesen().chats[0].modus).toBe("Prompt bauen"); expect(auftragSenden).toHaveBeenCalledTimes(1); aufraeumen.forEach(fn => fn?.());
 });
+
+it.each(["- Eins\n* Zwei", "1. Eins\r\n2. Zwei"])("trennt Vorschläge zeilenweise vom Fragetext: %s", async liste => {
+  await eingabe().senden("Export"); const d = quelle.lesen();
+  d.chats[0].verlauf.push({ id: "frage", von: "Orchestrator", text: `Welches Format?\n\n${liste}\n \t`, aktionen: [] }); quelle.aktualisieren(d);
+  const props = eingabe().promptBauen.props;
+  expect(props.frage.text).toBe("Welches Format?"); expect(props.frage.aktionen.map(a => a.antwort)).toEqual(["Eins", "Zwei"]);
+  h.werte = []; h.refs = []; h.i = h.r = 0;
+  expect(baum(PromptBauen(props)).find(e => e.props?.["aria-label"] === "Deine Antwort").props.placeholder).toBe("Eigene Antwort …");
+});
+it.each(["\n" + "\t\t\t\n".repeat(5000), "\r\n\t\t\t".repeat(5000)])("wertet lange Leerzeilen in unter 100 ms aus (%#)", async leer => {
+  await eingabe().senden("Export"); const d = quelle.lesen();
+  d.chats[0].verlauf.push({ id: "frage", von: "Orchestrator", text: `Welches Format?${leer}\n- CSV\n- JSON${leer}`, aktionen: [] }); quelle.aktualisieren(d);
+  const start = performance.now(), frage = eingabe().promptBauen.props.frage, dauer = performance.now() - start;
+  expect(frage.text).toBe("Welches Format?"); expect(dauer).toBeLessThan(100);
+});
+it.each(["Welches For", "## Ziel\nHalber Entwurf"])("wertet die letzte laufende Antwort erst nach Abschluss aus: %s", async text => {
+  await eingabe().senden("Export"); const d = quelle.lesen();
+  d.chats[0].verlauf.push({ id: "alt", von: "Orchestrator", text: "Welches Format?\n- CSV\n- JSON", aktionen: [] }); quelle.aktualisieren(d);
+  let fertig; vi.mocked(auftragSenden).mockImplementationOnce(() => new Promise(r => { fertig = r; }));
+  const lauf = eingabe().promptBauen.props.onAntwort("CSV"); await Promise.resolve();
+  const neu = quelle.lesen(); neu.chats[0].verlauf.push({ id: "stream", von: "Orchestrator", text, aktionen: [] }); quelle.aktualisieren(neu);
+  const props = eingabe().promptBauen.props;
+  expect(props.frage).toBeUndefined(); expect(props.abschnitte).toBeUndefined(); expect(props.rueckfragen).toEqual([{ text: "Welches Format?", antwort: "CSV" }]);
+  const hook = { werte: h.werte, refs: h.refs }; h.werte = []; h.refs = []; h.i = h.r = 0;
+  const el = baum(PromptBauen(props)); Object.assign(h, hook);
+  expect(el.find(e => e.type === "h3" && e.props.children === "Frage an dich")).toBeUndefined();
+  expect(el.find(e => e.props?.role === "status").props.children).toBe("Orchestrator schreibt …");
+  fertig({ erfolg: true, sitzung: null }); await lauf;
+  const abgeschlossen = eingabe().promptBauen.props;
+  if (text.startsWith("##")) expect(abgeschlossen.abschnitte[0]).toBe("Halber Entwurf");
+  else expect(abgeschlossen.frage.text).toBe(text);
+});
+
+const testFenster = () => {
+  const formular = { werte: [], refs: [] };
+  return (props = eingabe().promptBauen.props) => { const hook = { werte: h.werte, refs: h.refs };
+    Object.assign(h, formular, { i: 0, r: 0 }); const el = baum(PromptBauen(props)); Object.assign(h, hook); return el; };
+};
+it("sperrt Idee und alle fünf Abschnitte während des Schreibens", () => {
+  h.i = h.r = 0; const props = { idee: "CSV", laeuft: true };
+  const felder = baum(PromptBauen(props)).filter(e => e.type === "textarea"); expect(felder).toHaveLength(6);
+  expect(felder.every(e => e.props.readOnly || e.props.disabled)).toBe(true);
+  h.i = h.r = 0; expect(baum(PromptBauen({ ...props, laeuft: false })).filter(e => e.type === "textarea").every(e => !e.props.readOnly && !e.props.disabled)).toBe(true);
+});
+it("zählt Verfeinern nicht als Antwort und hält die Frage bis zur neuen Antwort offen", async () => {
+  await eingabe().senden("CSV"); const d = quelle.lesen();
+  d.chats[0].verlauf.push({ id: "entwurf", von: "Orchestrator", text: "## Ziel\nCSV", aktionen: [] }, { id: "frage", von: "Orchestrator", text: "Für wen?", aktionen: [] }); quelle.aktualisieren(d);
+  const fenster = testFenster(); let fertig; vi.mocked(auftragSenden).mockImplementationOnce(() => new Promise(r => { fertig = r; }));
+  const lauf = fenster().find(e => e.props?.text === "Weiter verfeinern").props.onClick(); await Promise.resolve();
+  expect(eingabe().promptBauen.props).toMatchObject({ frage: { text: "Für wen?" }, rueckfragen: [] });
+  const neu = quelle.lesen(); neu.chats[0].verlauf.push({ id: "neu", von: "Orchestrator", text: "Welches Format?", aktionen: [] }); quelle.aktualisieren(neu);
+  expect(eingabe().promptBauen.props.frage.text).toBe("Für wen?"); fertig({ erfolg: true, sitzung: null }); await lauf;
+  expect(eingabe().promptBauen.props).toMatchObject({ frage: { text: "Welches Format?" }, rueckfragen: [] });
+});
+it("behält die freie Antwort bei frühem Fehler und leert erst nach dem Ablegen", async () => {
+  await eingabe().senden("CSV"); const d = quelle.lesen(); d.kopf.geoeffnet = false;
+  d.chats[0].verlauf.push({ id: "frage", von: "Orchestrator", text: "Format?", aktionen: [] }); quelle.aktualisieren(d);
+  const fenster = testFenster(), props = eingabe().promptBauen.props, feld = () => fenster(props).find(e => e.props?.["aria-label"] === "Deine Antwort");
+  feld().props.onChange({ target: { value: "Excel" } }); await fenster().find(e => e.props?.text === "Antwort senden").props.onClick();
+  expect(feld().props.value).toBe("Excel"); expect(quelle.lesen().chats[0].verlauf.at(-1).von).toBe("Orchestrator");
+  const neu = quelle.lesen(); neu.kopf.geoeffnet = true; quelle.aktualisieren(neu); let fertig;
+  vi.mocked(auftragSenden).mockImplementationOnce(() => new Promise(r => { fertig = r; }));
+  const lauf = fenster().find(e => e.props?.text === "Antwort senden").props.onClick(); await Promise.resolve();
+  expect(quelle.lesen().chats[0].verlauf.at(-1).text).toBe("Excel"); expect(feld().props.value).toBe(""); fertig({ erfolg: true, sitzung: null }); await lauf;
+});
+it("sendet nach frühem Startfehler die bearbeitete Idee einmal erneut im Prompt-Modus", async () => {
+  const d = quelle.lesen(); d.kopf.geoeffnet = false; quelle.aktualisieren(d); await eingabe().senden("CSV");
+  const fenster = testFenster(); expect(fenster().find(e => e.props?.role === "alert").props.children).toContain("Projekt öffnen");
+  expect(fenster().find(e => e.props?.text === "Idee senden")).toBeTruthy();
+  fenster().find(e => e.props?.["aria-label"] === "Deine Idee").props.onChange({ target: { value: "Excel Export" } });
+  const neu = quelle.lesen(); neu.kopf.geoeffnet = true; quelle.aktualisieren(neu);
+  await fenster().find(e => e.props?.text === "Idee senden").props.onClick();
+  expect(auftragSenden).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ modus: "Prompt bauen", text: "Excel Export" }));
+  expect(quelle.lesen().chats[0].verlauf).toHaveLength(1); expect(fenster().find(e => e.props?.text === "Idee senden")).toBeUndefined();
+});
