@@ -1,13 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ListChecks, MessagesSquare, Play } from "lucide-react";
+import { ChevronDown, ListChecks, MessagesSquare, Pencil, Play } from "lucide-react";
 import { Umschalter } from "../../bausteine/Umschalter";
 import { Tooltip } from "../../bausteine/Tooltip";
 import { Fortschrittsring } from "../../bausteine/Fortschrittsring";
 import type { Chat } from "../../daten/typen";
 export const erklaerungen = ["Der Orchestrator plant, startet Agenten und meldet sich mit Ergebnissen.",
   "Der Orchestrator zeigt dir zuerst seinen Plan. Gebaut wird erst nach deiner Freigabe.",
-  "Der Orchestrator stellt dir erst Fragen, bis klar ist, was du willst."];
-export const modi = ["Ausführen", "Planen", "Interview"], efforts = ["Niedrig", "Mittel", "Hoch", "Sehr hoch"];
+  "Der Orchestrator stellt dir erst Fragen, bis klar ist, was du willst.",
+  "Aus Stichworten wird ein ausführlicher Auftrag. Du prüfst ihn, bevor er losgeht."];
+export const modi = ["Ausführen", "Planen", "Interview", "Prompt bauen"], efforts = ["Niedrig", "Mittel", "Hoch", "Sehr hoch"];
 
 export function Modi({ wert, aendern }: { wert: string; aendern: (wert: string) => void }) {
   const ort = useRef<HTMLDivElement>(null), [tipp, setTipp] = useState(erklaerungen[0]);
@@ -17,7 +18,7 @@ export function Modi({ wert, aendern }: { wert: string; aendern: (wert: string) 
   const zeige = (ziel: EventTarget | null) => { const knopf = (ziel as Element)?.closest("button"); if (knopf) setTipp(knopf.getAttribute("aria-description")!); };
   return <Tooltip text={tipp}><div ref={ort} onPointerOver={e => zeige(e.target)} onFocus={e => zeige(e.target)}>
     <Umschalter className="ein-modi" moeglichkeiten={modi} wert={wert} beschriftung="Modus" onChange={aendern}
-      symbole={[Play, ListChecks, MessagesSquare].map((Icon, i) => <Icon key={i} size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />)} />
+      symbole={[Play, ListChecks, MessagesSquare, Pencil].map((Icon, i) => <Icon key={i} size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />)} />
   </div></Tooltip>;
 }
 export function EffortSymbol({ wert }: { wert: string }) {

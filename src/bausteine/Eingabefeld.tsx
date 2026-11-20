@@ -28,7 +28,7 @@ export function Eingabefeld({ id, text, onTextAendern, onSenden, onAnhaengen, se
   };
   return <form className="ein" onSubmit={event => { event.preventDefault(); senden(); }}>
     <>{kopf}<label htmlFor={id} className="ein-sr">Nachricht an den Orchestrator</label></>
-    <textarea {...feld} id={id} rows={2} placeholder="Schreib, was gebaut werden soll …" value={text}
+    <textarea {...feld} id={id} rows={2} placeholder={feld?.placeholder ?? "Schreib, was gebaut werden soll …"} value={text}
       onChange={event => { feld?.onChange?.(event); onTextAendern(event.target.value); }} onKeyDown={tastatur}
       aria-describedby={[beschreibungId, fehler ? `${id}-meldung` : undefined].filter(Boolean).join(" ") || undefined} />
     <div className="ein-leiste">
