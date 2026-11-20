@@ -65,3 +65,14 @@ it("vergleicht Aufwand und Tokens zur vorigen Fassung, auch bei unbekannten Wert
   for (const [aktuell, alt] of [[schritte, a.schritte.slice(0, 1)], [a.schritte.slice(0, 1), schritte]]) expect(anzeigen(aktuell, alt).match(/– zu A/g)).toHaveLength(2);
   expect(anzeigen(schritte, undefined)).not.toContain("zu A");
 });
+it.each([["dauerMinuten", "Aufwand", "−4 min"], ["tokens", "Tokens", "−4"]])("vergleicht %s nur bei vollständig bekannten Werten beider Fassungen", (feld, name, delta) => {
+  const schritte = werte => werte.map((wert, i) => ({ ...a.schritte[i], dauerMinuten: 10, tokens: 10, [feld]: wert }));
+  const anzeigen = (aktuell, alt) => renderToStaticMarkup(<PlanAufwand schritte={schritte(aktuell)} vorher={schritte(alt)} vorherName="A" onZeigen={() => {}} />);
+  const kachel = (html, titel) => html.match(new RegExp(`<section[^>]*aria-label="${titel}"[^>]*>(.*?)</section>`))[1];
+  for (const [aktuell, alt] of [[[10, null], [10, 10]], [[10, 10], [10, null]], [[10, null], [10, null]]]) {
+    const html = anzeigen(aktuell, alt);
+    expect(kachel(html, name)).toContain("<p>– zu A</p>");
+    expect(kachel(html, feld === "tokens" ? "Aufwand" : "Tokens")).toContain(feld === "tokens" ? "<p>0 min zu A</p>" : "<p>0 zu A</p>");
+  }
+  expect(kachel(anzeigen([6, 10], [10, 10]), name)).toContain(`<p>${delta} zu A</p>`);
+});

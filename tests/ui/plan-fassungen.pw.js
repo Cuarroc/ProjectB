@@ -6,22 +6,16 @@ test("ChatVerlauf übernimmt eine neue Fassung im offenen Dialog und gibt ihre I
   page.on("pageerror", e => fehler.push(e.message));
   await page.goto("/");
   await page.evaluate(async () => {
-    const [{ default: React }, { default: { createRoot } }, { default: ChatVerlauf }, { BeispielQuelle }, { beispiel }, { antwortPlan }] = await Promise.all([
-      import("/node_modules/.vite/deps/react.js"), import("/node_modules/.vite/deps/react-dom_client.js"),
-      import("/src/bereiche/ChatVerlauf.tsx"), import("/src/daten/quelle.ts"), import("/src/daten/beispiel.ts"), import("/src/daten/plan.ts"),
+    const [{ chatEingabeQuelle: quelle }, { antwortPlan }] = await Promise.all([
+      import("/src/bereiche/ChatEingabe.tsx"), import("/src/daten/plan.ts"),
     ]);
-    document.getElementById("root").hidden = true;
-    const element = document.createElement("div"); element.id = "test-chat"; document.body.append(element);
-    const daten = structuredClone(beispiel), a = antwortPlan("- [ ] Alter Schritt A", "fassung-a"), b = antwortPlan("- [ ] Neuer Schritt B", "fassung-b");
+    const daten = quelle.lesen(), a = antwortPlan("- [ ] Alter Schritt A", "fassung-a"), b = antwortPlan("- [ ] Neuer Schritt B", "fassung-b");
     const nachricht = plan => ({ id: plan.id, von: "Orchestrator", zeit: "12:00", text: "Plan", plan, aktionen: [{ id: "plan-freigeben", text: "Freigeben und bauen" }] });
     daten.chats[0].verlauf = [nachricht(a)]; daten.chats[0].gestartetUm = null;
-    const quelle = new BeispielQuelle(daten), root = createRoot(element);
-    window.aktionen = [];
-    const rendern = () => root.render(React.createElement(React.StrictMode, null, React.createElement(ChatVerlauf, { quelle, onAktion: (...args) => window.aktionen.push(args) })));
-    window.neueFassung = () => { daten.chats[0].verlauf.push(nachricht(b)); quelle.aktualisieren(structuredClone(daten)); rendern(); };
-    rendern();
+    window.neueFassung = () => { daten.chats[0].verlauf.push(nachricht(b)); quelle.aktualisieren(daten); };
+    quelle.aktualisieren(daten);
   });
-  const oeffner = page.locator("#test-chat").getByRole("button", { name: "Plan öffnen", exact: true }).first();
+  const oeffner = page.getByRole("button", { name: "Plan öffnen", exact: true }).first();
   await oeffner.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.locator(".pl-schritt h3")).toHaveText(["Alter Schritt A"]);
@@ -36,7 +30,10 @@ test("ChatVerlauf übernimmt eine neue Fassung im offenen Dialog und gibt ihre I
   await expect(dialog.getByRole("button", { name: "Simpler, Türkis" })).toHaveAttribute("aria-pressed", "false");
   expect(await dialog.evaluate(e => e.contains(document.activeElement))).toBe(true);
   await dialog.getByRole("button", { name: "Freigeben und bauen", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.aktionen[0]?.slice(0, 2))).toEqual(["fassung-b", "plan-freigeben"]);
+  await expect.poll(() => page.evaluate(async () => {
+    const { chatEingabeQuelle: q } = await import("/src/bereiche/ChatEingabe.tsx");
+    return q.lesen().chats[0].verlauf.flatMap(n => n.plan ? [[n.plan.id, n.plan.freigabe]] : []);
+  })).toEqual([["fassung-a", "Wartet auf dich"], ["fassung-b", "Freigegeben"]]);
   await expect(dialog).toHaveCount(0); await expect(oeffner).toBeFocused();
   expect(fehler).toEqual([]);
 });
@@ -49,7 +46,7 @@ test("Planfassungen: Wechsel, Vergleich, Sperren und Kopf ohne Überlauf", async
   const aufwand = dialog.getByRole("region", { name: "Aufwand", exact: true }), tokens = dialog.getByRole("region", { name: "Tokens", exact: true });
   await expect(dialog.locator(".pl-meta")).toContainText("Fassung B von 2");
   await expect(dialog.locator(".pl-schritt")).toHaveCount(4); await expect(aufwand).toContainText("~14 min");
-  await expect(aufwand).toContainText("−4 min zu A"); await expect(tokens).toContainText("+12k zu A");
+  await expect(aufwand).toContainText("– zu A"); await expect(tokens).toContainText("– zu A");
   const bilder = process.env.BILD_ORDNER;
   if (bilder && info.project.name !== "1280x800") await page.screenshot({ path: `${bilder}/P-9-1c_plan_${info.project.name}.png`, animations: "disabled" });
   const schritt = dialog.locator(".pl-schritt").first();
