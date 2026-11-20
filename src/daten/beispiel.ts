@@ -118,3 +118,14 @@ export const beispiel: Datenstand = {
 
 export const beispielFassungen = [beispiel.plan, { ...beispiel.plan, id: "csv-plan-b", freigabe: "Wartet auf dich" as const,
   schritte: beispiel.plan.schritte.slice(1).map(s => ({ ...s, dauerMinuten: s.dauerMinuten! - 1, tokens: s.tokens! + 3000 })) }];
+
+export const promptBeispiel = {
+  idee: "Ich will dass man die paketliste exportieren kann für excel, mit status und dauer und so",
+  abschnitte: [
+    "Die Paketliste lässt sich als CSV-Datei exportieren, die Kunden in Excel ohne Nacharbeit öffnen können.",
+    "Kunden fragen regelmäßig nach einer Übersicht ihrer Pakete. Heute muss Elias die Liste abtippen.",
+    "- Knopf „Als CSV speichern“ über der Paketliste.\n- Exportiert nur die gerade gefilterten Pakete.\n- Spalten: Name, Status, Dauer.\n- Trennzeichen Semikolon, UTF-8 mit BOM, damit Umlaute in Excel stimmen.",
+    "- Ein Test exportiert 3 Pakete mit Umlauten und prüft die Datei Byte für Byte.\n- Die Datei öffnet sich in Excel ohne Importdialog.\n- Tests grün, Review durch die andere Modellfamilie ohne offene Funde.",
+    "Keine neue Abhängigkeit für CSV. Die Paketliste selbst nicht umbauen.",
+  ],
+};
