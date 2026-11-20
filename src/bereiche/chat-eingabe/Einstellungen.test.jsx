@@ -47,3 +47,19 @@ it.each(["Escape", "Tab"])("%s schließt und gibt den Fokus zurück", key => {
   menue(el).props.onKeyDownCapture({ key, preventDefault: vi.fn(), stopPropagation: vi.fn() });
   expect(menue(ansicht())).toBeUndefined(); expect(h.fokus).toHaveBeenCalled();
 });
+it("zeigt Prompt bauen mit drei Empfehlungen und setzt alle Gruppen zurück", () => {
+  const modus = "Prompt bauen";
+  knopf(ansicht(modus)).props.onClick();
+  const gruppen = [["Länge", "Mittel", "Kurz"], ["Auftrag für", "Orchestrator", "Codex"], ["Abnahme-Punkte ergänzen", "An", "Aus"]];
+  expect(menue(ansicht(modus)).props["aria-label"]).toBe("Einstellungen für Prompt bauen");
+  expect(text(finde(ansicht(modus), e => text(e) === "Gilt für neue Aufträge in diesem Modus."))).toContain("Gilt für neue Aufträge");
+  for (const [name, empfohlen, angepasst] of gruppen) {
+    const el = ansicht(modus), gruppe = finde(el, e => e.type === Umschalter && e.props.beschriftung === name);
+    expect(gruppe.props.wert).toBe(empfohlen);
+    expect(finde(el, e => e.props.className === "empf" && text(e) === `Empfohlen: ${empfohlen}`)).toBeDefined();
+    gruppe.props.onChange(angepasst);
+  }
+  expect(status(ansicht(modus))).toBe("Angepasst"); reset(ansicht(modus)).props.onClick();
+  for (const [name, empfohlen] of gruppen) expect(finde(ansicht(modus), e => e.type === Umschalter && e.props.beschriftung === name).props.wert).toBe(empfohlen);
+  expect(reset(ansicht(modus)).props.disabled).toBe(true);
+});

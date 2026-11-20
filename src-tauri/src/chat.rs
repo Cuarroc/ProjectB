@@ -26,7 +26,7 @@ pub async fn auftrag_senden(
                 Ok::<_, String>((feld("id")?, feld("anbieter")?, feld("pfad")?))
             })
             .transpose()?;
-        let (anbieter, wunsch) =
+        let (anbieter, mut wunsch) =
             kern::chat::startwunsch(&modell, &effort, &modus, sitzung, &pfad, text)?;
         let ordner = Path::new(&pfad);
         if !ordner.is_dir() {
@@ -34,6 +34,11 @@ pub async fn auftrag_senden(
         }
         let daten = app.path().app_data_dir().map_err(|e| e.to_string())?;
         fs::create_dir_all(&daten).map_err(|e| e.to_string())?;
+        if modus == "Prompt bauen" {
+            let datei = kern::einstellungen::datei_fuer(&daten, &pfad);
+            let werte = kern::einstellungen::laden(datei);
+            wunsch.rolle = Some(kern::chat::prompt_rolle(&werte.prompt_bauen));
+        }
         let kontingent = daten.join("kontingent.json");
         // shortcut: kein Anhalten des Chat-Laufs, kommt mit Funktion 3
         let mut sende_fehler = None;

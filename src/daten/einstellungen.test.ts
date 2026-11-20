@@ -20,3 +20,17 @@ it.each([
     expect((await einstellungenAendern("Projekt", delta)).werte[modus]).toEqual(anzeige);
   }
 });
+it.each([
+  [0, "laenge", ["kurz", "mittel", "ausfuehrlich"]],
+  [1, "auftragFuer", ["orchestrator", "codex", "claude"]],
+  [2, "abnahmePunkteErgaenzen", ["an", "aus"]],
+] as const)("übersetzt Prompt bauen.%s mit einzelnem Delta und Rückfall", async (i, feld, texte) => {
+  const zeilen = modusEinstellungen["Prompt bauen"];
+  for (const [n, wert] of zeilen[i].werte.entries()) {
+    const anzeige = zeilen.map(z => z.empfohlen as string); anzeige[i] = wert;
+    const delta = einstellungenAenderung("Prompt bauen", anzeige, i);
+    expect(delta).toEqual({ prompt_bauen: { [feld]: texte[n] } });
+    vi.mocked(invoke).mockResolvedValueOnce(delta);
+    expect((await einstellungenAendern("Projekt", delta)).werte["Prompt bauen"]).toEqual(anzeige);
+  }
+});

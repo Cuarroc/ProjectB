@@ -11,6 +11,11 @@ export const modusEinstellungen = {
     { name: "Dauer und Tokens schätzen", empfohlen: "An", werte: ["An", "Aus"] },
     { name: "Bei Unklarem nachfragen", empfohlen: "An", werte: ["An", "Aus"] },
   ],
+  "Prompt bauen": [
+    { name: "Länge", empfohlen: "Mittel", werte: ["Kurz", "Mittel", "Ausführlich"] },
+    { name: "Auftrag für", empfohlen: "Orchestrator", werte: ["Orchestrator", "Codex", "Claude"] },
+    { name: "Abnahme-Punkte ergänzen", empfohlen: "An", werte: ["An", "Aus"] },
+  ],
 } as const;
 
 export const orchestratorBeispiel = { tokens: 113000, laufzeitSekunden: 432,
