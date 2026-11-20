@@ -13,6 +13,11 @@ it("liest alle fünf Abschnitte und erhält Markdown-Listen", () => {
   expect(auftragAbschnitte(text)).toEqual(erwartet);
 });
 
+it.each([" (Zusatz)", ": Zusatz", " (Zusatz): Hinweis"])("liest alle fünf Abschnitte mit Zusatz %j", zusatz => {
+  const text = abschnitte.map((titel, i) => `## ${titel}${zusatz}\r\n${inhalte[i]}`).join("\r\n\r\n");
+  expect(auftragAbschnitte(text)).toEqual(erwartet);
+});
+
 it.each(["#", "##", "###"])("erlaubt %s, andere Schreibweise, Leerraum und CRLF", raute => {
   const text = abschnitte.map((titel, i) =>
     ` ${raute}\t${titel.toUpperCase().replace(",", "")}  \r\n\r\n ${inhalte[i]} \r\n`,
@@ -26,7 +31,8 @@ it("lässt fehlende und leere Abschnitte leer", () => {
   });
 });
 
-it.each(["", "Welches Format brauchst du?\n\n- CSV\n- JSON", "#### Ziel\nKein erlaubter Abschnitt."])(
+it.each(["", "Welches Format brauchst du?\n\n- CSV\n- JSON", "#### Ziel\nKein erlaubter Abschnitt.",
+  "## Zielsetzung\nKein erlaubter Abschnitt.", "## Ziel (offen\nKein erlaubter Abschnitt."])(
   "liefert ohne Abschnitt null: %j", text => expect(auftragAbschnitte(text)).toBeNull(),
 );
 

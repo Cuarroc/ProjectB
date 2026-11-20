@@ -12,8 +12,9 @@ const PROMPT_ROLLE: &str = "Mach aus den Stichworten einen ausführlichen Auftra
     Ändere keine Dateien. Fehlt etwas Wichtiges, stelle genau EINE Rückfrage, wenn möglich mit \
     2–4 kurzen Antwortvorschlägen als Liste. Beende die Antwort dann mit dieser Liste (- …), ohne Text danach. \
     Sonst antworte NUR mit diesen fünf Abschnitten, in dieser Reihenfolge und mit genau diesen Überschriften: \
-    ## Ziel (ein Satz), ## Hintergrund, ## Was genau (Liste), ## Fertig, wenn (Liste prüfbarer Punkte), \
-    ## Nicht tun. Jede Überschrift steht auf einer eigenen Zeile.";
+    \n## Ziel\n## Hintergrund\n## Was genau\n## Fertig, wenn\n## Nicht tun\n\
+    Jede Überschrift steht auf einer eigenen Zeile. Unter Ziel steht ein Satz. \
+    Unter Was genau und Fertig, wenn steht eine Liste, bei Fertig, wenn mit prüfbaren Punkten.";
 
 pub fn startwunsch(
     modell: &str,
@@ -151,6 +152,12 @@ mod tests {
                     "## Nicht tun",
                 ] {
                     assert!(rolle.contains(vorgabe), "{vorgabe}");
+                }
+                for titel in ["Ziel", "Hintergrund", "Was genau", "Fertig, wenn", "Nicht tun"] {
+                    let ueberschrift = format!("## {titel}");
+                    let (_, danach) = rolle.split_once(&ueberschrift).unwrap();
+                    assert!(danach.starts_with(['\n', ',', ' ']), "{ueberschrift}");
+                    assert!(!danach.trim_start().starts_with('('), "{ueberschrift}");
                 }
                 let format = "2–4 kurzen Antwortvorschlägen als Liste.";
                 assert!(super::INTERVIEW_ROLLE.contains(format));

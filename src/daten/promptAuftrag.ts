@@ -4,7 +4,7 @@ const felder = {
 } as const;
 
 export function auftragAbschnitte(text: string) {
-  const treffer = [...text.matchAll(/^[ \t]*#{1,3}[ \t]+(Ziel|Hintergrund|Was genau|Fertig,? wenn|Nicht tun)[ \t]*\r?$/gim)];
+  const treffer = [...text.matchAll(/^[ \t]*#{1,3}[ \t]+(Ziel|Hintergrund|Was genau|Fertig,? wenn|Nicht tun)(?:[ \t]*\([^\r\n)]*\))?(?:[ \t]*:[^\r\n]*)?[ \t]*\r?$/gim)];
   if (!treffer.length) return null;
   const auftrag = { ziel: "", hintergrund: "", wasGenau: "", fertigWenn: "", nichtTun: "" };
   const gesehen = new Set<string>();
