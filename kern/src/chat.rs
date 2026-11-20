@@ -8,6 +8,13 @@ const PLANEN_ROLLE: &str = "Erstelle nur einen Plan. Ändere keine Dateien. Höc
 const INTERVIEW_ROLLE: &str = "Stelle genau eine Frage pro Antwort, wenn möglich mit 2–4 kurzen \
     Antwortvorschlägen als Liste. Frage weiter, bis du sicher bist. Fasse dann den Auftrag zusammen \
     und bitte um Bestätigung. Ändere keine Dateien.";
+const PROMPT_ROLLE: &str = "Mach aus den Stichworten einen ausführlichen Auftrag für einen Coding-Agenten. \
+    Ändere keine Dateien. Fehlt etwas Wichtiges, stelle genau EINE Rückfrage, wenn möglich mit \
+    2–4 kurzen Antwortvorschlägen als Liste. Beende die Antwort dann mit dieser Liste (- …), ohne Text danach. \
+    Sonst antworte NUR mit diesen fünf Abschnitten, in dieser Reihenfolge und mit genau diesen Überschriften: \
+    \n## Ziel\n## Hintergrund\n## Was genau\n## Fertig, wenn\n## Nicht tun\n\
+    Jede Überschrift steht auf einer eigenen Zeile. Unter Ziel steht ein Satz. \
+    Unter Was genau und Fertig, wenn steht eine Liste, bei Fertig, wenn mit prüfbaren Punkten.";
 
 pub fn startwunsch(
     modell: &str,
@@ -24,6 +31,7 @@ pub fn startwunsch(
         "Ausführen" => None,
         "Planen" => Some(PLANEN_ROLLE.into()),
         "Interview" => Some(INTERVIEW_ROLLE.into()),
+        "Prompt bauen" => Some(PROMPT_ROLLE.into()),
         _ => return Err(format!("Unbekannter Modus: {modus}")),
     };
     let fortsetzen = sitzung
@@ -123,6 +131,40 @@ pub fn chat_text(e: &Ereignis, letzter_text: Option<&str>) -> Option<String> {
 mod tests {
     use super::chat_text;
     use crate::{verbrauch::Stand, Ereignis};
+
+    #[test]
+    fn prompt_bauen_ist_lesend_und_verlangt_abschnitte_oder_rueckfrage() {
+        for (modell, anbieter) in [("Opus 5.5", "claude"), ("gpt-6.1-sol", "codex")] {
+            for sitzung in [None, Some(("id", anbieter, "projekt"))] {
+                let (_, wunsch) =
+                    super::startwunsch(modell, "Hoch", "Prompt bauen", sitzung, "projekt", "CSV-Export".into())
+                        .unwrap();
+                assert!(wunsch.nur_lesen);
+                let rolle = wunsch.rolle.unwrap();
+                for vorgabe in [
+                    "Coding-Agenten",
+                    "Ändere keine Dateien.",
+                    "genau EINE Rückfrage",
+                    "## Ziel",
+                    "## Hintergrund",
+                    "## Was genau",
+                    "## Fertig, wenn",
+                    "## Nicht tun",
+                ] {
+                    assert!(rolle.contains(vorgabe), "{vorgabe}");
+                }
+                for titel in ["Ziel", "Hintergrund", "Was genau", "Fertig, wenn", "Nicht tun"] {
+                    let ueberschrift = format!("## {titel}");
+                    let (_, danach) = rolle.split_once(&ueberschrift).unwrap();
+                    assert!(danach.starts_with(['\n', ',', ' ']), "{ueberschrift}");
+                    assert!(!danach.trim_start().starts_with('('), "{ueberschrift}");
+                }
+                let format = "2–4 kurzen Antwortvorschlägen als Liste.";
+                assert!(super::INTERVIEW_ROLLE.contains(format));
+                assert!(rolle.contains(format));
+            }
+        }
+    }
 
     #[test]
     fn planen_fordert_risiko_und_aufwand_je_teilaufgabe() {
