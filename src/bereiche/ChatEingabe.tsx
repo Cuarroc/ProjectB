@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { anhangSpeichern, auftragSenden, chatNachrichtenHoeren, teamStarten } from "../daten/tauri";
 import { Anhaenge, AnhangAblage, useAnhaenge } from "./chat-eingabe/Anhaenge";
@@ -12,6 +12,8 @@ import "./chat-eingabe/ChatEingabe.css";
 import { Einstellungen } from "./chat-eingabe/Einstellungen";
 import { Befehle, kompaktSperrgrund } from "./chat-eingabe/Befehle";
 import { chatAnlegen, neuerChatGesperrt } from "../daten/chats";
+import PromptBauen from "./PromptBauen";
+import { promptBeispiel } from "../daten/beispiel";
 import { allesAnhalten } from "./anhalten";
 
 export const chatEingabeQuelle = new BeispielQuelle();
@@ -69,9 +71,9 @@ function orchestratorNachricht(quelle: BeispielQuelle, id: string, text: string,
   chat.verlauf.push({ id: crypto.randomUUID(), von: "Orchestrator", zeit: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), text, aktionen: [] });
   quelle.aktualisieren(daten);
 }
-export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false, aendern, schreiben, senden, befehl = () => {}, anzahl = 0, neuGesperrt = false, projektOffen = true, anhaenge }: {
+export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false, aendern, schreiben, senden, befehl = () => {}, anzahl = 0, neuGesperrt = false, projektOffen = true, anhaenge, promptBauen }: {
   chat: Chat; modelle: string[]; text: string; fehler: string;
-  laeuft?: boolean;
+  laeuft?: boolean; promptBauen?: ReactNode;
   anhaenge?: ReturnType<typeof useAnhaenge>;
   befehl?: (name: string) => void; anzahl?: number; neuGesperrt?: boolean; projektOffen?: boolean;
   aendern: (werte: Partial<Chat>) => void; schreiben: (text: string) => void; senden: (text: string) => void;
@@ -80,7 +82,7 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false
     {laeuft && <p className="ein-arbeitet" id="chat-arbeitet" role="status">Orchestrator arbeitet … Bitte warte vor dem nächsten Senden.</p>}
     <span className="ein-sr" id="modus-hilfe">{erklaerungen[modi.indexOf(chat.modus)]}</span>
     <Befehle key={chat.id} text={text} anzahl={anzahl} neuGesperrt={neuGesperrt} kompaktGrund={kompaktSperrgrund(chat, laeuft, projektOffen)} kontextProzent={chat.kontextProzent} ausfuehren={name => { befehl(name); schreiben(""); }}>{(feld, abfangen, befehlFehler) =>
-    <Eingabefeld feld={feld} id="chat-nachricht" text={text} onTextAendern={schreiben}
+    <Eingabefeld feld={{ ...feld, placeholder: chat.modus === "Prompt bauen" ? "Stichworte reichen, zum Beispiel: Paketliste, CSV, Status und Dauer …" : undefined }} id="chat-nachricht" text={text} onTextAendern={schreiben}
       onSenden={inhalt => { if (!abfangen(inhalt)) senden(inhalt); }} fehler={befehlFehler || fehler}
       onAnhaengen={() => anhaenge?.eingabe.current?.click()} hatAnhaenge={!!anhaenge?.dateien.length} sendet={laeuft} beschreibungId={laeuft ? "modus-hilfe chat-arbeitet" : "modus-hilfe"}
       kopf={<><div className="ein-moduszeile"><Modi wert={chat.modus} aendern={modus => aendern({ modus: modus as Chat["modus"] })} /><Einstellungen modus={chat.modus} /></div>{anhaenge && <Anhaenge {...anhaenge} gesperrt={laeuft} />}</>}
@@ -93,6 +95,7 @@ export function ChatEingabeAnsicht({ chat, modelle, text, fehler, laeuft = false
         </Auswahl>
         <Kontext chat={chat} aendern={aendern} />
       </>} />}</Befehle>
+    {promptBauen}
   </AnhangAblage>;
 }
 export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: BeispielQuelle }) {
@@ -102,6 +105,7 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
 export function useChatEingabe(quelle = chatEingabeQuelle) {
   const [daten, setDaten] = useState(() => quelle.lesen()), [text, schreiben] = useState(""), [fehler, setFehler] = useState("");
   const anhaenge = useAnhaenge(setFehler), [speichert, setSpeichert] = useState(false);
+  const [prompt, setPrompt] = useState<{ idee: string; abschnitte?: string[] } | null>(() => typeof window !== "undefined" && !isTauri() && new URLSearchParams(window.location.search).get("vorschau") === "prompt" ? promptBeispiel : null);
   const kompaktAntworten = useRef(new Map<string, string[]>());
   const laufende = useRef(new Set<string>()), empfang = useRef<Promise<() => void>>(Promise.resolve(() => {}));
   useEffect(() => { const lesen = () => setDaten(quelle.lesen()); const ab = quelle.abonnieren(lesen); lesen(); return ab; }, [quelle]);
@@ -123,7 +127,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (werte.kontextfenster && !Object.hasOwn(werte, "kontextProzent")) werte.kontextProzent = ziel.kontextProzent * ziel.kontextfenster / werte.kontextfenster;
     Object.assign(ziel, werte); quelle.aktualisieren(neu);
   };
-  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt, kompakt = false, mitAnhaengen = false) => {
+  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt, kompakt = false, mitAnhaengen = false, abgelegt?: () => void) => {
     if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
     if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
     if (freigabe) {
@@ -143,11 +147,13 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
         inhalt += `\n\nAnhänge:\n${pfade.join("\n")}`;
       }
       const vorher = quelle.lesen(), ziel = vorher.chats.find(c => c.id === chat.id);
+      if (ziel?.modus === "Prompt bauen" && !abgelegt) throw new Error("Bitte den Auftrag zuerst im Fenster Prompt bauen prüfen.");
       if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, inhalt);
       nachrichtAblegen(quelle, anzeige, kompakt, pfade); if (mitAnhaengen) { schreiben(aktuell => aktuell === anzeige ? "" : aktuell); anhaenge.leeren(); } setFehler("");
     }
     catch (e) { laufende.current.delete(chat.id); setFehler(`Nicht gesendet: ${e instanceof Error ? e.message : String(e)}`); return; }
     finally { setSpeichert(false); }
+    abgelegt?.();
     if (!isTauri()) { laufende.current.delete(chat.id); return; }
     if (kompakt) kompaktAntworten.current.set(chat.id, []);
     aendern({ gestartetUm: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) });
@@ -156,7 +162,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     const modus = ziel.modus, anfang = ziel.verlauf.length;
     try {
       await empfang.current;
-      const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus: ziel.modus, sitzung, text: gesendet });
+      const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus, sitzung, text: gesendet });
       if (kompakt) {
         const text = kompaktAntworten.current.get(chat.id)!.join("\n\n").trim();
         if (!antwort.erfolg || !text) throw new Error(text || "Keine Zusammenfassung empfangen.");
@@ -226,5 +232,8 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       if (name === "neu") chatAnlegen(quelle);
       else if (name === "anhalten") allesAnhalten.setzen(true);
       else if (name === "planen" || name === "interview") aendern({ modus: name === "planen" ? "Planen" : "Interview" }); },
-    text, fehler, anhaenge, laeuft: speichert || laufende.current.has(chat.id), aendern, schreiben, senden: (inhalt: string) => senden(inhalt, undefined, inhalt, false, true), onAktion };
+    promptBauen: prompt ? <PromptBauen {...prompt} fehler={fehler} onSchliessen={() => setPrompt(null)} onSenden={inhalt => senden(inhalt, undefined, inhalt, false, true, () => { aendern({ modus: "Ausführen" }); setPrompt(null); })} /> : null,
+    text, fehler, anhaenge, laeuft: speichert || laufende.current.has(chat.id), aendern, schreiben, senden: (inhalt: string) => {
+      if (chat.modus === "Prompt bauen") { if (!laufende.current.has(chat.id)) { setPrompt({ idee: inhalt }); schreiben(""); } return; }
+      return senden(inhalt, undefined, inhalt, false, true); }, onAktion };
 }

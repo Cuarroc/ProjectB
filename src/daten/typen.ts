@@ -44,7 +44,7 @@ export type Chat = {
   todos?: Todo[];
   sitzung?: { id: string; anbieter: Anbieter; pfad: string } | null;
   id: string; titel: string; verlauf: Nachricht[]; gestartetUm: string | null;
-  modus: "Ausführen" | "Planen" | "Interview";
+  modus: "Ausführen" | "Planen" | "Interview" | "Prompt bauen";
   modell: string; effort: Effort; kontextfenster: number; kontextProzent: number;
 };
 export type Kopf = {

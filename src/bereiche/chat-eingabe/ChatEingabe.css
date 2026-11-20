@@ -53,3 +53,4 @@
   .chat-eingabe .kontext-prozent { display: none; }
   .chat-eingabe .kn-haupt { padding-inline: var(--abstand-4); }
 }
+.chat-eingabe .einst-gruppe { margin-left: auto; }
