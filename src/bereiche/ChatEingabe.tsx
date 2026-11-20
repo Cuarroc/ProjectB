@@ -12,7 +12,8 @@ import "./chat-eingabe/ChatEingabe.css";
 import { Einstellungen } from "./chat-eingabe/Einstellungen";
 import { Befehle, kompaktSperrgrund } from "./chat-eingabe/Befehle";
 import { chatAnlegen, neuerChatGesperrt } from "../daten/chats";
-import PromptBauen from "./PromptBauen";
+import PromptBauen, { type PromptFrage } from "./PromptBauen";
+import { auftragAbschnitte } from "../daten/promptAuftrag";
 import { promptBeispiel } from "../daten/beispiel";
 import { allesAnhalten } from "./anhalten";
 
@@ -105,7 +106,7 @@ export default function ChatEingabe({ quelle = chatEingabeQuelle }: { quelle?: B
 export function useChatEingabe(quelle = chatEingabeQuelle) {
   const [daten, setDaten] = useState(() => quelle.lesen()), [text, schreiben] = useState(""), [fehler, setFehler] = useState("");
   const anhaenge = useAnhaenge(setFehler), [speichert, setSpeichert] = useState(false);
-  const [prompt, setPrompt] = useState<{ idee: string; abschnitte?: string[] } | null>(() => typeof window !== "undefined" && !isTauri() && new URLSearchParams(window.location.search).get("vorschau") === "prompt" ? promptBeispiel : null);
+  const [prompt, setPrompt] = useState<{ idee: string; abschnitte?: string[]; chatId?: string; anfang?: number; verlauf?: Chat["verlauf"] } | null>(() => typeof window !== "undefined" && !isTauri() && new URLSearchParams(window.location.search).get("vorschau") === "prompt" ? promptBeispiel : null);
   const kompaktAntworten = useRef(new Map<string, string[]>());
   const laufende = useRef(new Set<string>()), empfang = useRef<Promise<() => void>>(Promise.resolve(() => {}));
   useEffect(() => { const lesen = () => setDaten(quelle.lesen()); const ab = quelle.abonnieren(lesen); lesen(); return ab; }, [quelle]);
@@ -127,7 +128,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (werte.kontextfenster && !Object.hasOwn(werte, "kontextProzent")) werte.kontextProzent = ziel.kontextProzent * ziel.kontextfenster / werte.kontextfenster;
     Object.assign(ziel, werte); quelle.aktualisieren(neu);
   };
-  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt, kompakt = false, mitAnhaengen = false, abgelegt?: () => void) => {
+  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt, kompakt = false, mitAnhaengen = false, abgelegt?: () => void, promptModus = false) => {
     if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
     if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
     if (freigabe) {
@@ -147,7 +148,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
         inhalt += `\n\nAnhänge:\n${pfade.join("\n")}`;
       }
       const vorher = quelle.lesen(), ziel = vorher.chats.find(c => c.id === chat.id);
-      if (ziel?.modus === "Prompt bauen" && !abgelegt) throw new Error("Bitte den Auftrag zuerst im Fenster Prompt bauen prüfen.");
+      if (ziel?.modus === "Prompt bauen" && !abgelegt && !promptModus && !kompakt) throw new Error("Bitte den Auftrag zuerst im Fenster Prompt bauen prüfen.");
       if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, inhalt);
       nachrichtAblegen(quelle, anzeige, kompakt, pfade); if (mitAnhaengen) { schreiben(aktuell => aktuell === anzeige ? "" : aktuell); anhaenge.leeren(); } setFehler("");
     }
@@ -159,7 +160,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     aendern({ gestartetUm: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) });
     const aktuell = quelle.lesen(), ziel = aktuell.chats.find(c => c.id === chat.id)!;
     const pfad = aktuell.kopf.pfad, sitzung = ziel.sitzung ?? null;
-    const modus = ziel.modus, anfang = ziel.verlauf.length;
+    const modus = promptModus ? "Prompt bauen" : ziel.modus, anfang = ziel.verlauf.length;
     try {
       await empfang.current;
       const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus, sitzung, text: gesendet });
@@ -219,6 +220,14 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (kommentar !== undefined) return senden(kommentar);
     schreiben(text.startsWith("Kommentare zum Plan: ") ? text : `Kommentare zum Plan: ${text}`); document.getElementById("chat-nachricht")?.focus();
   };
+  const stand: { abschnitte?: string[]; abschnittId: string; rueckfragen: { text: string; antwort: string }[]; frage?: PromptFrage } = { abschnitte: prompt?.abschnitte, abschnittId: "", rueckfragen: [] };
+  for (const n of prompt?.chatId === chat.id ? chat.verlauf.slice(prompt.anfang) : prompt?.verlauf ?? []) {
+    if (n.von === "Orchestrator") {
+      const abschnitte = auftragAbschnitte(n.text);
+      if (abschnitte) { stand.abschnitte = Object.values(abschnitte); stand.abschnittId = n.id; stand.frage = undefined; }
+      else { const aktionen = interviewAktionen(n.text); stand.frage = { text: aktionen.length ? n.text.replace(/(?:\r?\n[ \t]*(?:[-*]|\d+\.)[ \t]+[^\r\n]+[ \t\r\n]*)+$/, "").trim() : n.text, aktionen }; }
+    } else if (n.von === "Du" && stand.frage) { stand.rueckfragen.push({ text: stand.frage.text, antwort: n.text }); stand.frage = undefined; }
+  }
   return { chat, projektOffen: !isTauri() || !!daten.kopf.geoeffnet, neuGesperrt: neuerChatGesperrt(daten), modelle: ["Opus 5.5", "Sonnet 5.5", "Haiku 5.5", "gpt-6.1-sol"],
     anzahl: daten.agenten.filter(a => a.zustand === "Arbeitet").length,
     befehl: (name: string) => {
@@ -232,8 +241,8 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       if (name === "neu") chatAnlegen(quelle);
       else if (name === "anhalten") allesAnhalten.setzen(true);
       else if (name === "planen" || name === "interview") aendern({ modus: name === "planen" ? "Planen" : "Interview" }); },
-    promptBauen: prompt ? <PromptBauen {...prompt} fehler={fehler} onSchliessen={() => setPrompt(null)} onSenden={inhalt => senden(inhalt, undefined, inhalt, false, true, () => { aendern({ modus: "Ausführen" }); setPrompt(null); })} /> : null,
+    promptBauen: prompt && (!prompt.chatId || prompt.chatId === chat.id) ? <PromptBauen {...prompt} {...stand} laeuft={speichert || laufende.current.has(chat.id)} onAntwort={inhalt => senden(inhalt, undefined, inhalt, false, false, undefined, true)} fehler={fehler} onSchliessen={() => setPrompt(null)} onSenden={inhalt => senden(inhalt, undefined, inhalt, false, true, () => { aendern({ modus: "Ausführen" }); setPrompt(null); })} /> : null,
     text, fehler, anhaenge, laeuft: speichert || laufende.current.has(chat.id), aendern, schreiben, senden: (inhalt: string) => {
-      if (chat.modus === "Prompt bauen") { if (!laufende.current.has(chat.id)) { setPrompt({ idee: inhalt }); schreiben(""); } return; }
+      if (chat.modus === "Prompt bauen") { if (!laufende.current.has(chat.id)) { setPrompt({ idee: inhalt, chatId: chat.id, anfang: chat.verlauf.length }); schreiben(""); return senden(inhalt, undefined, inhalt, false, false, undefined, true); } return; }
       return senden(inhalt, undefined, inhalt, false, true); }, onAktion };
 }

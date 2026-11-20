@@ -21,3 +21,10 @@
 .pb-fuss{flex:none;justify-content:space-between;padding:var(--abstand-6) var(--abstand-8);box-shadow:var(--schatten-kante)}
 
 .prompt-bauen #prompt-titel{position:static;width:auto;height:auto;overflow:visible;clip-path:none;font:var(--schrift-zahl-gross)}
+
+.pb-links{display:grid;align-content:start;gap:var(--abstand-6);min-width:0}
+.pb-rueckfragen{list-style:none;margin:0;padding:0}.pb-rueckfragen p{display:flex;align-items:start;gap:var(--abstand-2);margin:0 0 var(--abstand-2);color:var(--text-2)}
+.pb-rueckfragen svg{flex:none;color:var(--akzent)}.pb-antwort{display:inline-block;padding:var(--abstand-1) var(--abstand-2);border-radius:var(--rund-segment);background:var(--akzent-grund);overflow-wrap:anywhere}
+.pb-frage{background:radial-gradient(120% 140% at 0% 0%,var(--status-wartet-grund),transparent 62%),var(--flaeche-1);box-shadow:var(--b-leuchten-wartet)}
+.pb-frage .pb-zeile{color:var(--status-wartet)}.pb-frage p{overflow-wrap:anywhere}.pb-vorschlaege{display:flex;flex-wrap:wrap;gap:var(--abstand-2);margin-bottom:var(--abstand-3)}
+.pb-vorschlaege .knopf{max-width:100%;height:auto;min-height:var(--steuer-hoehe);white-space:normal}.pb-frage textarea{margin-bottom:var(--abstand-2)}

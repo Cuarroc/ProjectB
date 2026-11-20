@@ -13,7 +13,7 @@ test("Prompt bauen: Vorschau, Bearbeiten und Fenster ohne Überlauf", async ({ p
   test.skip(process.env.UI_BASELINE === "1", "Neues Fenster wird am Kandidaten geprüft.");
   await page.goto("/?vorschau=prompt"); await page.evaluate(() => document.fonts.ready);
   const dialog = page.getByRole("dialog", { name: "Prompt bauen", exact: true });
-  await expect(dialog).toBeVisible(); await expect(dialog.getByRole("textbox")).toHaveCount(6);
+  await expect(dialog).toBeVisible(); await expect(dialog.getByRole("textbox")).toHaveCount(7);
   await expect(dialog.getByRole("textbox", { name: "Ziel", exact: true })).toHaveValue(/CSV-Datei/);
   expect(await dialog.getByRole("heading", { name: "Prompt bauen", exact: true }).evaluate(e => e.getBoundingClientRect().width)).toBeGreaterThan(1);
   expect(await dialog.locator("textarea").evaluateAll(es => es.every(e => e.clientHeight >= e.scrollHeight))).toBe(true);
@@ -48,4 +48,19 @@ test("Vierter Modus lässt bestehende Einstellungen erreichbar", async ({ page }
   expect(await menue.evaluate(e => { const r = e.getBoundingClientRect(), s = e.closest(".chat-spalte").getBoundingClientRect(); return r.left >= s.left && r.right <= s.right; })).toBe(true);
   await menue.getByRole("radio", { name: "Bis zu 5", exact: true }).click();
   await expect(menue.getByRole("radio", { name: "Bis zu 5", exact: true })).toHaveAttribute("aria-checked", "true");
+});
+
+test("Prompt bauen: Rückfragen aus dem Soll und sichtbare Knopfleiste", async ({ page }, info) => {
+  test.skip(process.env.UI_BASELINE === "1", "Rückfragen werden am Kandidaten geprüft.");
+  await page.goto("/?vorschau=prompt"); await page.evaluate(() => document.fonts.ready);
+  const dialog = page.getByRole("dialog", { name: "Prompt bauen", exact: true }), fragen = dialog.getByRole("region", { name: "Rückfragen", exact: true });
+  await expect(fragen).toContainText("3 beantwortet");
+  for (const text of ["Für wen ist der Export?", "Für Kunden, die öffnen ihn in Excel.", "Welche Pakete?", "Nur die gerade gefilterten.", "Was soll mit Umlauten passieren?", "Müssen in Excel richtig aussehen."]) await expect(fragen).toContainText(text);
+  const offen = dialog.getByRole("region", { name: "Frage an dich", exact: true });
+  await expect(offen).toContainText("Wie soll die Datei heißen?");
+  for (const name of ["pakete-JJJJ-MM-TT.csv", "Beim Speichern wählen"]) await expect(offen.getByRole("button", { name, exact: true })).toBeEnabled();
+  await expect(offen.getByRole("textbox", { name: "Deine Antwort" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Als Auftrag senden", exact: true })).toBeInViewport();
+  expect(await dialog.evaluate(e => e.getBoundingClientRect().bottom <= innerHeight && [e, ...e.querySelectorAll("section,textarea,footer")].every(k => k.scrollWidth <= k.clientWidth))).toBe(true);
+  if (bilder && info.project.name !== "1280x800") await page.screenshot({ path: `${bilder}/P-9-2b_fenster_${info.project.name}.png` });
 });
