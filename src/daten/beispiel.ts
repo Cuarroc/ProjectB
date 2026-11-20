@@ -128,4 +128,10 @@ export const promptBeispiel = {
     "- Ein Test exportiert 3 Pakete mit Umlauten und prüft die Datei Byte für Byte.\n- Die Datei öffnet sich in Excel ohne Importdialog.\n- Tests grün, Review durch die andere Modellfamilie ohne offene Funde.",
     "Keine neue Abhängigkeit für CSV. Die Paketliste selbst nicht umbauen.",
   ],
+  verlauf: [
+    ["Orchestrator", "Für wen ist der Export?"], ["Du", "Für Kunden, die öffnen ihn in Excel."],
+    ["Orchestrator", "Welche Pakete?"], ["Du", "Nur die gerade gefilterten."],
+    ["Orchestrator", "Was soll mit Umlauten passieren?"], ["Du", "Müssen in Excel richtig aussehen."],
+    ["Orchestrator", "Wie soll die Datei heißen?\n\n- pakete-JJJJ-MM-TT.csv\n- Beim Speichern wählen"],
+  ].map(([von, text], i) => ({ id: `prompt-${i}`, von: von as "Du" | "Orchestrator", text, zeit: "14:36", aktionen: [] })),
 };
