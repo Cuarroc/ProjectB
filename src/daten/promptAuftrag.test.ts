@@ -15,7 +15,7 @@ it("liest alle fünf Abschnitte und erhält Markdown-Listen", () => {
 
 it.each([" (Zusatz)", ": Zusatz", " (Zusatz): Hinweis"])("liest alle fünf Abschnitte mit Zusatz %j", zusatz => {
   const text = abschnitte.map((titel, i) => `## ${titel}${zusatz}\r\n${inhalte[i]}`).join("\r\n\r\n");
-  expect(auftragAbschnitte(text)).toEqual(erwartet);
+  expect(auftragAbschnitte(text)).toEqual(Object.fromEntries(Object.entries(erwartet).map(([k, v]) => [k, zusatz.includes(":") ? `${zusatz.split(":")[1].trim()}\n${v}` : v])));
 });
 
 it.each(["#", "##", "###"])("erlaubt %s, andere Schreibweise, Leerraum und CRLF", raute => {
@@ -40,4 +40,8 @@ it.each(["Erstes Ziel.", ""])("behält bei doppelter Überschrift den ersten Inh
   expect(auftragAbschnitte(`## Ziel\n${ziel}\n## ZIEL\nZweites Ziel.\n## Nicht tun\nNichts löschen.`)).toEqual({
     ziel, hintergrund: "", wasGenau: "", fertigWenn: "", nichtTun: "Nichts löschen.",
   });
+});
+
+it("erhält den Inhalt hinter dem Doppelpunkt", () => {
+  expect(auftragAbschnitte("## Ziel: Text\nFortsetzung")?.ziel).toBe("Text\nFortsetzung");
 });
