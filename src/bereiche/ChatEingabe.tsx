@@ -127,7 +127,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     if (werte.kontextfenster && !Object.hasOwn(werte, "kontextProzent")) werte.kontextProzent = ziel.kontextProzent * ziel.kontextfenster / werte.kontextfenster;
     Object.assign(ziel, werte); quelle.aktualisieren(neu);
   };
-  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt, kompakt = false, mitAnhaengen = false) => {
+  const senden = async (inhalt: string, freigabe?: string, anzeige = inhalt, kompakt = false, mitAnhaengen = false, abgelegt?: () => void) => {
     if (laufende.current.has(chat.id)) { setFehler("Dieser Chat läuft bereits. Bitte warte auf die Antwort."); return; }
     if (isTauri() && !quelle.lesen().kopf.geoeffnet) { setFehler("Bitte zuerst oben ein Projekt öffnen."); return; }
     if (freigabe) {
@@ -147,11 +147,13 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
         inhalt += `\n\nAnhänge:\n${pfade.join("\n")}`;
       }
       const vorher = quelle.lesen(), ziel = vorher.chats.find(c => c.id === chat.id);
+      if (ziel?.modus === "Prompt bauen" && !abgelegt) throw new Error("Bitte den Auftrag zuerst im Fenster Prompt bauen prüfen.");
       if (ziel) gesendet = textMitVerlauf(ziel, vorher.kopf.pfad, inhalt);
       nachrichtAblegen(quelle, anzeige, kompakt, pfade); if (mitAnhaengen) { schreiben(aktuell => aktuell === anzeige ? "" : aktuell); anhaenge.leeren(); } setFehler("");
     }
     catch (e) { laufende.current.delete(chat.id); setFehler(`Nicht gesendet: ${e instanceof Error ? e.message : String(e)}`); return; }
     finally { setSpeichert(false); }
+    abgelegt?.();
     if (!isTauri()) { laufende.current.delete(chat.id); return; }
     if (kompakt) kompaktAntworten.current.set(chat.id, []);
     aendern({ gestartetUm: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) });
@@ -160,7 +162,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
     const modus = ziel.modus, anfang = ziel.verlauf.length;
     try {
       await empfang.current;
-      const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus: ziel.modus, sitzung, text: gesendet });
+      const antwort = await auftragSenden({ chat: ziel.id, pfad, modell: ziel.modell, effort: ziel.effort, modus, sitzung, text: gesendet });
       if (kompakt) {
         const text = kompaktAntworten.current.get(chat.id)!.join("\n\n").trim();
         if (!antwort.erfolg || !text) throw new Error(text || "Keine Zusammenfassung empfangen.");
@@ -230,7 +232,7 @@ export function useChatEingabe(quelle = chatEingabeQuelle) {
       if (name === "neu") chatAnlegen(quelle);
       else if (name === "anhalten") allesAnhalten.setzen(true);
       else if (name === "planen" || name === "interview") aendern({ modus: name === "planen" ? "Planen" : "Interview" }); },
-    promptBauen: prompt ? <PromptBauen {...prompt} onSchliessen={() => setPrompt(null)} onSenden={inhalt => { aendern({ modus: "Ausführen" }); setPrompt(null); return senden(inhalt, undefined, inhalt, false, true); }} /> : null,
+    promptBauen: prompt ? <PromptBauen {...prompt} fehler={fehler} onSchliessen={() => setPrompt(null)} onSenden={inhalt => senden(inhalt, undefined, inhalt, false, true, () => { aendern({ modus: "Ausführen" }); setPrompt(null); })} /> : null,
     text, fehler, anhaenge, laeuft: speichert || laufende.current.has(chat.id), aendern, schreiben, senden: (inhalt: string) => {
       if (chat.modus === "Prompt bauen") { if (!laufende.current.has(chat.id)) { setPrompt({ idee: inhalt }); schreiben(""); } return; }
       return senden(inhalt, undefined, inhalt, false, true); }, onAktion };

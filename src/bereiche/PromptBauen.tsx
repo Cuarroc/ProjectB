@@ -5,8 +5,8 @@ import "./PromptBauen.css";
 
 const titel = ["Ziel", "Hintergrund", "Was genau", "Fertig, wenn", "Nicht tun"];
 export const auftragText = (abschnitte: string[]) => abschnitte.flatMap((text, i) => text.trim() ? [`## ${titel[i]}\n${text.trim()}`] : []).join("\n\n");
-export default function PromptBauen({ idee, abschnitte, onSchliessen, onSenden }: {
-  idee: string; abschnitte?: string[]; onSchliessen: () => void; onSenden: (text: string) => void;
+export default function PromptBauen({ idee, abschnitte, fehler, onSchliessen, onSenden }: {
+  idee: string; abschnitte?: string[]; fehler?: string; onSchliessen: () => void; onSenden: (text: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null), [ideeText, setIdee] = useState(idee);
   const [texte, setTexte] = useState(() => abschnitte ?? [idee, "", "", "", ""]);
@@ -24,7 +24,7 @@ export default function PromptBauen({ idee, abschnitte, onSchliessen, onSenden }
       <div><h2 id="prompt-titel">Prompt bauen</h2><p id="prompt-hilfe">Aus deiner groben Idee wird ein ausführlicher Auftrag. Du prüfst und änderst ihn, bevor er an den Orchestrator geht.</p></div>
       <Knopf text="Prompt bauen schließen" symbol={X} nurSymbol variante="leise" onClick={onSchliessen} /></header>
     <div className="pb-inhalt"><section className="pb-idee"><div className="pb-zeile"><h3>Deine Idee</h3><span className="pb-marke">Stichworte</span></div>
-      <textarea aria-label="Deine Idee" rows={3} value={ideeText} onChange={e => setIdee(e.target.value)} /></section>
+      <textarea aria-label="Deine Idee" rows={3} value={ideeText} onChange={e => setIdee(e.target.value)} />{fehler && <p className="ein-meldung" role="alert">{fehler}</p>}</section>
       <section className="pb-auftrag"><div className="pb-zeile"><h3>Fertiger Auftrag</h3><span className="pb-marke">5 Abschnitte</span><span className="pb-marke">Direkt bearbeitbar</span></div>
         {titel.map((name, i) => <label className="pb-karte" key={name}><span className="pb-kartentitel"><span className="pb-nummer">{i + 1}</span>{name}</span>
           <textarea aria-label={name} rows={1} placeholder="Noch leer" value={texte[i]} onChange={e => setTexte(v => v.map((text, j) => j === i ? e.target.value : text))} /></label>)}
