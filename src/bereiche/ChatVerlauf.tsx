@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Check, ChevronRight, Circle, Copy, MessageCircleQuestion, Users } from "lucide-react";
 import { BeispielQuelle } from "../daten/quelle";
+import { beispielFassungen } from "../daten/beispiel";
 import { chatAnlegen, neuerChatGesperrt } from "../daten/chats";
 import { Knopf } from "../bausteine/Knopf";
 import { Fortschrittsring } from "../bausteine/Fortschrittsring";
@@ -35,7 +36,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
   const [interviews, setInterviews] = useState<Record<string, InterviewZustand>>({});
   const [antworten, setAntworten] = useState<Record<string, string>>({});
   const [meldung, setMeldung] = useState("");
-  const [planOffen, setPlanOffen] = useState<{ plan: Plan; echt: boolean } | null>(null);
+  const [planOffen, setPlanOffen] = useState<{ plan: Plan; echt: boolean; neuesteId?: string } | null>(null);
   const [planFreigabe, setPlanFreigabe] = useState("");
   const [planMarken, setPlanMarken] = useState<Record<string, PlanMarken>>({});
   useEffect(() => {
@@ -50,6 +51,9 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
     return abmelden;
   }, [quelle]);
   const chat = daten.chats.find(c => c.id === daten.aktiverChatId);
+  const vorschau = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vorschau") === "plan";
+  const fassungen = vorschau ? beispielFassungen : chat?.verlauf.flatMap(n => n.plan ? [n.plan] : []) ?? [];
+  const neuesterPlan = fassungen.at(-1) ?? planOffen?.plan;
   const [, zeitAktualisieren] = useState(0);
   useEffect(() => {
     if (!chat?.gestartetUm) return;
@@ -116,7 +120,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
                 </details>
                 {risiko.map(s => <p className="r-plan-risiko" key={s.id}>Risiko: {s.beschreibung}</p>)}
                 {planFreigabe && <p role="status">{planFreigabe}</p>}
-                <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen({ plan, echt: false }); onPlanOeffnen?.(plan.id); }} />
+                <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen({ plan: vorschau ? fassungen.at(-1)! : plan, echt: false, neuesteId: neuesterPlan?.id }); onPlanOeffnen?.(plan.id); }} />
               </section>}
               {frage && <section className="r-innen r-frage" aria-label={n.text} aria-live="assertive">
                 <div className="r-frage-kopf"><MessageCircleQuestion size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" /><strong>{n.text}</strong></div>
@@ -125,7 +129,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
                   onClick={() => { setAntworten(v => ({ ...v, [frage.id]: a.id })); onAntwort?.(frage.id, a.id); }} />)}</div>
               </section>}
               {(n.aktionen.length > 0 || n.plan) && <div className="r-aktionen">{n.aktionen.map(a => <Knopf key={a.id} text={a.text} aria-label={a.antwort === undefined ? undefined : markdownKlartext(a.antwort)} variante={a.id === "plan-freigeben" ? "haupt" : a.id.startsWith("antwort-") ? "antwort" : "zweit"} disabled={!onAktion || !!chat.gestartetUm || (a.id === "plan-freigeben" && teamLaeuft)} grund={a.id === "plan-freigeben" && teamLaeuft ? "Das letzte Team läuft noch oder ist nicht gesichert." : undefined} onClick={() => onAktion?.(n.id, a.id)} />)}
-                {n.plan && <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen({ plan: n.plan!, echt: true }); onPlanOeffnen?.(n.plan!.id); }} />}
+                {n.plan && <Knopf text="Plan öffnen" symbol={ChevronRight} onClick={() => { setPlanOffen({ plan: n.plan!, echt: true, neuesteId: neuesterPlan?.id }); onPlanOeffnen?.(n.plan!.id); }} />}
               </div>}
             </article>
           </li>;
@@ -133,7 +137,7 @@ export default function ChatVerlauf({ quelle = standardQuelle, onPlanOeffnen, on
       </ol>
     </div>
     <div className="chat-meldung" role="status">{meldung}</div>
-    {planOffen && <Planfenster daten={daten} laeuft={!!chat?.gestartetUm || teamLaeuft} plan={planOffen.echt ? planOffen.plan : undefined} freigabeGesperrt={teamLaeuft} entscheidbar={!planOffen.echt || (!!onAktion && !chat?.gestartetUm && !!chat?.verlauf.find(n => n.id === planOffen.plan.id)?.aktionen.length)} gespeicherteMarken={planMarken[planOffen.plan.id] ?? {}} onSchliessen={() => setPlanOffen(null)} onEntscheiden={(plan, marken, stil) => {
+    {planOffen && <Planfenster key={neuesterPlan?.id ?? planOffen.plan.id} daten={daten} fassungen={planOffen.echt || vorschau ? fassungen : undefined} fassungIndex={Math.max(0, planOffen.neuesteId === neuesterPlan?.id ? fassungen.findIndex(p => p.id === planOffen.plan.id) : fassungen.length - 1)} laeuft={!!chat?.gestartetUm || teamLaeuft} plan={planOffen.echt ? planOffen.plan : undefined} freigabeGesperrt={teamLaeuft} entscheidbar={!planOffen.echt || (!!onAktion && !chat?.gestartetUm && !!chat?.verlauf.find(n => n.plan?.id === neuesterPlan?.id)?.aktionen.length)} gespeicherteMarken={planMarken[neuesterPlan?.id ?? planOffen.plan.id] ?? {}} onSchliessen={() => setPlanOffen(null)} onEntscheiden={(plan, marken, stil) => {
       if (planOffen.echt) { onAktion?.(plan.id, plan.freigabe === "Freigegeben" ? "plan-freigeben" : "plan-kommentieren", planKommentare(plan, stil, marken)); return; }
       if (quelle instanceof BeispielQuelle) quelle.aktualisieren({ ...quelle.lesen(), plan });
       else setDaten(d => ({ ...d, plan }));
